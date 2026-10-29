@@ -369,6 +369,8 @@ class Collector:
     def run(self):
         signal.signal(signal.SIGTERM, lambda *_: setattr(self, "running", False))
         log.info("Ev Enerji toplayıcı başladı")
+        self.refresh_devices()          # önce kayıtlı cihazlar: keşif bunları "yeni" saymasın
+        self.t_meta = time.time()
         self.discover()
         self.t_disc = time.time()
         while self.running:

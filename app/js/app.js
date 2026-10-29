@@ -1,7 +1,7 @@
 import { store } from './data.js';
 import { build } from './model.js';
 import { disposeAll } from './charts.js';
-import { closeSheet, hydrateIcons, icon, sheetOpen } from './ui.js';
+import { closeSheet, hydrateIcons, icon, sheetOpen, toast } from './ui.js';
 import { renderPano, updatePano } from './views/pano.js';
 import { renderTogg, updateTogg } from './views/togg.js';
 import { renderEv } from './views/ev.js';
@@ -20,6 +20,18 @@ const VIEWS = {
 };
 
 const viewEl = document.getElementById('view');
+
+// Tek dokunuşla kontrol anahtarı: bildirimdeki ".../#anahtar=XXXX" bağlantısı.
+// "#" sonrası sunucuya gitmez; anahtar telefona kaydedilip adresten hemen silinir.
+let keySaved = false;
+{
+  const m = location.hash.match(/^#anahtar=([\w-]{16,})$/);
+  if (m) {
+    store.setKey(m[1]);
+    keySaved = true;
+    history.replaceState(null, '', location.pathname + '#cihazlar');
+  }
+}
 let current = (location.hash.slice(1) in VIEWS) ? location.hash.slice(1) : 'pano';
 let M = null;
 let lastLiveRender = 0;
@@ -118,6 +130,7 @@ store.subscribe((kind) => {
 applyTheme();
 viewEl.innerHTML = `<div class="empty" style="padding-top:80px">${icon('bolt')}<br>Veriler yükleniyor…</div>`;
 store.init();
+if (keySaved) setTimeout(() => toast('Kontrol anahtarı kaydedildi ✓ Prizleri artık buradan açıp kapatabilirsin', 4500), 1200);
 
 // Gün dönümü ve saatlik grafikler için 5 dk'da bir tam yenile (sayfa açıksa)
 setInterval(() => { if (!sheetOpen()) refresh(); }, 5 * 60 * 1000);

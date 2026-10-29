@@ -14,7 +14,7 @@ function sessItem(M, s) {
     <div class="sess-date"><b>${d.getDate()}</b><span>${AY_K[d.getMonth()]}</span></div>
     <div class="sess-main">
       <div class="t">${live ? 'Şarj sürüyor' : `${GUN_K[d.getDay()]} ${hm(s.start)}${s.end ? ' – ' + hm(s.end) : ''}`}</div>
-      <div class="s">${live ? `${hm(s.start)}'den beri` : dur(s.minutes ?? ((s.end - s.start) / 60))}${s.per100 ? ` · ${num(s.per100, 1)} kWh/100 km` : ''}${s.odo ? ` · ${num(s.odo)} km` : ''}</div>
+      <div class="s">${live ? `Başlangıç ${hm(s.start)}` : dur(s.minutes ?? ((s.end - s.start) / 60))}${s.per100 ? ` · ${num(s.per100, 1)} kWh/100 km` : ''}${s.odo ? ` · ${num(s.odo)} km` : ''}</div>
     </div>
     <div class="sess-amt"><b>${num(s.kwh, 1)} kWh</b>${tl(cost)}</div>
   </button>`;
@@ -64,7 +64,7 @@ function openSession(M, s, app) {
 }
 
 export function renderTogg(el, M, app) {
-  if (!M.evs.length) {
+  if (!M.evs.length && !M.histTotal) {
     el.innerHTML = `<div class="card"><div class="empty">${icon('car')}<br>Araç şarj prizi tanımlı değil.<br>Cihazlar sekmesinden prizin türünü <b>Araç şarjı</b> yap.</div></div>`;
     return;
   }
@@ -81,7 +81,7 @@ export function renderTogg(el, M, app) {
         <div><div class="muted" style="font-size:12px;font-weight:800;letter-spacing:.06em;text-transform:uppercase">${M.y} şarjı</div>
           <div style="font-size:34px;font-weight:800;letter-spacing:-.03em" class="num">${num(M.evYtd)} <small class="muted" style="font-size:15px">kWh</small></div>
           <div class="muted" style="font-weight:700">${tl(M.evTl, 0)}${n ? ` · ${n} şarj · ort. ${kwh(avg, 1)}` : ''}</div>${histNote}</div>
-        <div class="batt">${icon('car')}</div>
+        <div class="car-wrap"><img class="car-img" src="img/t10x.webp" alt="Togg T10X" width="160"></div>
       </div>
       <div class="share-bar" style="position:relative;z-index:1" aria-label="Togg payı ${pct(M.evShare * 100)}">
         <i style="width:${M.evShare * 100}%;background:var(--ev)"></i><i style="flex:1;background:var(--home)"></i></div>

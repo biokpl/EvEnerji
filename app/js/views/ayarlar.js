@@ -31,6 +31,8 @@ export function renderAyarlar(el, M, app) {
       <div class="field"><div><label for="ky">Aylık kademe (kWh)</label><small>Aylık kademe uygulanıyorsa sınır; yoksa boş bırak.</small></div><input class="input num" id="ky" inputmode="numeric" value="${T.kademe_kwh_ay || ''}" placeholder="yok"></div>
       <div class="field"><div><label for="k2">Kademe üstü fiyat</label></div><input class="input num" id="k2" inputmode="decimal" value="${f(T.kademe2_tl || '')}" placeholder="–"></div>
       ${yr === M.y ? `<div class="field"><div><label for="py">${M.y - 1} toplam tüketimi (kWh)</label><small>Bu yılın limitini aştıysa bütün yıl son kaynak fiyatı uygulanır. e-Devlet / fatura.</small></div><input class="input num" id="py" inputmode="numeric" value="${T.onceki_yil_kwh ?? ''}" placeholder="kWh"></div>` : ''}
+      ${yr === M.y ? `<div class="field"><div><label for="bs">Abonelik başlangıcı</label><small>Bu yıl taşındıysan ilk okuma tarihi (yıllık hız bundan hesaplanır).</small></div><input class="input" type="date" id="bs" value="${esc(T.baslangic || '')}"></div>
+      <div class="field"><div><label for="so">Son fatura okuması</label><small>Ev şalteri bağlanana kadar ölçüm bu tarihte biter, sonrası tahmin edilir.</small></div><input class="input" type="date" id="so" value="${esc(T.son_okuma || '')}"></div>` : ''}
       <button class="btn primary" id="saveT" style="margin-top:12px">${icon('check')}Tarifeyi kaydet</button>
     </div>
 
@@ -84,6 +86,8 @@ export function renderAyarlar(el, M, app) {
   $('#saveT').onclick = () => {
     const v = { limit_kwh: n($('#lim').value), normal_tl: n($('#nt').value), sktt_tl: n($('#st').value), kademe_kwh_ay: n($('#ky').value), kademe2_tl: n($('#k2').value) };
     if ($('#py')) v.onceki_yil_kwh = n($('#py').value);
+    if ($('#bs')?.value) v.baslangic = $('#bs').value;
+    if ($('#so')?.value) v.son_okuma = $('#so').value;
     Object.keys(v).forEach((k) => v[k] == null && delete v[k]);
     save(`settings/tariff/${yr}`, v, 'Tarife kaydedildi');
   };

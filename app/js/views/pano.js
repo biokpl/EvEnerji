@@ -1,6 +1,6 @@
 // Ana pano: yıllık limit halkası, canlı güç, şarj durumu, uyarılar, 30 gün, gelecek yıl senaryosu
 import { colors, mount, stackedBars } from '../charts.js';
-import { AYLAR, alertBox, dur, esc, icon, kwh, num, pct, tl, watt } from '../ui.js';
+import { AYLAR, alertBox, ayDa, ayDan, dur, esc, icon, kwh, num, pct, tl, watt } from '../ui.js';
 
 const R = 96, C = 2 * Math.PI * R, ARC = 0.75 * C;
 
@@ -38,7 +38,8 @@ function ring(M) {
 
 function heroText(M) {
   const L = M.t.limit_kwh;
-  const parts = [`Bu gidişle yıl sonu <b>≈ ${kwh(M.proj, 0)}</b>.`];
+  const parts = [`Günde ≈ ${kwh(M.rate, 1)} hızla yıl sonu <b>≈ ${kwh(M.proj, 0)}</b>.`];
+  if (M.ytdEst) parts.push(`(Son okuma ${M.covEnd.toLocaleDateString('tr-TR')}; sonrası tahmin.)`);
   if (M.exceedDate === 'gecti') parts.push('Yıllık limit <b>aşıldı</b>.');
   else if (M.exceedDate) parts.push(`Limit <b>${M.exceedDate.getDate()} ${AYLAR[M.exceedDate.getMonth()]}</b> civarı aşılabilir.`);
   const sb = M.projDurum.skttBas;
@@ -53,8 +54,8 @@ function kpis(M) {
   <div class="kpis">
     <div class="kpi" data-go="ev">
       <div class="k-label">${icon('home')}Ev şu an</div>
-      <div class="k-val" data-live="homeW">${M.homeW == null ? '–' : watt(M.homeW)}</div>
-      <div class="k-sub">Bugün <span data-live="todayHome">${kwh(M.todayHome)}</span></div>
+      <div class="k-val" data-live="homeW">${M.home ? (M.homeW == null ? '–' : watt(M.homeW)) : '–'}</div>
+      <div class="k-sub">${M.home ? `Bugün <span data-live="todayHome">${kwh(M.todayHome)}</span>` : 'Şalter bağlanınca canlı'}</div>
     </div>
     <div class="kpi ${charging ? 'charging' : ''}" data-go="togg" data-live-cls="evKpi">
       <div class="k-label">${charging ? '<span class="pulse"></span>' : icon('car')}Togg</div>
@@ -62,14 +63,14 @@ function kpis(M) {
       <div class="k-sub">Bugün <span data-live="todayEv">${kwh(M.todayEv)}</span></div>
     </div>
     <div class="kpi" data-go="ev">
-      <div class="k-label">${icon('coin')}${AYLAR[M.mi]} faturası</div>
+      <div class="k-label">${icon('coin')}${AYLAR[M.mi]} (tahmini)</div>
       <div class="k-val">${num(M.monthTl)}<small>TL</small></div>
-      <div class="k-sub">${kwh(M.monthKwh, 0)} · ${num(M.priceNow, 2)} TL/kWh</div>
+      <div class="k-sub">≈ ${kwh(M.monthKwh, 0)} · son kWh ${num(M.priceNow, 2)} TL</div>
     </div>
     <div class="kpi" data-go="togg">
       <div class="k-label">${icon('bolt')}Togg ${M.y}</div>
       <div class="k-val">${num(M.evTl)}<small>TL</small></div>
-      <div class="k-sub">${kwh(M.evYtd, 0)} · evin ${pct(M.evShare * 100)}'i</div>
+      <div class="k-sub">${kwh(M.evYtd, 0)} · ort. ${num(M.evAvgTl, 2)} TL/kWh</div>
     </div>
   </div>`;
 }
@@ -82,7 +83,7 @@ export function chargeCard(M) {
   return `
   <div class="card no-anim">
     <div class="charge">
-      <div class="batt">${icon('battery')}</div>
+      <div class="car-wrap"><img class="car-img" src="img/t10x.webp" alt="Togg T10X" width="120"><span class="plug-dot"></span></div>
       <div>
         <div class="t"><span class="pulse" style="display:inline-block;margin-right:6px"></span>Şarj ediliyor · ${esc(s.dev.name)}</div>
         <div class="v">${kwh(s.kwh, 2)} · ${tl(s.kwh * M.priceNow)}</div>
@@ -98,7 +99,7 @@ function insights(M) {
   const out = [];
   if (M.level === 'bad' && M.ytd <= L) {
     out.push(alertBox('danger', 'alert', 'Yıl sonu tahmini limiti aşıyor',
-      `Tahmin ${kwh(M.proj, 0)}, limit ${kwh(L, 0)}. Kalan ${num(Math.max(0, L - M.ytd))} kWh'yi yıl sonuna yaymak için günde en çok <b>${kwh(M.butce, 1)}</b> harcamalısın (son 30 gün ort. ${kwh(M.son30 / 30 || 0, 1)}).`));
+      `Tahmin ${kwh(M.proj, 0)}, limit ${kwh(L, 0)}. Kalan ${num(Math.max(0, L - M.ytd))} kWh'yi yıl sonuna yaymak için günde en çok <b>${kwh(M.butce, 1)}</b> harcamalısın (şu anki hız ${kwh(M.rate, 1)}/gün).`));
   } else if (M.level === 'mid') {
     out.push(alertBox('warn', 'alert', 'Limite yakınsın', `Tahmin ${kwh(M.proj, 0)} (limitin ${pct((M.proj / L) * 100)}'i). Günlük bütçe ${kwh(M.butce, 1)}.`));
   } else if (M.level === 'good') {
@@ -108,29 +109,48 @@ function insights(M) {
     out.push(alertBox('info', 'car', 'Aşımın sebebi Togg şarjı',
       `Togg olmasa yıl sonu ≈ ${kwh(M.noEvProj, 0)} olurdu. Şarjın bir kısmını işyeri/halka açık istasyonlara kaydırmak limiti korur.`));
   }
-  const s3500 = M.scenarios.find((s) => s.L === 3500);
-  if (s3500?.sktt) {
-    out.push(alertBox('warn', 'trend', `${M.y + 1} için dikkat`,
-      `Limit 3.500'e inerse bu yılki tüketimin (≈ ${kwh(M.proj, 0)}) yüzünden 1 Ocak ${M.y + 1}'den itibaren son kaynak fiyatı uygulanır.`));
+  if (M.kademeAylari.length && M.evYtd > 0) {
+    const i = M.kademeAylari.at(-1);
+    const h = M.homeMonths[i], e = M.evMonths[i], k = M.t.kademe_kwh_ay;
+    out.push(alertBox('warn', 'car', 'Togg evi pahalı kademeye taşıyor',
+      `${ayDa(i)} Togg olmadan ev ≈ ${kwh(h - e, 0)} ile ucuz kademede (${num(k)} kWh'ye kadar ${num(M.t.normal_tl, 2)} TL) kalırdı. Togg'la ${kwh(h, 0)} oldu; ${kwh(h - k, 0)} ${num(M.t.kademe2_tl, 2)} TL'den faturalandı. Bu yüzden Togg'un kWh'si sana ortalama <b>${num(M.evAvgTl, 2)} TL</b>'ye geliyor.`));
+  }
+  // Gelecek yıl: tam yıl tüketim bu hızla limiti aşıyor mu?
+  const sel = M.scenarios.find((s) => s.selected) || M.scenarios.find((s) => s.L === 4000);
+  if (sel?.fromJan) {
+    out.push(alertBox('danger', 'trend', `${M.y + 1} son kaynak tarifesiyle başlar`,
+      `${M.y + 1} limiti ${num(sel.L)} kWh olursa bu yılki ≈ ${kwh(M.proj, 0)} tüketim yüzünden 1 Ocak'tan itibaren son kaynak fiyatı uygulanır.`));
+  } else if (sel?.exceedNext) {
+    out.push(alertBox('warn', 'trend', `${M.y + 1}'de limit aşılır`,
+      `${M.y} güvende, ama bu hızla (günde ≈ ${kwh(M.rate, 1)}) ${M.y + 1}'de yıllık ≈ <b>${kwh(M.nextYear, 0)}</b> tüketirsin. ${num(sel.L)} kWh limiti <b>${ayDa(sel.exceedNext - 1)}</b> aşılır${sel.fromMonth ? `, son kaynak fiyatı <b>${ayDan(sel.fromMonth - 1)}</b> başlar` : ''} ve ${M.y + 2} yılının tamamı son kaynak tarifesinden faturalanır.`));
   }
   return out.join('');
 }
 
 function scenarios(M) {
-  const max = Math.max(M.proj, 4000) * 1.05;
-  const rows = M.scenarios.map((s) => `
+  const max = Math.max(M.nextYear, M.proj, 4000) * 1.05;
+  const status = (s) => {
+    if (s.fromJan) return { c: 'var(--bad)', t: 'Ocak\'tan SKTT', sub: `+${num(s.extra)} TL` };
+    if (s.fromMonth) return { c: 'var(--bad)', t: `${ayDan(s.fromMonth - 1)} SKTT`, sub: `+${num(s.extra)} TL · ${M.y + 2} tamamı` };
+    if (s.exceedNext) return { c: 'var(--mid)', t: `${ayDa(s.exceedNext - 1)} aşılır`, sub: `${M.y + 2} SKTT` };
+    return { c: 'var(--good)', t: 'Normal', sub: 'tarife' };
+  };
+  const rows = M.scenarios.map((s) => {
+    const st = status(s);
+    return `
     <div class="scen-row">
       <div class="L">${num(s.L)}<small>kWh limit${s.selected ? ' · seçili' : ''}</small></div>
-      <div class="bar"><i style="width:${(Math.min(M.proj, max) / max) * 100}%;background:${s.sktt ? 'var(--bad)' : 'var(--good)'}"></i>
+      <div class="bar"><i style="width:${(Math.min(M.nextYear, max) / max) * 100}%;background:${st.c}"></i>
         <i style="left:${(s.L / max) * 100}%;width:2px;background:var(--text);border-radius:0"></i></div>
-      <div class="r" style="color:${s.sktt ? 'var(--bad)' : 'var(--good)'}">${s.sktt ? `+${num(s.extra)} TL` : 'Normal'}<small>${s.sktt ? 'yıllık fark' : 'tarife'}</small></div>
-    </div>`).join('');
+      <div class="r" style="color:${st.c}">${st.t}<small>${st.sub}</small></div>
+    </div>`;
+  }).join('');
   return `
   <div class="card">
-    <h2>${M.y + 1} limiti senaryosu</h2>
-    <p class="hint">Yeni limit önceki yılın tüketimine uygulanır. Bu yılı ≈ ${kwh(M.proj, 0)} ile kapatırsan (çizgi = limit):</p>
+    <h2>${M.y + 1} senaryosu</h2>
+    <p class="hint">Bu hızla ${M.y + 1}'de yıllık ≈ <b>${kwh(M.nextYear, 0)}</b> (çubuk) tüketirsin; dikey çizgi limit. ${M.y} toplamı ≈ ${kwh(M.proj, 0)}.</p>
     <div class="scen">${rows}</div>
-    <p class="chart-note">Fark, gelecek yıl da benzer tüketim varsayımıyla ${num(M.tNext.normal_tl, 2)} → ${num(M.tNext.sktt_tl, 2)} TL/kWh üzerinden hesaplandı. Fiyatları Ayarlar'dan güncelle.</p>
+    <p class="chart-note">Limit aşılırsa aşılan ayı izleyen 3. aydan itibaren son kaynak fiyatı (tahmini ${num(M.tNext.sktt_tl, 2)} TL/kWh) uygulanır ve ertesi yıl tamamen son kaynaktan faturalanır. Mevsim etkisi hesaba katılmadı.</p>
   </div>`;
 }
 
@@ -145,17 +165,17 @@ export function renderPano(el, M, app) {
       <div class="trio">
         <div><b>${num(Math.max(0, M.t.limit_kwh - M.ytd))}</b><span>kalan kWh</span></div>
         <div><b>${num(M.butce, 1)}</b><span>günlük bütçe</span></div>
-        <div><b data-live="todayHome2">${num(M.todayHome, 1)}</b><span>bugün kWh</span></div>
+        ${M.home ? `<div><b data-live="todayHome2">${num(M.todayHome, 1)}</b><span>bugün kWh</span></div>` : `<div><b>${num(M.rate, 1)}</b><span>kWh/gün hız</span></div>`}
       </div>
     </div>
     ${kpis(M)}
     <div data-slot="charge">${chargeCard(M)}</div>
     <div class="card"><h2>Durum</h2><p class="hint">Yıllık ${num(M.t.limit_kwh)} kWh son kaynak limitine göre.</p><div class="alerts">${insights(M)}</div></div>
-    <div class="card">
+    ${M.home ? '' : '<!--'}<div class="card">
       <div class="card-head"><h2>Son 30 gün</h2><span class="muted" style="font-size:12px;font-weight:700">kWh/gün</span></div>
       <div class="legend"><span><i style="background:var(--home)"></i>Ev (diğer)</span><span><i style="background:var(--ev)"></i>Togg</span><span><i style="background:var(--mid);height:2px"></i>Günlük bütçe</span></div>
       <div class="chart short" id="c30"></div>
-    </div>
+    </div>${M.home ? '' : '-->'}
     ${scenarios(M)}`;
 
   el.querySelectorAll('[data-go]').forEach((k) => k.addEventListener('click', () => app.go(k.dataset.go)));

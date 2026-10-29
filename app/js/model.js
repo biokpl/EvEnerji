@@ -1,5 +1,5 @@
 // Ham veriden ekranların kullandığı özetleri çıkarır.
-import { birimFiyat, gunlukButce, kalanGun, tarife, yilDurumu, yilSonuTahmini } from './tariff.js';
+import { ayMaliyeti, birimFiyat, gunlukButce, kalanGun, tarife, yilDurumu } from './tariff.js';
 import { iso } from './ui.js';
 
 const z12 = () => Array(12).fill(0);
@@ -39,12 +39,11 @@ export function build(raw) {
   for (let i = 0; i < 12; i++) evMonths[i] += histMonth(`${y}-${String(i + 1).padStart(2, '0')}`);
   const histTotal = sum(Object.values(hist).map((v) => Number(v) || 0));
 
-  const t = tarife(y, S.tariff?.[y]);
-  const tNext = tarife(y + 1, { ...S.tariff?.[y], onceki_yil_kwh: null, ...S.tariff?.[y + 1] });
-  const durum = yilDurumu(t, homeMonths);
-  const ytd = durum.kum;
+  const TY = S.tariff?.[y] || {};
+  const t = tarife(y, TY);
+  const tNext = tarife(y + 1, { ...TY, onceki_yil_kwh: null, ...S.tariff?.[y + 1] });
 
-  // Son 30 gün
+  // Son 30 gün (ana sayaç)
   const days = (id) => raw.days?.[id] || {};
   const lastN = (id, n) => {
     const out = [];
@@ -54,48 +53,82 @@ export function build(raw) {
   const homeDays30 = home ? lastN(home.id, 30) : [];
   const covered = homeDays30.filter(([, v]) => v > 0).length;
   const son30 = covered >= 20 ? sum(homeDays30.map(([, v]) => v)) * (30 / covered) : 0;
-  const proj = yilSonuTahmini(ytd, son30, now);
+
+  // Ölçüm kapsamı: abonelik başlangıcından (taşınma) son ölçülen güne kadar.
+  // Sayaç yoksa son fatura okuma tarihine kadar; aradaki günler tahminle doldurulur.
+  const DAY = 864e5;
+  const d0 = (s) => { const d = new Date(s); d.setHours(0, 0, 0, 0); return d; };
+  const today0 = d0(today);
+  const start = TY.baslangic && d0(TY.baslangic) > new Date(y, 0, 1) ? d0(TY.baslangic) : new Date(y, 0, 1);
+  const meterDays = home ? Object.keys(days(home.id)).filter((k) => k.startsWith(String(y)) && days(home.id)[k] > 0).sort() : [];
+  let covEnd = today0;
+  if (!meterDays.length && TY.son_okuma) covEnd = d0(TY.son_okuma);
+  else if (meterDays.length) covEnd = new Date(today0.getTime() + DAY); // bugün dahil ölçülüyor
+  const covDays = Math.max(1, Math.round((covEnd - start) / DAY));
+  const measured = sum(homeMonths);
+  // Günlük hız: sayaçtan son 30 gün, yoksa son faturanın günlük ortalaması; dönem ortalamasıyla harmanlanır
+  const avgAll = measured / covDays;
+  const lastBillMi = [...homeMonths.keys()].filter((i) => Number(bills[String(i + 1).padStart(2, '0')] || 0) > 0).pop();
+  const recent = son30 > 0 ? son30 / 30 : lastBillMi != null ? homeMonths[lastBillMi] / new Date(y, lastBillMi + 1, 0).getDate() : avgAll;
+  const rate = measured > 0 ? 0.6 * recent + 0.4 * avgAll : 0;
+  const gapDays = Math.max(0, Math.round((today0 - covEnd) / DAY) + 1);
+  const ytdEst = gapDays > 0 && !meterDays.length;
+  const ytd = measured + (ytdEst ? rate * gapDays : 0);
+  const remain = kalanGun(now) - 1;
+  const proj = ytd + rate * remain;
   const butce = gunlukButce(t.limit_kwh, ytd, now);
+
+  // Ay ay tahmini tam yıl (geçmiş: ölçüm, boşluk ve gelecek: hız x gün)
+  const projMonths = [...homeMonths];
+  for (let i = 0; i < 12; i++) {
+    const mStart = new Date(y, i, 1), mEnd = new Date(y, i + 1, 1);
+    const from = Math.max(mStart.getTime(), Math.max(covEnd.getTime(), start.getTime()));
+    const n = Math.max(0, Math.round((mEnd.getTime() - from) / DAY));
+    projMonths[i] += rate * n;
+  }
+  const durum = yilDurumu(t, homeMonths);
+  const projDurum = yilDurumu(t, projMonths);
+
+  // Togg'un gerçek maliyeti = faturası Togg'la - Togg olmadan (kademe/SKTT farkı dahil)
   const evYtd = sum(evMonths);
-  const evShare = ytd > 0 ? Math.min(1, evYtd / ytd) : 0;
-  const evProj = proj * evShare;
-  const evTlByMonth = evMonths.map((k, i) => k * birimFiyat(t, durum, i + 1));
+  const evTlByMonth = evMonths.map((k, i) => {
+    if (!k) return 0;
+    const tot = Math.max(projMonths[i], k);
+    const sk = projDurum.aylikSktt[i];
+    return ayMaliyeti(t, tot, sk) - ayMaliyeti(t, tot - k, sk);
+  });
   const evTl = sum(evTlByMonth);
+  const evAvgTl = evYtd > 0 ? evTl / evYtd : 0;
+  const evShare = proj > 0 ? Math.min(1, sum(evMonths.map((k, i) => Math.min(k, projMonths[i]))) / sum(projMonths.slice(0, mi + 1))) : 0;
+  const evProj = proj * evShare;
+  const noEvProj = proj - evProj;
+  // Togg'un evi yüksek kademeye taşıdığı aylar
+  const kademeAylari = t.kademe_kwh_ay > 0 ? homeMonths.map((h, i) => (h > t.kademe_kwh_ay && h - evMonths[i] <= t.kademe_kwh_ay ? i : -1)).filter((i) => i >= 0) : [];
 
   // Tahmini aşım tarihi
   let exceedDate = null;
   if (ytd > t.limit_kwh) exceedDate = 'gecti';
-  else if (proj > t.limit_kwh) {
-    const daily = (proj - ytd) / Math.max(1, kalanGun(now) - 1);
-    const d = Math.ceil((t.limit_kwh - ytd) / daily);
-    exceedDate = new Date(now.getTime() + d * 864e5);
-  }
-  // Tahmini yıl sonu aylık dağılım -> aşım ayı ve SKTT başlangıcı
-  const projMonths = [...homeMonths];
-  {
-    const daily = (proj - ytd) / Math.max(1, kalanGun(now) - 1);
-    for (let i = mi; i < 12; i++) {
-      const dim = new Date(y, i + 1, 0).getDate();
-      const left = i === mi ? dim - now.getDate() : dim;
-      projMonths[i] += daily * left;
-    }
-  }
-  const projDurum = yilDurumu(t, projMonths);
+  else if (proj > t.limit_kwh && rate > 0) exceedDate = new Date(now.getTime() + Math.ceil((t.limit_kwh - ytd) / rate) * DAY);
 
   let level = 'good', levelText = 'Güvende';
   if (ytd > t.limit_kwh) { level = 'bad'; levelText = 'Limit aşıldı'; }
   else if (proj > t.limit_kwh) { level = 'bad'; levelText = 'Aşım riski'; }
   else if (proj > t.limit_kwh * 0.9) { level = 'mid'; levelText = 'Sınıra yakın'; }
 
-  // Gelecek yıl: limit L olursa bu yılın tüketimi L'yi aşıyorsa 1 Ocak'tan itibaren SKTT
-  const nextUse = proj; // gelecek yıl da benzer tüketim varsayımı
+  // Gelecek yıl: bugünkü hızla tam yıl. Limit L ise (a) bu yılın tüketimi L'yi aşarsa 1 Ocak'tan,
+  // (b) aşmazsa gelecek yıl içinde aşıldığı ayı izleyen 3. aydan itibaren son kaynak fiyatı.
+  const nextMonths = Array.from({ length: 12 }, (_, i) => rate * new Date(y + 1, i + 1, 0).getDate());
+  const nextYear = sum(nextMonths);
   const scenarios = [3000, 3500, 4000].map((L) => {
-    const sktt = proj > L;
-    const normalCost = nextUse * tNext.normal_tl;
-    const cost = sktt ? nextUse * tNext.sktt_tl : normalCost;
-    return { L, sktt, cost, extra: cost - normalCost, selected: L === tNext.limit_kwh };
+    const tl_ = { ...tNext, limit_kwh: L, onceki_yil_kwh: proj };
+    const d = yilDurumu(tl_, nextMonths);
+    const normal = yilDurumu({ ...tNext, limit_kwh: 1e12, onceki_yil_kwh: null }, nextMonths).toplamTl;
+    const fromJan = proj > L;
+    const fromMonth = !fromJan && d.skttBas && d.skttBas[0] === y + 1 ? d.skttBas[1] : null;
+    const exceedNext = !fromJan && d.asimAyi ? d.asimAyi : null;
+    return { L, sktt: fromJan || !!fromMonth, fromJan, fromMonth, exceedNext, followYear: !!exceedNext,
+      cost: d.toplamTl, extra: d.toplamTl - normal, selected: L === tNext.limit_kwh };
   });
-  const noEvProj = proj - evProj;
 
   // Oturumlar
   const sessions = [];
@@ -118,10 +151,10 @@ export function build(raw) {
 
   return {
     raw, now, y, mi, today, S, t, tNext, durum, projDurum, devices, enabled, home, evs, plugs, winderDev,
-    homeMonths, evMonths, evTlByMonth, ytd, son30, proj, butce, evYtd, evShare, evProj, evTl, noEvProj,
-    exceedDate, level, levelText, scenarios, sessions, per100, activeSession,
-    priceNow: birimFiyat(t, durum, mi + 1),
-    monthTl: durum.aylikTl[mi], monthKwh: homeMonths[mi],
+    homeMonths, projMonths, evMonths, evTlByMonth, ytd, ytdEst, rate, son30, proj, butce, evYtd, evShare, evProj, evTl, evAvgTl, noEvProj,
+    exceedDate, level, levelText, scenarios, nextYear, kademeAylari, sessions, per100, activeSession, covEnd, start,
+    priceNow: birimFiyat(t, projDurum, mi + 1),
+    monthTl: projDurum.aylikTl[mi], monthKwh: projMonths[mi],
     homeW: home?.live?.w ?? null,
     evW: evs.reduce((a, d) => a + (d.live?.w || 0), 0),
     todayHome: home ? Math.max(Number(days(home.id)[today] || 0), Number(home.live?.today || 0)) : 0,

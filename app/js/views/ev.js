@@ -52,7 +52,7 @@ export function renderEv(el, M, app) {
   el.innerHTML = `
     <div class="kpis">
       <div class="kpi"><div class="k-label">${icon('bolt')}Bugün</div><div class="k-val">${num(M.todayHome, 1)}<small>kWh</small></div><div class="k-sub">${tl(M.todayHome * M.priceNow)}</div></div>
-      <div class="kpi"><div class="k-label">${icon('calc')}Son 30 gün ort.</div><div class="k-val">${num(M.son30 / 30 || 0, 1)}<small>kWh</small></div><div class="k-sub">bütçe ${kwh(M.butce, 1)}/gün</div></div>
+      <div class="kpi"><div class="k-label">${icon('calc')}Günlük hız</div><div class="k-val">${num(M.rate, 1)}<small>kWh</small></div><div class="k-sub">bütçe ${kwh(M.butce, 1)}/gün</div></div>
     </div>
     <div class="card">
       <div class="card-head"><h2>Tüketim</h2>

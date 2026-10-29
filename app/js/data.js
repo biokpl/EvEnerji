@@ -27,7 +27,8 @@ export const store = {
     try {
       const raw = await loadAll(this.fb);
       const enabled = Object.values(raw.devices || {}).filter((d) => d.enabled);
-      if (!enabled.length) return this.startDemo('Henüz cihaz bağlanmadı; örnek verilerle gösteriliyor.');
+      const hasData = Object.keys(raw.settings?.bills || {}).length || raw.settings?.ev_history;
+      if (!enabled.length && !hasData) return this.startDemo('Henüz cihaz bağlanmadı; örnek verilerle gösteriliyor.');
       this.raw = raw;
       this.mode = 'live';
       this.online = true;

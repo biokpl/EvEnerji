@@ -268,7 +268,12 @@ class Collector:
         hid = self.home_id()
         son30 = sum(v for k, v in self.meters[hid].st["days"].items()
                     if k >= (today - timedelta(days=30)).isoformat())
-        proj = yil_sonu_tahmini(ytd, son30, today)
+        bas = ((self.settings.get("tariff") or {}).get(str(y)) or {}).get("baslangic")
+        try:
+            bas = date.fromisoformat(bas) if bas else None
+        except ValueError:
+            bas = None
+        proj = yil_sonu_tahmini(ytd, son30, today, bas)
         al = self.state["alerts"]
         esikler = (self.settings.get("alerts") or {}).get("esikler", [70, 85, 95])
         for e in sorted(esikler):

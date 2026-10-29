@@ -53,7 +53,7 @@ function header() {
   else if (!store.online) sub = 'Bağlantı yok';
   else if (stale) sub = 'Pi yanıt vermiyor';
   else if (M?.activeSession) sub = 'Togg şarj oluyor';
-  else if (M) sub = `Canlı · ${M.enabled.length} cihaz`;
+  else if (M) sub = M.enabled.length ? `Canlı · ${M.enabled.length} cihaz` : 'Fatura verisi · cihaz bekleniyor';
   document.getElementById('subtxt').textContent = sub;
   document.getElementById('banner').innerHTML = store.mode === 'demo'
     ? `<div class="banner">${icon('info')}<span>${store.reason} Kurulum bitince gerçek veriye kendiliğinden geçer.</span></div>` : '';

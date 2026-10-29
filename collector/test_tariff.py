@@ -56,6 +56,13 @@ def test_tahmin_ve_butce():
     assert abs(b - (2170 / 183)) < 1e-6
 
 
+def test_yil_icinde_tasinma():
+    # 4 Ağustos'ta taşınıldı; 30 Ekim'e kadar 88 günde 880 kWh (10/gün)
+    bugun = date(2026, 10, 30)
+    p = yil_sonu_tahmini(880, 300, bugun, date(2026, 8, 4))
+    assert abs(p - (880 + 10 * 62)) < 1.0, p
+
+
 def test_gelecek_yil_senaryosu():
     s = gelecek_yil_senaryosu(3400)
     assert s == {3000: True, 3500: False, 4000: False}

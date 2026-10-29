@@ -92,12 +92,16 @@ def birim_fiyat(t: Tarife, durum: YilDurumu, ay: int) -> float:
     return t.normal_tl
 
 
-def yil_sonu_tahmini(ytd_kwh: float, son30_kwh: float, bugun: date) -> float:
+def yil_sonu_tahmini(ytd_kwh: float, son30_kwh: float, bugun: date,
+                     baslangic: date | None = None) -> float:
     """Yıl sonu tahmini: kalan günler son 30 günün ortalamasıyla dolar
-    (yılın ortalamasıyla harmanlanır; mevsim etkisini yumuşatır)."""
+    (dönem ortalamasıyla harmanlanır). Abonelik yıl içinde başladıysa
+    (taşınma) ortalama o tarihten itibaren hesaplanır."""
     gun_yil = 366 if calendar.isleap(bugun.year) else 365
     gecen = bugun.timetuple().tm_yday
     kalan = gun_yil - gecen
+    if baslangic and baslangic.year == bugun.year:
+        gecen = max(1, gecen - baslangic.timetuple().tm_yday + 1)
     if gecen <= 0:
         return ytd_kwh
     ort_yil = ytd_kwh / gecen

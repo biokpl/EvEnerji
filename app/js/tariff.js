@@ -48,16 +48,31 @@ export function birimFiyat(t, d, ay) {
   return t.normal_tl;
 }
 
-const gunYil = (y) => ((y % 4 === 0 && y % 100 !== 0) || y % 400 === 0 ? 366 : 365);
+export const gunYil = (y) => ((y % 4 === 0 && y % 100 !== 0) || y % 400 === 0 ? 366 : 365);
 const yilinGunu = (d) => Math.floor((Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()) - Date.UTC(d.getFullYear(), 0, 0)) / 864e5);
 
-export function yilSonuTahmini(ytd, son30, bugun) {
-  const gecen = yilinGunu(bugun);
-  const kalan = gunYil(bugun.getFullYear()) - gecen;
-  if (gecen <= 0) return ytd;
+// Bu yıl geçen gün; abonelik yıl içinde başladıysa (taşınma) o tarihten sayılır
+function gecenGun(bugun, baslangic) {
+  let g = yilinGunu(bugun);
+  if (baslangic) {
+    const b = new Date(baslangic);
+    if (b.getFullYear() === bugun.getFullYear()) g = Math.max(1, g - yilinGunu(b) + 1);
+  }
+  return g;
+}
+
+// Günlük tüketim hızı: son 30 gün (varsa) ile dönem ortalamasının harmanı
+export function gunlukHiz(ytd, son30, bugun, baslangic) {
+  const gecen = gecenGun(bugun, baslangic);
+  if (gecen <= 0) return 0;
   const ortYil = ytd / gecen;
   const ort30 = son30 > 0 ? son30 / 30 : ortYil;
-  return ytd + (0.6 * ort30 + 0.4 * ortYil) * kalan;
+  return 0.6 * ort30 + 0.4 * ortYil;
+}
+
+export function yilSonuTahmini(ytd, son30, bugun, baslangic) {
+  const kalan = gunYil(bugun.getFullYear()) - yilinGunu(bugun);
+  return ytd + gunlukHiz(ytd, son30, bugun, baslangic) * kalan;
 }
 
 export function gunlukButce(limit, ytd, bugun) {

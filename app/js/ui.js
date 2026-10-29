@@ -60,7 +60,12 @@ export const tl = (x, d) => `${num(x, d ?? (Math.abs(x) < 100 ? 2 : 0))} TL`;
 export const watt = (w) => (w == null ? '–' : w >= 1000 ? `${num(w / 1000, 2)} kW` : `${num(w)} W`);
 export const pct = (x, d = 0) => `%${num(x, d)}`;
 export const AYLAR = ['Ocak', 'Şubat', 'Mart', 'Nisan', 'Mayıs', 'Haziran', 'Temmuz', 'Ağustos', 'Eylül', 'Ekim', 'Kasım', 'Aralık'];
-export const AY_K = ['Oca', 'Şub', 'Mar', 'Nis', 'May', 'Haz', 'Tem', 'Ağu', 'Eyl', 'Eki', 'Kas', 'Ara'];
+// Ay adlarına doğru Türkçe ek: Ekim'de / Ekim'den, Kasım'da / Kasım'dan, Mart'ta / Mart'tan
+const _AY_EK = [['ta', 'tan'], ['ta', 'tan'], ['ta', 'tan'], ['da', 'dan'], ['ta', 'tan'], ['da', 'dan'],
+  ['da', 'dan'], ['ta', 'tan'], ['de', 'den'], ['de', 'den'], ['da', 'dan'], ['ta', 'tan']];
+export const ayDa = (i) => `${AYLAR[i]}'${_AY_EK[i][0]}`;
+export const ayDan = (i) => `${AYLAR[i]}'${_AY_EK[i][1]}`;
+export const AY_K =['Oca', 'Şub', 'Mar', 'Nis', 'May', 'Haz', 'Tem', 'Ağu', 'Eyl', 'Eki', 'Kas', 'Ara'];
 export const GUN_K = ['Paz', 'Pzt', 'Sal', 'Çar', 'Per', 'Cum', 'Cmt'];
 export const iso = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 export const hm = (ts) => new Date(ts * 1000).toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' });

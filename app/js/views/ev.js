@@ -5,7 +5,7 @@ import { AYLAR, AY_K, GUN_K, esc, icon, iso, kwh, num, pct, tl } from '../ui.js'
 let period = 'gun30';
 
 function seriesFor(M) {
-  const evDay = (k) => M.evs.reduce((a, d) => a + Number(M.days(d.id)[k] || 0), 0);
+  const evDay = M.evDay;
   if (period === 'bugun') {
     const hrs = (id) => M.home ? (M.raw.hours?.[id]?.[M.today] || Array(24).fill(0)) : Array(24).fill(0);
     const h = hrs(M.home.id);
@@ -26,10 +26,13 @@ function seriesFor(M) {
 
 function breakdown(M) {
   const ym = `${M.y}-${String(M.mi + 1).padStart(2, '0')}`;
-  const total = M.homeMonths[M.mi];
-  if (!total) return '<div class="empty">Bu ay için veri yok.</div>';
-  const rows = M.plugs.map((d) => ({ d, k: Number(M.raw.months?.[d.id]?.[ym] || 0) })).filter((r) => r.k > 0.01).sort((a, b) => b.k - a.k);
+  const firstEv = M.evs[0]?.id;
+  const rows = M.plugs.map((d) => ({ d, k: Number(M.raw.months?.[d.id]?.[ym] || 0) + (d.id === firstEv ? M.histMonth(ym) : 0) }))
+    .filter((r) => r.k > 0.01).sort((a, b) => b.k - a.k);
   const known = rows.reduce((a, r) => a + r.k, 0);
+  // Ana sayaç ay ortasında başladıysa ölçülen prizler toplamı geçebilir
+  const total = Math.max(M.homeMonths[M.mi], known);
+  if (!total) return '<div class="empty">Bu ay için veri yok.</div>';
   const other = Math.max(0, total - known);
   const all = [...rows.map((r) => ({ name: r.d.name, k: r.k, color: r.d.type === 'ev_sarj' ? 'var(--ev)' : (r.d.color || 'var(--accent2)'), ic: r.d.icon })),
     { name: 'Diğer (ölçülmeyen)', k: other, color: 'var(--home)', ic: 'home' }];

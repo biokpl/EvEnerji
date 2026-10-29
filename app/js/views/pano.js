@@ -163,7 +163,7 @@ export function renderPano(el, M, app) {
   if (M.home) {
     const c = colors();
     const homeD = M.lastN(M.home.id, 30);
-    const evD = homeD.map(([k]) => M.evs.reduce((a, d) => a + Number(M.days(d.id)[k] || 0), 0));
+    const evD = homeD.map(([k]) => M.evDay(k));
     const other = homeD.map(([, v], i) => Math.max(0, v - evD[i]));
     const cats = homeD.map(([k]) => `${+k.slice(8)}.${+k.slice(5, 7)}`);
     const opt = stackedBars(c, cats, evD.map((v) => +v.toFixed(2)), other.map((v) => +v.toFixed(2)), {

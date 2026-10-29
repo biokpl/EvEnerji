@@ -46,6 +46,7 @@ export function renderAyarlar(el, M, app) {
       <div class="field"><div><label for="bk">Batarya (kWh)</label><small>T10X Uzun Menzil 88,5 · Standart 52,4</small></div><input class="input num" id="bk" inputmode="decimal" value="${f(car.battery_kwh)}"></div>
       <div class="field"><div><label for="ef">Şarj verimi (%)</label><small>Duvardan çekilenin bataryaya giden payı (Mode-2 AC ≈ %88–92).</small></div><input class="input num" id="ef" inputmode="numeric" value="${Math.round(car.efficiency * 100)}"></div>
       <div class="field"><div><label for="pt">İstasyon fiyatı (TL/kWh)</label><small>Togg sekmesindeki kıyas için.</small></div><input class="input num" id="pt" inputmode="decimal" value="${f(car.public_tl)}"></div>
+      ${M.history ? `<div class="field"><div><label>Aktarılan geçmiş</label><small>${esc(M.history.source || '')} · ${esc(M.history.from || '')} – ${esc(M.history.until || '')}. Togg toplamlarına eklenir.</small></div><b class="num">${num(M.histTotal, 1)} kWh</b></div>` : ''}
       <button class="btn ghost" id="saveC" style="margin-top:12px">${icon('check')}Kaydet</button>
     </div>
 
@@ -105,7 +106,8 @@ export function renderAyarlar(el, M, app) {
     const rows = [['tarih', 'ev_kwh', 'togg_kwh']];
     const keys = new Set(Object.keys(M.home ? M.days(M.home.id) : {}));
     M.evs.forEach((d) => Object.keys(M.days(d.id)).forEach((k) => keys.add(k)));
-    [...keys].sort().forEach((k) => rows.push([k, num(M.home ? M.days(M.home.id)[k] || 0 : 0, 3), num(M.evs.reduce((a, d) => a + (M.days(d.id)[k] || 0), 0), 3)]));
+    Object.keys(M.history?.days || {}).forEach((k) => keys.add(k));
+    [...keys].sort().forEach((k) => rows.push([k, num(M.home ? M.days(M.home.id)[k] || 0 : 0, 3), num(M.evDay(k), 3)]));
     downloadFile(`ev-enerji-gunluk-${M.today}.csv`, rows.map((r) => r.join(';')).join('\n'));
   };
   $('#csvS').onclick = () => {

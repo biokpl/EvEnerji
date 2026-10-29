@@ -32,6 +32,12 @@ export function build(raw) {
   const homeMonths = meterMonths.map((v, i) => Math.max(v, Number(bills[String(i + 1).padStart(2, '0')] || 0)));
   const evMonths = z12();
   evs.forEach((d) => monthsOf(raw, d.id, y).forEach((v, i) => { evMonths[i] += v; }));
+  // Prizin Pi'ye bağlanmadan önceki geçmişi (GG Smart'tan aktarılan günlük kWh).
+  // Pi ölçümü bu tarihten sonra başladığı için üst üste binmez: toplanır.
+  const hist = S.ev_history?.days || {};
+  const histMonth = (ym) => sum(Object.entries(hist).filter(([k]) => k.startsWith(ym)).map(([, v]) => Number(v) || 0));
+  for (let i = 0; i < 12; i++) evMonths[i] += histMonth(`${y}-${String(i + 1).padStart(2, '0')}`);
+  const histTotal = sum(Object.values(hist).map((v) => Number(v) || 0));
 
   const t = tarife(y, S.tariff?.[y]);
   const tNext = tarife(y + 1, { ...S.tariff?.[y], onceki_yil_kwh: null, ...S.tariff?.[y + 1] });
@@ -120,7 +126,8 @@ export function build(raw) {
     evW: evs.reduce((a, d) => a + (d.live?.w || 0), 0),
     todayHome: home ? Math.max(Number(days(home.id)[today] || 0), Number(home.live?.today || 0)) : 0,
     todayEv: evs.reduce((a, d) => a + Math.max(Number(days(d.id)[today] || 0), Number(d.live?.today || 0)), 0),
-    lastN, days,
+    lastN, days, histMonth, histTotal, history: S.ev_history || null,
+    evDay: (k) => evs.reduce((a, d) => a + Number(days(d.id)[k] || 0), 0) + Number(hist[k] || 0),
     car: { battery_kwh: 88.5, efficiency: 0.9, public_tl: 9, ...(S.car || {}) },
     winder: raw.winder?.state || null,
     discovered: Object.entries(raw.discovered || {}).filter(([id]) => !raw.devices?.[id]),

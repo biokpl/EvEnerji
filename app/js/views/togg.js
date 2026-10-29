@@ -68,8 +68,10 @@ export function renderTogg(el, M, app) {
     el.innerHTML = `<div class="card"><div class="empty">${icon('car')}<br>Araç şarj prizi tanımlı değil.<br>Cihazlar sekmesinden prizin türünü <b>Araç şarjı</b> yap.</div></div>`;
     return;
   }
-  const n = M.sessions.filter((s) => new Date(s.start * 1000).getFullYear() === M.y).length;
-  const avg = n ? M.evYtd / n : 0;
+  const yearSess = M.sessions.filter((s) => new Date(s.start * 1000).getFullYear() === M.y);
+  const n = yearSess.length;
+  const avg = n ? yearSess.reduce((a, s) => a + (s.kwh || 0), 0) / n : 0;
+  const histNote = M.histTotal > 0 ? `<div class="muted" style="font-size:11.5px;font-weight:600;margin-top:2px">${num(M.histTotal, 1)} kWh ${esc(M.history.source || 'önceki')} geçmişi dahil</div>` : '';
   const tlPer100 = M.per100 ? (M.per100 * M.priceNow) : null;
   const skttCost = M.evYtd * M.t.sktt_tl;
   const list = showAll ? M.sessions : M.sessions.slice(0, 8);
@@ -78,7 +80,7 @@ export function renderTogg(el, M, app) {
       <div class="row-between" style="position:relative;z-index:1">
         <div><div class="muted" style="font-size:12px;font-weight:800;letter-spacing:.06em;text-transform:uppercase">${M.y} şarjı</div>
           <div style="font-size:34px;font-weight:800;letter-spacing:-.03em" class="num">${num(M.evYtd)} <small class="muted" style="font-size:15px">kWh</small></div>
-          <div class="muted" style="font-weight:700">${tl(M.evTl, 0)} · ${n} şarj · ort. ${kwh(avg, 1)}</div></div>
+          <div class="muted" style="font-weight:700">${tl(M.evTl, 0)}${n ? ` · ${n} şarj · ort. ${kwh(avg, 1)}` : ''}</div>${histNote}</div>
         <div class="batt">${icon('car')}</div>
       </div>
       <div class="share-bar" style="position:relative;z-index:1" aria-label="Togg payı ${pct(M.evShare * 100)}">

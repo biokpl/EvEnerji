@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="tr" data-theme="dark">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Ev Enerji</title>
+  <meta name="description" content="Togg T10X şarjı, ev tüketimi ve yıllık 4.000 kWh limit takibi; akıllı prizler ve kablo sarıcı tek uygulamada.">
+  <meta name="theme-color" content="#060b14">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <link rel="manifest" href="manifest.json">
+  <link rel="icon" href="icons/icon-192.png">
+  <link rel="apple-touch-icon" href="icons/icon-192.png">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/app.css">
+  <script>
+    try { const t = localStorage.getItem('evEnerji.theme'); if (t) document.documentElement.dataset.theme = t; } catch {}
+  </script>
+</head>
+<body>
+  <div class="app">
+    <header class="topbar">
+      <div class="logo" aria-hidden="true">
+        <svg viewBox="0 0 24 24" fill="#fff"><path d="M13.2 2.5 5.5 13.4h5.1L9.4 21.5l8.1-11.2h-5.2z"/></svg>
+      </div>
+      <div class="tb-text">
+        <h1 id="title">Pano</h1>
+        <div class="sub" id="subtitle"><span class="conn" id="conn"></span><span id="subtxt">Ev Enerji</span></div>
+      </div>
+      <div class="spacer"></div>
+      <button class="icon-btn" id="themeBtn" aria-label="Tema değiştir"></button>
+    </header>
+    <div id="banner"></div>
+    <main id="view"></main>
+  </div>
+
+  <nav class="nav" id="nav">
+    <button data-tab="pano"><span data-icon="gauge"></span>Pano</button>
+    <button data-tab="togg"><span data-icon="car"></span>Togg</button>
+    <button data-tab="ev"><span data-icon="home"></span>Ev</button>
+    <button data-tab="cihazlar"><span data-icon="plug"></span>Cihazlar</button>
+    <button data-tab="sarici"><span data-icon="reel"></span>Sarıcı</button>
+    <button data-tab="ayarlar"><span data-icon="settings"></span>Ayarlar</button>
+  </nav>
+
+  <div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+  <script src="vendor/echarts.min.js"></script>
+  <script type="module" src="js/app.js"></script>
+</body>
+</html>

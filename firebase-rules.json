@@ -1,0 +1,38 @@
+{
+  "rules": {
+    ".read": true,
+    ".write": false,
+
+    "settings": {
+      ".write": true,
+      "tariff": { "$yil": { ".validate": "$yil.matches(/^20[2-9][0-9]$/)" } },
+      "bills": { "$yil": { ".validate": "$yil.matches(/^20[2-9][0-9]$/)" } }
+    },
+
+    "devices": {
+      "$id": {
+        ".write": true,
+        ".validate": "!newData.exists() || (newData.child('name').isString() && newData.child('name').val().length <= 60 && newData.child('type').val().matches(/^(ev_sarj|priz|ana_sayac|kablo_sarici)$/))"
+      }
+    },
+
+    "sessions": {
+      "$dev": {
+        "$sid": {
+          "odo": { ".write": true, ".validate": "newData.isNumber() && newData.val() > 0 && newData.val() < 2000000" },
+          "note": { ".write": true, ".validate": "newData.isString() && newData.val().length <= 200" }
+        }
+      }
+    },
+
+    "commands": {
+      "$cid": {
+        ".write": "!data.exists() && newData.exists()",
+        ".validate": "newData.hasChildren(['device', 'action', 'ts', 'nonce', 'sig']) && newData.child('sig').isString() && newData.child('sig').val().length == 64 && newData.child('ts').isNumber() && newData.child('ts').val() > now - 120000 && newData.child('ts').val() < now + 120000"
+      }
+    },
+
+    "command_results": { "$cid": { ".write": "!newData.exists()" } },
+    "discovered": { "$id": { ".write": "!newData.exists()" } }
+  }
+}

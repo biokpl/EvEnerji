@@ -1,0 +1,4 @@
+tinytuya>=1.13
+requests>=2.31
+zeroconf>=0.130
+pycryptodomex>=3.20

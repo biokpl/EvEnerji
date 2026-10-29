@@ -1,0 +1,10 @@
+# Gizli anahtarlar ve yerel durum — asla yayınlanmaz
+collector/config.json
+collector/devices_local.json
+collector/state.json
+collector/*.tmp
+collector/tinytuya.json
+collector/devices.json
+collector/snapshot.json
+__pycache__/
+*.pyc

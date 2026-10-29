@@ -1,0 +1,38 @@
+{
+  "_not": "Bu dosyayı config.json olarak kopyalayıp doldur. config.json ve devices_local.json Git'e GİRMEZ (gizli anahtar içerir).",
+
+  "firebase_url": "https://ev-enerji-default-rtdb.europe-west1.firebasedatabase.app",
+  "base_path": "",
+  "firebase_secret": "Firebase > Proje ayarları > Hizmet hesapları > Veritabanı gizli anahtarları (yalnız Pi'de durur)",
+  "app_url": "https://biokpl.github.io/EvEnerji/",
+
+  "ntfy_topic": "EvEnerji-bkpl-XXXX",
+  "control_secret": "UZUN-RASTGELE-BIR-ANAHTAR (uygulamada Ayarlar > Kontrol anahtarı ile aynı olmalı)",
+
+  "poll_seconds": 10,
+  "flush_seconds": 60,
+
+  "tuya_cloud": {
+    "_not": "iot.tuya.com projesi (Smart Life hesabı bağlı). Yeni prizleri ve local key'leri otomatik bulmak için.",
+    "api_region": "eu",
+    "api_key": "",
+    "api_secret": "",
+    "any_device_id": ""
+  },
+
+  "ewelink": {
+    "_not": "Önce LAN modu denenir (yerel, anlık). Olmazsa bulut: dev.ewelink.cc'den alınan appid/secret ile.",
+    "region": "eu",
+    "app_id": "",
+    "app_secret": "",
+    "country_code": "+90",
+    "email": "",
+    "password": ""
+  },
+
+  "safety": {
+    "max_amp": 16.0,
+    "warn_ratio": 0.85,
+    "warn_minutes": 30
+  }
+}

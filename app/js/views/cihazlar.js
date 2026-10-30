@@ -121,72 +121,167 @@ function addHelp() {
     <button class="btn ghost" id="ok" style="margin-top:12px">Tamam</button>`, (sh) => { sh.querySelector('#ok').onclick = () => closeSheet(); });
 }
 
-// Cihaz detayı: canlı güç (açıkken anlık güncellenir), bugün saatlik, son 30 gün, bu ay
+// Cihaz detayı: durum + büyük canlı güç, yük çubuğu, 4 istatistik, tek grafik (Canlı / Bugün / 30 gün)
+let dtTab = 'bugun';
+
+// Cihaz rengi temaya göre okunur kalsın: açık temada çok açık, koyu temada çok koyu renkler ayarlanır
+function markColor(hex) {
+  const m = /^#?([0-9a-f]{6})$/i.exec(hex || '');
+  if (!m) return '#3b82f6';
+  const n = parseInt(m[1], 16), rgb = [n >> 16, (n >> 8) & 255, n & 255];
+  const lum = (0.2126 * rgb[0] + 0.7152 * rgb[1] + 0.0722 * rgb[2]) / 255;
+  const light = document.documentElement.dataset.theme === 'light';
+  const hx = (a) => '#' + a.map((c) => Math.round(Math.max(0, Math.min(255, c))).toString(16).padStart(2, '0')).join('');
+  if (light && lum > 0.62) return hx(rgb.map((c) => c * (0.62 / lum)));
+  if (!light && lum < 0.28) return hx(rgb.map((c) => c + (255 - c) * 0.45));
+  return hx(rgb);
+}
+
 function detailSheet(M, id, app) {
   const d = M.devices.find((x) => x.id === id);
   if (!d) return;
-  const col = d.color || '#3b82f6';
+  const col = markColor(d.color || '#3b82f6');
   const ym = `${M.y}-${String(M.mi + 1).padStart(2, '0')}`;
   const month = Number(M.raw.months?.[id]?.[ym] || 0);
   const d30 = M.lastN(id, 30);
   const sum30 = d30.reduce((a, [, v]) => a + v, 0);
-  const hours = (M.raw.hours?.[id]?.[M.today] || Array(24).fill(0)).slice(0, M.now.getHours() + 1);
+  const active = d30.filter(([, v]) => v > 0.001);
+  const avg = active.length ? sum30 / active.length : 0;
+  const peak = d30.reduce((b, x) => (x[1] > b[1] ? x : b), ['', 0]);
+  const hours = M.raw.hours?.[id]?.[M.today] || Array(24).fill(0);
+  const nowH = M.now.getHours();
   const live = () => store.raw?.live?.[id] || {};
-  const liveHtml = () => {
+  const fmtDay = (k) => { const dt = new Date(k); return `${dt.getDate()} ${AYLAR[dt.getMonth()].slice(0, 3)}`; };
+
+  const status = () => {
     const L = live();
     const stale = !L.ts || Date.now() / 1000 - L.ts > 120;
-    if (stale || L.ok === false) return `<span class="muted">Çevrimdışı${L.ts ? ' · ' + ago(L.ts) : ''}</span>`;
-    return `<b class="big">${watt(L.w)}</b><span>${L.v ? num(L.v) + ' V' : ''}${L.a != null ? ' · ' + num(L.a, 2) + ' A' : ''} · ${L.on === false ? 'kapalı' : 'açık'}</span>`;
+    if (stale || L.ok === false) return { c: 'off', t: 'Çevrimdışı' };
+    if (L.on === false) return { c: 'idle', t: 'Kapalı' };
+    return (L.w || 0) > 3 ? { c: 'run', t: 'Çalışıyor' } : { c: 'on', t: 'Açık · boşta' };
   };
+  const heroHtml = () => {
+    const L = live(), st = status();
+    const maxW = (d.max_amp || 16) * (L.v || 230);
+    const load = st.c === 'off' ? 0 : Math.min(100, ((L.w || 0) / maxW) * 100);
+    return `
+      <div class="dt-hero-row">
+        <div class="dt-power">${st.c === 'off' ? '–' : watt(L.w)}</div>
+        <span class="dt-pill ${st.c}"><i></i>${st.t}</span>
+      </div>
+      <div class="dt-chips">${L.v ? `<span>${num(L.v)} V</span>` : ''}${L.a != null ? `<span>${num(L.a, 2)} A</span>` : ''}${L.ts ? `<span>${ago(L.ts)}</span>` : ''}</div>
+      <div class="dt-load"><i style="width:${load.toFixed(1)}%;background:${col}"></i></div>
+      <div class="dt-load-cap"><span>Yük %${num(load, load < 10 ? 1 : 0)}</span><span>sınır ${num(d.max_amp || 16)} A ≈ ${watt(maxW)}</span></div>`;
+  };
+  const stat = (label, val, unit, sub) => `<div class="dt-stat"><span>${label}</span><b>${val}<small>${unit}</small></b><em>${sub}</em></div>`;
+
   const sh = openSheet(`
-    <div class="dt-head"><div class="d-ic" style="--dc:${esc(col)}">${icon(d.icon || 'plug')}</div>
-      <div><h3 style="margin:0">${esc(d.name)}</h3><div class="sh-sub" style="margin:2px 0 0">${esc(TYPES[d.type] || d.type)}${d.room ? ' · ' + esc(d.room) : ''}</div></div></div>
-    <div class="dt-live" id="dl">${liveHtml()}</div>
-    <div class="kpis" style="margin:12px 0">
-      <div class="kpi"><div class="k-label">Bugün</div><div class="k-val">${num(live().today ?? hours.reduce((a, b) => a + b, 0), 2)}<small>kWh</small></div><div class="k-sub">${tl((live().today || 0) * M.priceNow)}</div></div>
-      <div class="kpi"><div class="k-label">${AYLAR[M.mi]}</div><div class="k-val">${num(month, month < 10 ? 2 : 1)}<small>kWh</small></div><div class="k-sub">${tl(month * M.priceNow)} · 30 günde ${kwh(sum30)}</div></div>
+    <div class="dt-head">
+      <div class="dt-ic" style="--dc:${esc(col)}">${icon(d.icon || 'plug')}</div>
+      <div class="dt-name"><h3>${esc(d.name)}</h3><div>${esc(TYPES[d.type] || d.type)}${d.room ? ' · ' + esc(d.room) : ''}</div></div>
+      <button class="icon-btn" id="edit" aria-label="Düzenle">${icon('edit')}</button>
     </div>
-    <div class="dt-title">Canlı güç <small>uygulama açıkken</small></div><div id="dc-live" class="dt-chart"></div>
-    <div class="dt-title">Bugün, saatlik <small>kWh</small></div><div id="dc-h" class="dt-chart"></div>
-    <div class="dt-title">Son 30 gün <small>kWh</small></div><div id="dc-d" class="dt-chart"></div>
-    <div class="btn-row" style="margin-top:14px">
-      <button class="btn ghost" id="close">Kapat</button>
-      <button class="btn ghost" id="edit">${icon('edit')}Düzenle</button>
-    </div>`, (sh) => {
-    sh.querySelector('#close').onclick = () => closeSheet();
+    <div class="dt-hero" id="dh">${heroHtml()}</div>
+    <div class="dt-stats">
+      ${stat('Bugün', num(live().today ?? 0, 2), 'kWh', tl((live().today || 0) * M.priceNow))}
+      ${stat(AYLAR[M.mi], num(month, month < 10 ? 2 : 1), 'kWh', tl(month * M.priceNow))}
+      ${stat('Günlük ort.', num(avg, avg < 10 ? 2 : 1), 'kWh', active.length ? `${active.length} günde` : 'veri yok')}
+      ${stat('En yüksek gün', num(peak[1], peak[1] < 10 ? 2 : 1), 'kWh', peak[1] > 0 ? fmtDay(peak[0]) : '–')}
+    </div>
+    <div class="dt-chart-card">
+      <div class="dt-chart-head"><b id="dct">Bugün</b>
+        <div class="seg" id="dseg">${[['canli', 'Canlı'], ['bugun', 'Bugün'], ['gun30', '30 gün']].map(([k, t]) => `<button data-t="${k}" class="${dtTab === k ? 'on' : ''}">${t}</button>`).join('')}</div></div>
+      <div class="dt-note" id="dcn"></div>
+      <div class="dt-plot"><div id="dc" class="dt-chart"></div><div class="dt-empty" id="dce" hidden></div></div>
+    </div>
+    <p class="chart-note" style="text-align:center;margin-top:10px">₺ değerleri şu anki birim fiyatla (${num(M.priceNow, 2)} ₺/kWh) hesaplanır.</p>`, (sh) => {
     sh.querySelector('#edit').onclick = () => editSheet(M, id, app);
   });
+
   const c = colors(), ax = axisStyle(c);
-  const grid = { left: 40, right: 8, top: 10, bottom: 22 };
-  const yAx = { type: 'value', ...ax, axisLine: { show: false }, splitNumber: 3 };
-  // sayfa açılış animasyonu bitince çiz (boyutu doğru ölçülsün)
+  const grid = { left: 44, right: 10, top: 14, bottom: 26 };
+  const zero = (f) => (v) => (v === 0 ? '0' : f(v));   // eksende 0,00 yerine 0
+  const yAx = (fmt) => ({ type: 'value', min: 0, ...ax, axisLine: { show: false }, splitNumber: 3,
+    axisLabel: { ...ax.axisLabel, formatter: zero(fmt) } });
+  const grad = (a, b) => ({ type: 'linear', x: 0, y: 0, x2: 0, y2: 1, colorStops: [{ offset: 0, color: col + a }, { offset: 1, color: col + b }] });
+  const dim = col + 'a8';   // geçmiş çubuklar biraz soluk, güncel olan tam renk
+  let ch = null;
+
+  const views = {
+    canli: () => {
+      const t = trace.get(id) || [];
+      return {
+        title: 'Canlı güç', note: 'Uygulama açıkken gelen ölçümler.',
+        empty: t.length < 2 ? 'Ölçümler toplanıyor… Ekran açık kaldıkça çizgi oluşacak.' : '',
+        opt: {
+          grid, tooltip: { trigger: 'axis', axisPointer: { type: 'line', lineStyle: { color: c.faint } }, valueFormatter: (v) => watt(v) },
+          xAxis: { type: 'time', ...ax, splitNumber: 4, splitLine: { show: false },
+            axisLabel: { ...ax.axisLabel, hideOverlap: true, formatter: t.length > 1 && t[t.length - 1][0] - t[0][0] < 15 * 60e3 ? '{HH}:{mm}:{ss}' : '{HH}:{mm}' } },
+          yAxis: { ...yAx((v) => (v >= 1000 ? `${num(v / 1000, 1)} kW` : `${v} W`)), max: (v) => Math.max(10, Math.ceil(v.max * 1.25)) },
+          series: [{ type: 'line', data: t, showSymbol: false, smooth: 0.3, lineStyle: { color: col, width: 2 },
+            areaStyle: { color: grad('55', '05') }, emphasis: { disabled: true } }],
+        },
+      };
+    },
+    bugun: () => {
+      const sum = hours.reduce((a, b) => a + b, 0);
+      const peakH = hours.reduce((b, v, i) => (v > hours[b] ? i : b), 0);
+      return {
+        title: 'Bugün, saat saat', note: sum > 0.0005 ? `Toplam ${kwh(sum)} · en yoğun saat ${peakH}:00–${peakH + 1}:00` : '',
+        empty: sum > 0.0005 ? '' : 'Bugün henüz tüketim yok.',
+        opt: {
+          grid, tooltip: { trigger: 'axis', axisPointer: { type: 'shadow', shadowStyle: { color: c.hi } },
+            formatter: (p) => `<b>${p[0].dataIndex}:00–${p[0].dataIndex + 1}:00</b><br>${num(p[0].value || 0, 3)} kWh · ${tl((p[0].value || 0) * M.priceNow)}` },
+          xAxis: { type: 'category', data: [...Array(24).keys()].map((h) => `${h}`), ...ax, axisLabel: { ...ax.axisLabel, interval: 3 } },
+          yAxis: yAx((v) => num(v, v < 1 ? 2 : 1)),
+          series: [{ type: 'bar', barWidth: '62%', data: hours.map((v, h) => ({ value: h > nowH ? null : +v.toFixed(4),
+            itemStyle: { color: h === nowH ? col : dim, borderRadius: [4, 4, 0, 0] } })) }],
+        },
+      };
+    },
+    gun30: () => ({
+      title: 'Son 30 gün', note: sum30 > 0.001 ? `Toplam ${kwh(sum30)} · ${tl(sum30 * M.priceNow)} · kesikli çizgi: ortalama` : '',
+      empty: sum30 > 0.001 ? '' : 'Son 30 günde kayıt yok.',
+      opt: {
+        grid, tooltip: { trigger: 'axis', axisPointer: { type: 'shadow', shadowStyle: { color: c.hi } },
+          formatter: (p) => { const dt = new Date(d30[p[0].dataIndex][0]); return `<b>${dt.getDate()} ${AYLAR[dt.getMonth()]} ${GUN_K[dt.getDay()]}</b><br>${num(p[0].value, 2)} kWh · ${tl(p[0].value * M.priceNow)}`; } },
+        xAxis: { type: 'category', data: d30.map(([k]) => fmtDay(k)), ...ax, axisLabel: { ...ax.axisLabel, interval: 6 } },
+        yAxis: yAx((v) => num(v, v < 1 ? 2 : 1)),
+        series: [{ type: 'bar', barWidth: '64%', data: d30.map(([, v], i) => ({ value: +v.toFixed(3),
+          itemStyle: { color: i === d30.length - 1 ? col : dim, borderRadius: [4, 4, 0, 0] } })),
+          markLine: avg > 0 ? { symbol: 'none', silent: true, lineStyle: { color: c.muted, type: 'dashed', width: 1 },
+            label: { show: false }, data: [{ yAxis: +avg.toFixed(3) }] } : undefined }],
+      },
+    }),
+  };
+
+  const draw = () => {
+    const v = views[dtTab]();
+    sh.querySelector('#dct').textContent = v.title;
+    sh.querySelector('#dcn').textContent = v.note || '';
+    const empty = sh.querySelector('#dce');
+    empty.hidden = !v.empty; empty.textContent = v.empty || '';
+    if (ch) { ch.dispose(); ch = null; }
+    if (!v.empty) ch = mount(sh.querySelector('#dc'), v.opt);
+  };
+  sh.querySelector('#dseg').onclick = (e) => {
+    const b = e.target.closest('[data-t]'); if (!b) return;
+    dtTab = b.dataset.t;
+    sh.querySelectorAll('#dseg button').forEach((x) => x.classList.toggle('on', x === b));
+    draw();
+  };
+  // sayfa açılış animasyonu bitince çiz (boyut doğru ölçülsün); açık kaldıkça canlı güncelle
   setTimeout(() => {
-    const lc = mount(sh.querySelector('#dc-live'), {
-      grid, tooltip: { trigger: 'axis', valueFormatter: (v) => watt(v) },
-      xAxis: { type: 'time', ...ax, axisLabel: { ...ax.axisLabel, hideOverlap: true }, splitLine: { show: false } },
-      yAxis: { ...yAx, axisLabel: { ...ax.axisLabel, formatter: (v) => (v >= 1000 ? `${num(v / 1000, 1)}k` : v) } },
-      series: [{ type: 'line', data: trace.get(id) || [], showSymbol: false, smooth: 0.25, lineStyle: { color: col, width: 2 },
-        areaStyle: { color: col, opacity: 0.18 } }],
-    });
-    mount(sh.querySelector('#dc-h'), {
-      grid, tooltip: { trigger: 'axis', valueFormatter: (v) => `${num(v, 3)} kWh` },
-      xAxis: { type: 'category', data: hours.map((_, i) => `${i}`), ...ax },
-      yAxis: yAx,
-      series: [{ type: 'bar', data: hours.map((v) => +v.toFixed(4)), barMaxWidth: 14, itemStyle: { color: col, borderRadius: [3, 3, 0, 0] } }],
-    });
-    mount(sh.querySelector('#dc-d'), {
-      grid, tooltip: { trigger: 'axis', valueFormatter: (v) => `${num(v, 2)} kWh` },
-      xAxis: { type: 'category', data: d30.map(([k]) => { const dt = new Date(k); return `${dt.getDate()} ${GUN_K[dt.getDay()]}`; }), ...ax,
-        axisLabel: { ...ax.axisLabel, hideOverlap: true } },
-      yAxis: yAx,
-      series: [{ type: 'bar', data: d30.map(([, v]) => +v.toFixed(3)), barMaxWidth: 12, itemStyle: { color: col, borderRadius: [3, 3, 0, 0] } }],
-    });
-    // açık kaldıkça canlı değer ve grafik güncellenir
+    draw();
     const off = store.subscribe((kind) => {
       if (!sh.isConnected) return off();
       if (kind !== 'live') return;
-      sh.querySelector('#dl').innerHTML = liveHtml();
-      lc?.setOption({ series: [{ data: trace.get(id) || [] }] });
+      sh.querySelector('#dh').innerHTML = heroHtml();
+      if (dtTab === 'canli') {
+        const t = trace.get(id) || [];
+        if (ch && t.length >= 2) ch.setOption({ series: [{ data: t }] });
+        else if (!ch && t.length >= 2) draw();
+      }
     });
   }, 340);
 }

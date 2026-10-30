@@ -18,7 +18,7 @@ function ring(M) {
     <svg viewBox="0 0 236 236" aria-hidden="true">
       <defs><pattern id="hatch" width="6" height="6" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
         <rect width="6" height="6" fill="${over ? 'var(--bad)' : 'var(--faint)'}" opacity=".22"/><rect width="2.4" height="6" fill="${over ? 'var(--bad)' : 'var(--faint)'}" opacity=".75"/></pattern></defs>
-      <circle cx="118" cy="118" r="${R}" fill="none" stroke="var(--card-hi)" stroke-width="16" stroke-dasharray="${ARC} ${C}" stroke-linecap="round"/>
+      <circle cx="118" cy="118" r="${R}" fill="none" stroke="var(--card-hi)" stroke-width="16" stroke-dasharray="${ARC} ${C}" stroke-linecap="butt"/>
       ${a3 > 0.5 ? seg(a3, a1 + a2, 'url(#hatch)') : ''}
       ${seg(a1, 0, 'var(--home)')}
       ${a2 > 0.5 ? seg(a2 - 2, a1 + 2, 'var(--ev)') : ''}

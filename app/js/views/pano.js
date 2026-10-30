@@ -51,7 +51,7 @@ function heroText(M) {
 function kpis(M) {
   const charging = M.evW > 50;
   return `
-  <div class="kpis">
+  <div class="kpis kpis-c">
     <div class="kpi" data-go="ev">
       <div class="k-label">${icon('home')}Ev şu an</div>
       <div class="k-val" data-live="homeW">${M.home ? (M.homeW == null ? '–' : watt(M.homeW)) : '–'}</div>
@@ -163,9 +163,9 @@ export function renderPano(el, M, app) {
         <p>${heroText(M)}</p>
       </div>
       <div class="trio">
-        <div><b>${num(Math.max(0, M.t.limit_kwh - M.ytd))}<small> kWh</small></b><span>limitten kalan</span></div>
-        <div><b>${num(M.butce, 1)}<small> kWh</small></b><span>günlük bütçe<br>≈ ${tl(M.butce * M.priceNow, 0)}/gün</span></div>
-        ${M.home ? `<div><b><span data-live="todayHome2">${num(M.todayHome, 1)}</span><small> kWh</small></b><span>bugün</span></div>` : `<div><b>${num(M.rate, 1)}<small> kWh</small></b><span>günlük ort. tüketim</span></div>`}
+        <div><b>${num(Math.max(0, M.t.limit_kwh - M.ytd))}<small> kWh</small></b><span>Limitten Kalan</span></div>
+        <div><b>${num(M.butce, 1)}<small> kWh</small></b><span>Günlük Bütçe<br>≈ ${tl(M.butce * M.priceNow, 0)} karşılığı</span></div>
+        ${M.home ? `<div><b><span data-live="todayHome2">${num(M.todayHome, 1)}</span><small> kWh</small></b><span>Bugün</span></div>` : `<div><b>${num(M.rate, 1)}<small> kWh</small></b><span>Günlük Ort. Tüketim</span></div>`}
       </div>
     </div>
     ${kpis(M)}

@@ -20,8 +20,8 @@ WINDSHIELD = [(126, 69), (140, 52), (160, 33), (182, 21), (205, 14), (240, 11), 
 SIDE = [(343, 68), (346, 50), (352, 32), (360, 21), (370, 16), (395, 15), (440, 17), (452, 22),
         (464, 36), (472, 50), (476, 62), (476, 69)]
 
-ALPHA = 0.78      # cam opaklığı (0 saydam, 1 tam siyah)
-KEEP_LIGHT = 0.22  # yansımalardan korunan parlaklık payı
+ALPHA = 0.64      # cam opaklığı (0 saydam, 1 tam siyah)
+KEEP_LIGHT = 0.30  # yansımalardan korunan parlaklık payı
 
 
 def main():

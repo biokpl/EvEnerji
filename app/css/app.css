@@ -260,6 +260,15 @@ details.tbl summary { cursor: pointer; font-size: 12.5px; color: var(--muted); f
 
 /* Cihazlar */
 .devs { display: grid; gap: 10px; }
+.devs-head { display: flex; align-items: center; justify-content: space-between; margin: 0 2px 10px; font-size: 12.5px; font-weight: 700; color: var(--muted); }
+.devs-head .btn { width: auto; padding: 8px 14px; font-size: 13px; }
+.devs-head .btn svg { width: 15px; height: 15px; }
+.dev.sorting [data-edit] { cursor: default; }
+.sort-btns { display: flex; gap: 6px; }
+.sort-btns button { width: 38px; height: 38px; border-radius: 12px; border: 1px solid var(--line); background: var(--card-hi); color: var(--text); display: grid; place-items: center; cursor: pointer; padding: 0; }
+.sort-btns button:active { transform: scale(.94); }
+.sort-btns svg { width: 18px; height: 18px; }
+.dev:first-child .sort-btns [data-mv="-1"], .dev:last-child .sort-btns [data-mv="1"] { opacity: .3; pointer-events: none; }
 .dev {
   display: grid; grid-template-columns: 46px 1fr auto; gap: 12px; align-items: center; padding: 14px;
   border-radius: 18px; background: var(--card); border: 1px solid var(--line); animation: rise 0.45s both;

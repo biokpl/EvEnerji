@@ -10,6 +10,7 @@ const COLORS = [
   '#34d399', '#14b8a6', '#a16207', '#e5e7eb', '#94a3b8',
 ];
 const busy = new Set();
+let sorting = false;   // "Sırala" modu: kartlarda yukarı/aşağı okları
 
 function devCard(M, d) {
   const L = d.live || {};
@@ -26,11 +27,13 @@ function devCard(M, d) {
   } else {
     sub = `<b>${watt(L.w)}</b>${L.v ? ` · ${num(L.v)} V` : ''}${L.a != null ? ` · ${num(L.a, 2)} A` : ''} · bugün ${kwh(L.today || 0)}`;
   }
-  const right = canSwitch
+  const right = sorting
+    ? `<div class="sort-btns"><button data-mv="-1" data-id="${esc(d.id)}" aria-label="${esc(d.name)} yukarı">${icon('up')}</button><button data-mv="1" data-id="${esc(d.id)}" aria-label="${esc(d.name)} aşağı">${icon('downArrow')}</button></div>`
+    : canSwitch
     ? `<button class="switch ${on ? 'on' : ''} ${busy.has(d.id) ? 'busy' : ''}" data-sw="${esc(d.id)}" aria-label="${esc(d.name)} ${on ? 'kapat' : 'aç'}" ${offline ? 'disabled' : ''}></button>`
     : d.type === 'ana_sayac' ? `<span class="lock">${icon('lock')}Yalnız ölçüm</span>` : '';
   return `
-  <div class="dev ${on && !offline ? 'on' : ''} ${offline ? 'offline' : ''}" style="--dc:${esc(d.color || '#3b82f6')}">
+  <div class="dev ${on && !offline ? 'on' : ''} ${offline ? 'offline' : ''} ${sorting ? 'sorting' : ''}" style="--dc:${esc(d.color || '#3b82f6')}">
     <div class="d-ic" data-edit="${esc(d.id)}" role="button" aria-label="${esc(d.name)} düzenle">${icon(d.icon || 'plug')}</div>
     <div data-edit="${esc(d.id)}" role="button" style="min-width:0;cursor:pointer">
       <div class="d-name">${esc(d.name)}${d.enabled ? '' : ' <span class="muted">(kapalı)</span>'}</div>
@@ -110,6 +113,8 @@ export function renderCihazlar(el, M, app) {
       <p class="hint">Smart Life hesabında henüz eklenmemiş prizler.</p>
       <div class="stack">${M.discovered.map(([id, d]) => `<div class="row-between"><div><b>${esc(d.name)}</b><div class="muted" style="font-size:12px">${esc(d.product || '')}</div></div>
         <button class="btn primary sm" data-add="${esc(id)}">${icon('plus')}Ekle</button></div>`).join('')}</div></div>` : ''}
+    ${list.length > 1 ? `<div class="devs-head"><span>${sorting ? 'Okları kullanarak sırala' : `${list.length} cihaz`}</span>
+      <button class="btn ${sorting ? 'primary' : 'ghost'} sm" id="sort">${icon(sorting ? 'check' : 'edit')}${sorting ? 'Bitti' : 'Sırala'}</button></div>` : ''}
     <div class="devs">${list.map((d) => devCard(M, d)).join('')}</div>
     <div style="height:10px"></div>
     <button class="add-dev" id="add">${icon('plus')}Priz ekle</button>
@@ -120,7 +125,17 @@ export function renderCihazlar(el, M, app) {
     const [id, d] = M.discovered.find(([x]) => x === b.dataset.add);
     editSheet(M, id, app, { id, name: d.name, provider: d.provider || 'tuya', type: 'priz', icon: 'plug', color: COLORS[2], enabled: true, product: d.product });
   }));
-  el.querySelectorAll('[data-edit]').forEach((b) => b.addEventListener('click', () => editSheet(M, b.dataset.edit, app)));
+  el.querySelector('#sort')?.addEventListener('click', () => { sorting = !sorting; app.refresh({ silent: true, force: true }); });
+  el.querySelectorAll('[data-mv]').forEach((b) => b.addEventListener('click', async () => {
+    const ids = list.map((d) => d.id);
+    const i = ids.indexOf(b.dataset.id), j = i + Number(b.dataset.mv);
+    if (j < 0 || j >= ids.length) return;
+    [ids[i], ids[j]] = [ids[j], ids[i]];
+    // tüm sıraları 0..n-1 olarak yeniden yaz (eşit sıra numaraları da düzelir)
+    try { await app.store.patch('devices', Object.fromEntries(ids.map((id, k) => [`${id}/order`, k]))); }
+    catch { toast('Sıra kaydedilemedi'); }
+  }));
+  el.querySelectorAll('[data-edit]').forEach((b) => b.addEventListener('click', () => { if (!sorting) editSheet(M, b.dataset.edit, app); }));
   el.querySelectorAll('[data-sw]').forEach((b) => b.addEventListener('click', async () => {
     const id = b.dataset.sw;
     const turnOn = !b.classList.contains('on');

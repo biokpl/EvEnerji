@@ -84,6 +84,16 @@ export const store = {
     this.emit('all');
   },
 
+  // Birden çok alt yolu tek istekte yazar (ör. cihaz sırası). Ekran hemen güncellenir,
+  // sunucu reddederse veri yeniden yüklenip eski hâline döner.
+  async patch(path, obj) {
+    Object.entries(obj).forEach(([k, v]) => setPath(this.raw, `${path}/${k}`, v));
+    this.emit('reload');
+    if (this.mode === 'demo') return;
+    try { await req('PATCH', `${this.fb}/${path}.json`, obj); }
+    catch (e) { this.reload(); throw e; }
+  },
+
   async command(device, action) {
     if (this.mode === 'demo') return demoCommand(this, device, action);
     if (!this.key) return { ok: false, msg: 'Kontrol anahtarı girilmemiş (Ayarlar).', needKey: true };

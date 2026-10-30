@@ -20,8 +20,8 @@ WINDSHIELD = [(126, 69), (140, 52), (160, 33), (182, 21), (205, 14), (240, 11), 
 SIDE = [(343, 68), (346, 50), (352, 32), (360, 21), (370, 16), (395, 15), (440, 17), (452, 22),
         (464, 36), (472, 50), (476, 62), (476, 69)]
 
-ALPHA = 0.64      # cam opaklığı (0 saydam, 1 tam siyah)
-KEEP_LIGHT = 0.30  # yansımalardan korunan parlaklık payı
+ALPHA = 0.72      # cam opaklığı (0 saydam, 1 tam siyah)
+KEEP_LIGHT = 0.26  # yansımalardan korunan parlaklık payı
 REFLECT = "gok"   # cama eklenen yansıma deseni (bkz. reflect())
 
 
@@ -39,7 +39,7 @@ def reflect(kind, x, y):
     if kind == "cift":      # iki ince paralel şerit
         return 0.42 * band(t, 236, 11) + 0.26 * band(t, 262, 7) + 0.38 * band(t, 418, 9) + 0.22 * band(t, 440, 6)
     if kind == "gok":       # üstten gökyüzü yansıması + hafif şerit
-        return 0.34 * max(0.0, 1 - y / 46) ** 1.6 + 0.18 * band(t, 250, 22)
+        return 0.62 * max(0.0, 1 - y / 50) ** 1.4 + 0.40 * band(t, 250, 24)
     return 0.0
 
 

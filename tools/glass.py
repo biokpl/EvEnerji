@@ -1,6 +1,6 @@
 """Araç fotoğrafındaki camları yarı saydam füme (siyah) cama çevirir.
 
-  python tools/glass.py
+  python tools/glass.py [yansima: yok|capraz|gok|cift] [çıktı]
 Girdi: tools/src/t10x_cut.webp (arka planı silinmiş, camları açık gri)
 Çıktı: app/img/t10x.webp
 Cam bölgeleri elle çizilmiş çokgenlerdir; içlerinde yalnız renksiz (gri/beyaz)
@@ -22,9 +22,28 @@ SIDE = [(343, 68), (346, 50), (352, 32), (360, 21), (370, 16), (395, 15), (440, 
 
 ALPHA = 0.64      # cam opaklığı (0 saydam, 1 tam siyah)
 KEEP_LIGHT = 0.30  # yansımalardan korunan parlaklık payı
+REFLECT = "gok"   # cama eklenen yansıma deseni (bkz. reflect())
 
 
-def main():
+def band(t, center, width):
+    """Yumuşak kenarlı şerit: merkezde 1, kenarlara doğru 0."""
+    d = abs(t - center) / width
+    return max(0.0, 1 - d * d)
+
+
+def reflect(kind, x, y):
+    """Cam üzerine eklenecek beyaz parlama miktarı (0..1)."""
+    t = x + y * 1.7   # sağ üstten sol alta eğik çizgiler
+    if kind == "capraz":    # tek geniş çapraz parlama
+        return 0.30 * band(t, 250, 34) + 0.30 * band(t, 430, 26)
+    if kind == "cift":      # iki ince paralel şerit
+        return 0.42 * band(t, 236, 11) + 0.26 * band(t, 262, 7) + 0.38 * band(t, 418, 9) + 0.22 * band(t, 440, 6)
+    if kind == "gok":       # üstten gökyüzü yansıması + hafif şerit
+        return 0.34 * max(0.0, 1 - y / 46) ** 1.6 + 0.18 * band(t, 250, 22)
+    return 0.0
+
+
+def main(kind=REFLECT, dst=DST):
     im = Image.open(SRC).convert("RGBA")
     mask = Image.new("L", im.size)
     d = ImageDraw.Draw(mask)
@@ -48,11 +67,16 @@ def main():
             v = lum * KEEP_LIGHT
             nr, ng, nb = (int(255 * min(1, v * t + 0.02)) for t in (0.9, 0.95, 1.08))
             na = int(255 * (ALPHA + (1 - ALPHA) * v))
-            px[x, y] = (round(r + (nr - r) * k), round(g + (ng - g) * k), round(b + (nb - b) * k),
-                        round(a + (na - a) * k))
-    im.save(DST, "WEBP", quality=90, method=6)
-    print("yazıldı", DST, im.size)
+            r2, g2, b2, a2 = (r + (nr - r) * k, g + (ng - g) * k, b + (nb - b) * k, a + (na - a) * k)
+            f = reflect(kind, x, y) * k
+            if f:
+                r2, g2, b2 = (c + (w - c) * f for c, w in ((r2, 225), (g2, 236), (b2, 250)))
+                a2 += (255 - a2) * f
+            px[x, y] = (round(r2), round(g2), round(b2), round(a2))
+    im.save(dst, "WEBP", quality=90, method=6)
+    print("yazıldı", dst, im.size)
 
 
 if __name__ == "__main__":
-    main()
+    import sys
+    main(sys.argv[1] if len(sys.argv) > 1 else REFLECT, Path(sys.argv[2]) if len(sys.argv) > 2 else DST)

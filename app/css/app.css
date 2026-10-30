@@ -307,7 +307,7 @@ details.tbl summary { cursor: pointer; font-size: 12.5px; color: var(--muted); f
 
 /* Sarıcı */
 .reel-stage { display: grid; place-items: center; padding: 6px 0 2px; }
-.reel-stage svg { width: 210px; height: 210px; }
+.reel-stage svg { width: 232px; height: 270px; }
 .reel-spin { transform-origin: 105px 105px; }
 .reel-spin.go { animation: spin 1.8s linear infinite; }
 .reel-spin.rev { animation: spin 1.8s linear infinite reverse; }

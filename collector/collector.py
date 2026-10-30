@@ -89,7 +89,8 @@ class Collector:
         self.state.setdefault("hi_amp_since", {})
         self.meta: dict = {}
         self.providers: dict = {}
-        self.shared: dict = {}
+        # sağlayıcılar arası ortak nesneler; save_cfg: yenilenen eWeLink jetonunu config.json'a yazar
+        self.shared: dict = {"save_cfg": self.save_cfg}
         self.meters: dict[str, DeviceMeter] = {}
         self.sessions: dict[str, SessionTracker] = {}
         self.settings: dict = {}
@@ -99,6 +100,12 @@ class Collector:
         self.used_nonces: dict[str, float] = {}
         self.t_flush = self.t_meta = self.t_cmd = self.t_disc = 0.0
         self.running = True
+
+    def save_cfg(self):
+        tmp = CFG_FILE.with_suffix(".tmp")
+        tmp.write_text(json.dumps(self.cfg, ensure_ascii=False, indent=2), encoding="utf-8")
+        os.chmod(tmp, 0o600)
+        tmp.replace(CFG_FILE)
 
     # ------------------------------------------------------------ cihazlar
     def refresh_devices(self):

@@ -110,13 +110,28 @@ class EwelinkLan:
 
 # ---------------------------------------------------------------- Bulut
 class CoolkitCloud:
-    def __init__(self, cfg: dict):
+    def __init__(self, cfg: dict, save=None):
         self.cfg = cfg
         self.base = f"https://{cfg.get('region', 'eu')}-apia.coolkit.cc"
-        self.token = None
+        self.save = save            # yenilenen OAuth jetonlarını config.json'a yazar
+        oa = cfg.get("oauth") or {}
+        self.token = oa.get("access_token")
         self.s = requests.Session()
 
     def _login(self):
+        oa = self.cfg.get("oauth") or {}
+        if oa.get("refresh_token"):   # ewelink_kur.py ile alınan jeton: şifre gerekmez
+            body = json.dumps({"rt": oa["refresh_token"]})
+            r = self.s.post(f"{self.base}/v2/user/refresh", data=body, timeout=15, headers={
+                "Content-Type": "application/json", "X-CK-Appid": self.cfg["app_id"],
+                "Authorization": f"Sign {base64.b64encode(hmac.new(self.cfg['app_secret'].encode(), body.encode(), hashlib.sha256).digest()).decode()}"}).json()
+            if r.get("error"):
+                raise RuntimeError(f"eWeLink jeton yenileme: {r.get('msg')} (python ewelink_kur.py ile yeniden bağla)")
+            oa.update(access_token=r["data"]["at"], refresh_token=r["data"]["rt"], ts=int(time.time()))
+            self.token = oa["access_token"]
+            if self.save:
+                self.save()
+            return
         body = json.dumps({"countryCode": self.cfg.get("country_code", "+90"),
                            "email": self.cfg["email"], "password": self.cfg["password"]})
         sign = base64.b64encode(hmac.new(self.cfg["app_secret"].encode(), body.encode(),
@@ -177,5 +192,5 @@ def make_ewelink(dev_id: str, local: dict, cfg: dict, shared: dict):
     if mode == "lan":
         return EwelinkLan(dev_id, local)
     if "coolkit" not in shared:
-        shared["coolkit"] = CoolkitCloud(cfg)
+        shared["coolkit"] = CoolkitCloud(cfg, save=shared.get("save_cfg"))
     return EwelinkCloud(dev_id, local, shared["coolkit"])

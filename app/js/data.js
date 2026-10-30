@@ -59,7 +59,7 @@ export const store = {
       raw.live = { ...raw.live, ...this.raw.live };
       this.raw = raw;
       this.online = true;
-      this.emit('all');
+      this.emit('reload');
     } catch { this.online = false; this.emit('live'); }
   },
 

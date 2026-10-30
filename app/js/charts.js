@@ -1,5 +1,8 @@
 // ECharts sarmalayıcı: tema renkleri CSS değişkenlerinden okunur
 const instances = new Set();
+let quiet = false;
+// Arka plan yenilemesinde grafikler animasyonsuz çizilir (kullanıcı fark etmesin)
+export function setQuiet(on) { quiet = on; }
 
 export function colors() {
   const cs = getComputedStyle(document.documentElement);
@@ -23,6 +26,7 @@ export function mount(el, option) {
       textStyle: { color: c.text, fontSize: 12 }, extraCssText: 'border-radius:12px;box-shadow:0 8px 30px rgba(0,0,0,.25);',
     },
     ...option,
+    ...(quiet ? { animation: false } : {}),
   });
   instances.add(ch);
   return ch;

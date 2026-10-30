@@ -1,6 +1,6 @@
 import { store } from './data.js';
 import { build } from './model.js';
-import { disposeAll } from './charts.js';
+import { disposeAll, setQuiet } from './charts.js';
 import { closeSheet, hydrateIcons, icon, sheetOpen, toast } from './ui.js';
 import { renderPano, updatePano } from './views/pano.js';
 import { renderTogg, updateTogg } from './views/togg.js';
@@ -71,8 +71,22 @@ function header() {
     ? `<div class="banner">${icon('info')}<span>${store.reason} Kurulum bitince gerçek veriye kendiliğinden geçer.</span></div>` : '';
 }
 
-function refresh({ keepScroll = true } = {}) {
+// Ekrandaki verinin imzası: değişmediyse arka plan yenilemesi hiçbir şeye dokunmaz.
+// Saat de imzaya girer ki gün/saat dönümünde grafikler kendiliğinden güncellensin.
+let shownSig = '';
+function dataSig() {
+  const { live, winder, ...rest } = store.raw;
+  const d = new Date();
+  return `${current}|${document.documentElement.dataset.theme}|${d.toDateString()} ${d.getHours()}|${JSON.stringify(rest)}`;
+}
+const busy = () => sheetOpen() || document.activeElement?.matches('input,select,textarea');
+
+// silent: arka plan yenilemesi — veri aynıysa atla, değiştiyse animasyonsuz ve tek karede değiştir
+function refresh({ keepScroll = true, silent = false } = {}) {
   if (!store.raw) return;
+  const sig = dataSig();
+  if (silent && (sig === shownSig || busy())) return;
+  shownSig = sig;
   const y = window.scrollY;
   M = build(store.raw);
   disposeAll();
@@ -80,11 +94,11 @@ function refresh({ keepScroll = true } = {}) {
   document.getElementById('title').textContent = v.title;
   document.querySelectorAll('#nav button').forEach((b) => b.classList.toggle('on', b.dataset.tab === current));
   header();
-  viewEl.innerHTML = '';
   const wrap = document.createElement('div');
-  wrap.className = 'view';
-  viewEl.append(wrap);
-  v.render(wrap, M, app);
+  wrap.className = silent ? 'view no-anim' : 'view';
+  viewEl.replaceChildren(wrap);
+  setQuiet(silent);
+  try { v.render(wrap, M, app); } finally { setQuiet(false); }
   if (keepScroll) window.scrollTo(0, y);
 }
 
@@ -122,6 +136,7 @@ document.getElementById('themeBtn').addEventListener('click', () => {
 let pending = false;
 store.subscribe((kind) => {
   if (kind === 'live') return onLive();
+  if (kind === 'reload') return refresh({ silent: true });
   if (pending) return;
   pending = true;
   requestAnimationFrame(() => { pending = false; refresh(); });
@@ -132,8 +147,8 @@ viewEl.innerHTML = `<div class="empty" style="padding-top:80px">${icon('bolt')}<
 store.init();
 if (keySaved) setTimeout(() => toast('Kontrol anahtarı kaydedildi ✓ Prizleri artık buradan açıp kapatabilirsin', 4500), 1200);
 
-// Gün dönümü ve saatlik grafikler için 5 dk'da bir tam yenile (sayfa açıksa)
-setInterval(() => { if (!sheetOpen()) refresh(); }, 5 * 60 * 1000);
+// Gün/saat dönümü için 5 dk'da bir sessiz kontrol (veri ya da saat değiştiyse fark ettirmeden yeniden çizer)
+setInterval(() => refresh({ silent: true }), 5 * 60 * 1000);
 
 if ('serviceWorker' in navigator && location.protocol !== 'file:') {
   navigator.serviceWorker.register('sw.js').catch(() => {});

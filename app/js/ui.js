@@ -94,19 +94,42 @@ export function openSheet(html, onMount) {
   document.body.append(bg, sh);
   sheetEls = { bg, sh };
   bg.addEventListener('click', () => closeSheet());
-  let y0 = null;
-  sh.addEventListener('touchstart', (e) => { if (sh.scrollTop <= 0) y0 = e.touches[0].clientY; }, { passive: true });
-  sh.addEventListener('touchmove', (e) => {
+  // Aşağı sürükleyerek kapatma. İçerik en üstteyken aşağı çekiş paneli taşır; tarayıcının
+  // kendi kaydırması/yenileme hareketi engellenir (yoksa sürükleme yarıda kesiliyordu).
+  let y0 = null, t0 = 0, dy = 0, drag = false;
+  const start = (e) => {
+    y0 = sh.scrollTop <= 0 ? e.touches[0].clientY : null;
+    t0 = Date.now(); dy = 0; drag = false;
+  };
+  const move = (e) => {
     if (y0 == null) return;
-    const dy = e.touches[0].clientY - y0;
-    if (dy > 0) sh.style.transform = `translate(-50%, ${dy}px)`;
-  }, { passive: true });
-  sh.addEventListener('touchend', (e) => {
+    dy = e.touches[0].clientY - y0;
+    if (!drag) {
+      if (dy < -4 || sh.scrollTop > 0) { y0 = null; return; }   // yukarı kaydırma: normal içerik kaydırması
+      if (dy < 6) return;
+      drag = true; sh.classList.add('dragging'); bg.classList.add('dragging');
+    }
+    e.preventDefault();
+    const d = Math.max(0, dy);
+    sh.style.transform = `translate(-50%, ${d}px)`;
+    bg.style.opacity = String(Math.max(0.15, 1 - d / (sh.offsetHeight || 600)));
+  };
+  const end = () => {
     if (y0 == null) return;
-    const dy = e.changedTouches[0].clientY - y0; y0 = null;
-    sh.style.transform = '';
-    if (dy > 110) closeSheet();
-  });
+    y0 = null;
+    if (!drag) return;
+    drag = false;
+    sh.classList.remove('dragging'); bg.classList.remove('dragging');
+    const fast = dy > 45 && dy / Math.max(1, Date.now() - t0) > 0.5;   // hızlı aşağı fiske
+    if (dy > Math.min(140, sh.offsetHeight * 0.25) || fast) {
+      sh.style.transform = 'translate(-50%, 105%)'; bg.style.opacity = '0';
+      closeSheet();
+    } else { sh.style.transform = ''; bg.style.opacity = ''; }
+  };
+  sh.addEventListener('touchstart', start, { passive: true });
+  sh.addEventListener('touchmove', move, { passive: false });
+  sh.addEventListener('touchend', end);
+  sh.addEventListener('touchcancel', end);
   requestAnimationFrame(() => { bg.classList.add('open'); sh.classList.add('open'); });
   hydrateIcons(sh);
   onMount && onMount(sh);

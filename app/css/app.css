@@ -353,6 +353,8 @@ select.input { padding-right: 6px; }
 .sheet-bg.open { opacity: 1; }
 .sheet { position: fixed; left: 50%; bottom: 0; z-index: 51; width: min(560px, 100%); transform: translate(-50%, 105%); transition: transform 0.32s cubic-bezier(.2, .8, .2, 1); background: var(--card-solid); border-radius: 26px 26px 0 0; border: 1px solid var(--line); border-bottom: 0; padding: 10px 18px calc(22px + env(safe-area-inset-bottom)); max-height: 88vh; overflow-y: auto; box-shadow: 0 -20px 60px rgba(0, 0, 0, 0.4); }
 .sheet.open { transform: translate(-50%, 0); }
+.sheet { overscroll-behavior: contain; }
+.sheet.dragging, .sheet-bg.dragging { transition: none; }
 .sheet .grab { width: 42px; height: 5px; border-radius: 9px; background: var(--line); margin: 2px auto 14px; }
 .sheet h3 { margin: 0; font-size: 20px; letter-spacing: -0.02em; }
 .sheet .sh-sub { color: var(--muted); font-size: 13px; margin: 3px 0 14px; line-height: 1.45; }

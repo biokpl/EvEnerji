@@ -56,7 +56,7 @@ const nf = (d) => new Intl.NumberFormat('tr-TR', { minimumFractionDigits: d, max
 const NF = [nf(0), nf(1), nf(2)];
 export const num = (x, d = 0) => (x == null || Number.isNaN(x) ? '–' : NF[d].format(x));
 export const kwh = (x, d) => `${num(x, d ?? (Math.abs(x) < 10 ? 2 : Math.abs(x) < 100 ? 1 : 0))} kWh`;
-export const tl = (x, d) => `${num(x, d ?? (Math.abs(x) < 100 ? 2 : 0))} TL`;
+export const tl = (x, d) => `${num(x, d ?? (Math.abs(x) < 100 ? 2 : 0))} ₺`;
 export const watt = (w) => (w == null ? '–' : w >= 1000 ? `${num(w / 1000, 2)} kW` : `${num(w)} W`);
 export const pct = (x, d = 0) => `%${num(x, d)}`;
 export const AYLAR = ['Ocak', 'Şubat', 'Mart', 'Nisan', 'Mayıs', 'Haziran', 'Temmuz', 'Ağustos', 'Eylül', 'Ekim', 'Kasım', 'Aralık'];

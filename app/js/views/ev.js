@@ -38,7 +38,7 @@ function breakdown(M) {
     { name: 'Diğer (ölçülmeyen)', k: other, color: 'var(--home)', ic: 'home' }];
   return `
     <div class="share-bar">${all.map((r) => `<i style="width:${(r.k / total) * 100}%;background:${r.color}"></i>`).join('')}</div>
-    <table class="table"><thead><tr><th>Cihaz</th><th>kWh</th><th>Pay</th><th>TL</th></tr></thead><tbody>
+    <table class="table"><thead><tr><th>Cihaz</th><th>kWh</th><th>Pay</th><th>₺</th></tr></thead><tbody>
     ${all.map((r) => `<tr><td><span style="display:inline-block;width:9px;height:9px;border-radius:3px;background:${r.color};margin-right:7px"></span>${esc(r.name)}</td>
       <td>${num(r.k, 1)}</td><td>${pct((r.k / total) * 100)}</td><td>${num(r.k * M.priceNow)}</td></tr>`).join('')}
     </tbody></table>`;
@@ -65,8 +65,8 @@ export function renderEv(el, M, app) {
       <p class="hint">Kümülatif tüketim, yıl sonu tahmini ve ${num(M.t.limit_kwh)} kWh limiti.</p>
       <div class="legend"><span><i style="background:var(--accent)"></i>Gerçekleşen</span><span><i style="background:var(--faint)"></i>Tahmin</span><span><i style="background:var(--bad);height:2px"></i>Limit</span></div>
       <div class="chart short" id="cc"></div>
-      <details class="tbl"><summary>Aylık tablo (TL)</summary>
-        <table class="table"><thead><tr><th>Ay</th><th>kWh</th><th>Togg</th><th>TL</th></tr></thead><tbody>
+      <details class="tbl"><summary>Aylık tablo (₺)</summary>
+        <table class="table"><thead><tr><th>Ay</th><th>kWh</th><th>Togg</th><th>₺</th></tr></thead><tbody>
         ${M.homeMonths.map((k, i) => (i <= M.mi ? `<tr class="${M.durum.aylikSktt[i] ? 'sktt' : ''}"><td>${AYLAR[i]}</td><td>${num(k)}</td><td>${num(M.evMonths[i])}</td><td>${num(M.durum.aylikTl[i])}</td></tr>` : '')).join('')}
         <tr><td><b>Toplam</b></td><td><b>${num(M.ytd)}</b></td><td><b>${num(M.evYtd)}</b></td><td><b>${num(M.durum.toplamTl)}</b></td></tr>
         </tbody></table></details>

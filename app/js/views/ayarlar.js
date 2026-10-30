@@ -27,8 +27,8 @@ export function renderAyarlar(el, M, app) {
         <div class="seg" id="ys">${[M.y, M.y + 1].map((y) => `<button data-y="${y}" class="${y === yr ? 'on' : ''}">${y}</button>`).join('')}</div></div>
       <p class="hint">Faturandaki <b>vergiler dahil</b> birim fiyatları gir. Varsayılanlar yaklaşık değerdir.</p>
       <div class="field"><div><label for="lim">Yıllık limit (kWh)</label><small>2026: 4.000 · 1 Ocak 2027'den itibaren 3.000 (EPDK).</small></div><input class="input num" id="lim" inputmode="numeric" value="${T.limit_kwh ?? yasalLimit(yr)}" placeholder="${M.t.limit_kwh}"></div>
-      <div class="field"><div><label for="nt">Normal fiyat (TL/kWh)</label></div><input class="input num" id="nt" inputmode="decimal" value="${f(T.normal_tl)}" placeholder="${f(3.24)}"></div>
-      <div class="field"><div><label for="st">Son kaynak fiyatı (TL/kWh)</label><small>Limit aşılınca uygulanan fiyat.</small></div><input class="input num" id="st" inputmode="decimal" value="${f(T.sktt_tl)}" placeholder="${f(6.49)}"></div>
+      <div class="field"><div><label for="nt">Normal fiyat (₺/kWh)</label></div><input class="input num" id="nt" inputmode="decimal" value="${f(T.normal_tl)}" placeholder="${f(3.24)}"></div>
+      <div class="field"><div><label for="st">Son kaynak fiyatı (₺/kWh)</label><small>Limit aşılınca uygulanan fiyat.</small></div><input class="input num" id="st" inputmode="decimal" value="${f(T.sktt_tl)}" placeholder="${f(6.49)}"></div>
       <div class="field"><div><label for="ky">Aylık kademe (kWh)</label><small>Aylık kademe uygulanıyorsa sınır; yoksa boş bırak.</small></div><input class="input num" id="ky" inputmode="numeric" value="${T.kademe_kwh_ay || ''}" placeholder="yok"></div>
       <div class="field"><div><label for="k2">Kademe üstü fiyat</label></div><input class="input num" id="k2" inputmode="decimal" value="${f(T.kademe2_tl || '')}" placeholder="–"></div>
       ${yr === M.y ? `<div class="field"><div><label for="py">${M.y - 1} toplam tüketimi (kWh)</label><small>Bu yılın limitini aştıysa bütün yıl son kaynak fiyatı uygulanır. e-Devlet / fatura.</small></div><input class="input num" id="py" inputmode="numeric" value="${T.onceki_yil_kwh ?? ''}" placeholder="kWh"></div>` : ''}
@@ -48,7 +48,7 @@ export function renderAyarlar(el, M, app) {
       <h2>Araç</h2>
       <div class="field"><div><label for="bk">Batarya (kWh)</label><small>T10X Uzun Menzil 88,5 · Standart 52,4</small></div><input class="input num" id="bk" inputmode="decimal" value="${f(car.battery_kwh)}"></div>
       <div class="field"><div><label for="ef">Şarj verimi (%)</label><small>Duvardan çekilenin bataryaya giden payı (Mode-2 AC ≈ %88–92).</small></div><input class="input num" id="ef" inputmode="numeric" value="${Math.round(car.efficiency * 100)}"></div>
-      <div class="field"><div><label for="pt">İstasyon fiyatı (TL/kWh)</label><small>Togg sekmesindeki kıyas için.</small></div><input class="input num" id="pt" inputmode="decimal" value="${f(car.public_tl)}"></div>
+      <div class="field"><div><label for="pt">İstasyon fiyatı (₺/kWh)</label><small>Togg sekmesindeki kıyas için.</small></div><input class="input num" id="pt" inputmode="decimal" value="${f(car.public_tl)}"></div>
       ${M.history ? `<div class="field"><div><label>Aktarılan geçmiş</label><small>${esc(M.history.source || '')} · ${esc(M.history.from || '')} – ${esc(M.history.until || '')}. Togg toplamlarına eklenir.</small></div><b class="num">${num(M.histTotal, 1)} kWh</b></div>` : ''}
       <button class="btn ghost" id="saveC" style="margin-top:12px">${icon('check')}Kaydet</button>
     </div>

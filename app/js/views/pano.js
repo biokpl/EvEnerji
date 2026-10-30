@@ -64,13 +64,13 @@ function kpis(M) {
     </div>
     <div class="kpi" data-go="ev">
       <div class="k-label">${icon('coin')}${AYLAR[M.mi]} (tahmini)</div>
-      <div class="k-val">${num(M.monthTl)}<small>TL</small></div>
-      <div class="k-sub">≈ ${kwh(M.monthKwh, 0)} · son kWh ${num(M.priceNow, 2)} TL</div>
+      <div class="k-val">${num(M.monthTl)}<small>₺</small></div>
+      <div class="k-sub">≈ ${kwh(M.monthKwh, 0)} · son kWh ${num(M.priceNow, 2)} ₺</div>
     </div>
     <div class="kpi" data-go="togg">
       <div class="k-label">${icon('bolt')}Togg ${M.y}</div>
-      <div class="k-val">${num(M.evTl)}<small>TL</small></div>
-      <div class="k-sub">${kwh(M.evYtd, 0)} · ort. ${num(M.evAvgTl, 2)} TL/kWh</div>
+      <div class="k-val">${num(M.evTl)}<small>₺</small></div>
+      <div class="k-sub">${kwh(M.evYtd, 0)} · ort. ${num(M.evAvgTl, 2)} ₺/kWh</div>
     </div>
   </div>`;
 }
@@ -113,7 +113,7 @@ function insights(M) {
     const i = M.kademeAylari.at(-1);
     const h = M.homeMonths[i], e = M.evMonths[i], k = M.t.kademe_kwh_ay;
     out.push(alertBox('warn', 'car', 'Togg evi pahalı kademeye taşıyor',
-      `${ayDa(i)} Togg olmadan ev ≈ ${kwh(h - e, 0)} ile ucuz kademede (${num(k)} kWh'ye kadar ${num(M.t.normal_tl, 2)} TL) kalırdı. Togg'la ${kwh(h, 0)} oldu; ${kwh(h - k, 0)} ${num(M.t.kademe2_tl, 2)} TL'den faturalandı. Bu yüzden Togg'un kWh'si sana ortalama <b>${num(M.evAvgTl, 2)} TL</b>'ye geliyor.`));
+      `${ayDa(i)} Togg olmadan ev ≈ ${kwh(h - e, 0)} ile ucuz kademede (${num(k)} kWh'ye kadar ${num(M.t.normal_tl, 2)} ₺) kalırdı. Togg'la ${kwh(h, 0)} oldu; ${kwh(h - k, 0)} ${num(M.t.kademe2_tl, 2)} ₺'den faturalandı. Bu yüzden Togg'un kWh'si sana ortalama <b>${num(M.evAvgTl, 2)} ₺</b>'ye geliyor.`));
   }
   // Gelecek yıl: tam yıl tüketim bu hızla limiti aşıyor mu?
   const sel = M.scenarios[0];
@@ -130,8 +130,8 @@ function insights(M) {
 function scenarios(M) {
   const max = Math.max(M.nextYear, M.proj, ...M.scenarios.map((s) => s.L)) * 1.05;
   const status = (s) => {
-    if (s.fromJan) return { c: 'var(--bad)', t: 'Ocak\'tan SKTT', sub: `+${num(s.extra)} TL` };
-    if (s.fromMonth) return { c: 'var(--bad)', t: `${ayDan(s.fromMonth - 1)} SKTT`, sub: `+${num(s.extra)} TL · ${M.y + 2} tamamı` };
+    if (s.fromJan) return { c: 'var(--bad)', t: 'Ocak\'tan SKTT', sub: `+${num(s.extra)} ₺` };
+    if (s.fromMonth) return { c: 'var(--bad)', t: `${ayDan(s.fromMonth - 1)} SKTT`, sub: `+${num(s.extra)} ₺ · ${M.y + 2} tamamı` };
     if (s.exceedNext) return { c: 'var(--mid)', t: `${ayDa(s.exceedNext - 1)} aşılır`, sub: `${M.y + 2} SKTT` };
     return { c: 'var(--good)', t: 'Normal', sub: 'tarife' };
   };
@@ -150,7 +150,7 @@ function scenarios(M) {
     <h2>${M.y + 1} limiti: ${num(M.tNext.limit_kwh)} kWh</h2>
     <p class="hint">Bu hızla ${M.y + 1}'de yıllık ≈ <b>${kwh(M.nextYear, 0)}</b> (çubuk) tüketirsin; dikey çizgi limit. ${M.y} toplamı ≈ ${kwh(M.proj, 0)}.</p>
     <div class="scen">${rows}</div>
-    <p class="chart-note">Limit aşılırsa aşılan ayı izleyen 3. aydan itibaren son kaynak fiyatı (tahmini ${num(M.tNext.sktt_tl, 2)} TL/kWh) uygulanır ve ertesi yıl tamamen son kaynaktan faturalanır. Mevsim etkisi hesaba katılmadı.</p>
+    <p class="chart-note">Limit aşılırsa aşılan ayı izleyen 3. aydan itibaren son kaynak fiyatı (tahmini ${num(M.tNext.sktt_tl, 2)} ₺/kWh) uygulanır ve ertesi yıl tamamen son kaynaktan faturalanır. Mevsim etkisi hesaba katılmadı.</p>
   </div>`;
 }
 
@@ -163,9 +163,9 @@ export function renderPano(el, M, app) {
         <p>${heroText(M)}</p>
       </div>
       <div class="trio">
-        <div><b>${num(Math.max(0, M.t.limit_kwh - M.ytd))}</b><span>kalan kWh</span></div>
-        <div><b>${num(M.butce, 1)}</b><span>günlük bütçe</span></div>
-        ${M.home ? `<div><b data-live="todayHome2">${num(M.todayHome, 1)}</b><span>bugün kWh</span></div>` : `<div><b>${num(M.rate, 1)}</b><span>kWh/gün hız</span></div>`}
+        <div><b>${num(Math.max(0, M.t.limit_kwh - M.ytd))}<small> kWh</small></b><span>limitten kalan</span></div>
+        <div><b>${num(M.butce, 1)}<small> kWh</small></b><span>günlük bütçe<br>≈ ${tl(M.butce * M.priceNow, 0)}/gün</span></div>
+        ${M.home ? `<div><b><span data-live="todayHome2">${num(M.todayHome, 1)}</span><small> kWh</small></b><span>bugün</span></div>` : `<div><b>${num(M.rate, 1)}<small> kWh</small></b><span>günlük ort. tüketim</span></div>`}
       </div>
     </div>
     ${kpis(M)}

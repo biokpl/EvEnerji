@@ -30,13 +30,13 @@ function openSession(M, s, app) {
     <div class="sh-sub">${hm(s.start)}${s.end ? ` – ${hm(s.end)} · ${dur(s.minutes ?? (s.end - s.start) / 60)}` : ' · sürüyor'}</div>
     <div class="mini-stats">
       <div><b>${num(s.kwh, 2)}</b><span>kWh</span></div>
-      <div><b>${num(cost, 2)}</b><span>TL</span></div>
+      <div><b>${num(cost, 2)}</b><span>₺</span></div>
       <div><b>+${pct(soc)}</b><span>≈ batarya</span></div>
     </div>
     <div class="mini-stats">
       <div><b>${watt(s.peak_w)}</b><span>tepe güç</span></div>
       <div><b>${s.avg_w ? watt(s.avg_w) : '–'}</b><span>ortalama</span></div>
-      <div><b>${num(sktt, 0)}</b><span>SKTT'de TL</span></div>
+      <div><b>${num(sktt, 0)}</b><span>SKTT'de ₺</span></div>
     </div>
     <div class="field">
       <div><label for="odo">Kilometre sayacı</label><small>Şarj başlarken aracın km'si. İki şarjda girersen kWh/100 km hesaplanır.</small></div>
@@ -88,7 +88,7 @@ export function renderTogg(el, M, app) {
       <div class="legend" style="position:relative;z-index:1"><span><i style="background:var(--ev)"></i>Togg ${pct(M.evShare * 100)}</span><span><i style="background:var(--home)"></i>Evin geri kalanı</span></div>
       <div class="trio">
         <div><b>${M.per100 ? num(M.per100, 1) : '–'}</b><span>kWh/100 km</span></div>
-        <div><b>${tlPer100 ? num(tlPer100, 2) : '–'}</b><span>TL/100 km</span></div>
+        <div><b>${tlPer100 ? num(tlPer100, 2) : '–'}</b><span>₺/100 km</span></div>
         <div><b>${num(M.evProj)}</b><span>yıl sonu kWh</span></div>
       </div>
     </div>
@@ -97,7 +97,7 @@ export function renderTogg(el, M, app) {
       <div class="card-head"><h2>Aylık şarj</h2><span class="muted" style="font-size:12px;font-weight:700">kWh</span></div>
       <div class="chart short" id="cm"></div>
       <details class="tbl"><summary>Tablo olarak göster</summary>
-        <table class="table"><thead><tr><th>Ay</th><th>kWh</th><th>TL</th></tr></thead><tbody>
+        <table class="table"><thead><tr><th>Ay</th><th>kWh</th><th>₺</th></tr></thead><tbody>
         ${M.evMonths.map((k, i) => (i <= M.mi ? `<tr class="${M.durum.aylikSktt[i] ? 'sktt' : ''}"><td>${AYLAR[i]}</td><td>${num(k, 1)}</td><td>${num(M.evTlByMonth[i])}</td></tr>` : '')).join('')}
         </tbody></table></details>
     </div>
@@ -105,11 +105,11 @@ export function renderTogg(el, M, app) {
       <h2>Tarife karşılaştırması</h2>
       <p class="hint">Bu yılki Togg şarjının maliyeti, limit aşılıp son kaynak fiyatına geçilseydi:</p>
       <div class="mini-stats" style="grid-template-columns:1fr 1fr 1fr">
-        <div><b>${num(M.evTl)}</b><span>şu anki TL</span></div>
-        <div><b style="color:var(--bad)">${num(skttCost)}</b><span>SKTT'de TL</span></div>
+        <div><b>${num(M.evTl)}</b><span>şu anki ₺</span></div>
+        <div><b style="color:var(--bad)">${num(skttCost)}</b><span>SKTT'de ₺</span></div>
         <div><b>${M.evTl ? '×' + num(skttCost / M.evTl, 1) : '–'}</b><span>kat</span></div>
       </div>
-      <p class="chart-note">İstasyonla kıyas: aynı ${num(M.evYtd)} kWh halka açık istasyonda ${num(M.car.public_tl, 2)} TL/kWh'den ≈ <b>${num(M.evYtd * M.car.public_tl)} TL</b> ederdi (fiyat Ayarlar'da).</p>
+      <p class="chart-note">İstasyonla kıyas: aynı ${num(M.evYtd)} kWh halka açık istasyonda ${num(M.car.public_tl, 2)} ₺/kWh'den ≈ <b>${num(M.evYtd * M.car.public_tl)} ₺</b> ederdi (fiyat Ayarlar'da).</p>
     </div>
     <div class="card">
       <div class="card-head"><h2>Şarj oturumları</h2><span class="muted" style="font-size:12px;font-weight:700">${M.sessions.length} kayıt</span></div>

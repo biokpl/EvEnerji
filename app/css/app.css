@@ -163,7 +163,9 @@ button, input, select, textarea { font: inherit; color: inherit; }
 .trio { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-top: 16px; position: relative; z-index: 1; }
 .trio div { background: var(--card-hi); border-radius: 14px; padding: 10px 6px; text-align: center; }
 .trio b { display: block; font-size: 16.5px; font-weight: 800; font-variant-numeric: tabular-nums; }
-.trio span { font-size: 11px; color: var(--muted); font-weight: 600; }
+.trio span { font-size: 11px; color: var(--muted); font-weight: 600; line-height: 1.35; }
+.trio b small { font-size: 11px; color: var(--muted); font-weight: 700; }
+.trio b span { font: inherit; color: inherit; }
 
 /* Canlı kutucuklar */
 .kpis { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 14px; }

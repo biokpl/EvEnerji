@@ -1,4 +1,5 @@
 // Cihazlar: tüm prizler ve sayaçlar; aç/kapa, düzenle, yeni priz ekle
+import { pendingSwitch } from '../model.js';
 import { DEVICE_ICONS, closeSheet, esc, icon, kwh, num, openSheet, toast, watt, ago } from '../ui.js';
 
 const TYPES = { ev_sarj: 'Araç şarjı', priz: 'Priz', ana_sayac: 'Ana sayaç', kablo_sarici: 'Kablo sarıcı' };
@@ -111,12 +112,23 @@ export function renderCihazlar(el, M, app) {
   el.querySelectorAll('[data-sw]').forEach((b) => b.addEventListener('click', async () => {
     const id = b.dataset.sw;
     const turnOn = !b.classList.contains('on');
-    busy.add(id); b.classList.add('busy');
+    // Düğme anında döner; Pi yeni durumu bildirince gerçek veriyle birleşir
+    pendingSwitch.set(id, { on: turnOn, since: Date.now(), until: Date.now() + 20e3 });
+    busy.add(id);
+    b.classList.add('busy'); b.classList.toggle('on', turnOn);
+    b.closest('.dev')?.classList.toggle('on', turnOn);
+    app.store.emit('live');
+    let ok = false;
     try {
       const r = await app.store.command(id, turnOn ? 'on' : 'off');
-      toast(r.msg || (r.ok ? 'Tamam' : 'Başarısız'));
+      ok = !!r.ok;
+      if (!ok) toast(r.msg || 'Başarısız');
       if (r.needKey) app.go('ayarlar');
     } catch { toast('Komut gönderilemedi'); }
-    busy.delete(id); app.refresh();
+    busy.delete(id);
+    if (!ok) pendingSwitch.delete(id);   // başarısızsa eski duruma dön
+    document.querySelectorAll(`[data-sw="${CSS.escape(id)}"]`).forEach((x) => x.classList.remove('busy'));
+    if (!ok) app.refresh({ silent: true, force: true });
+    else app.store.emit('live');
   }));
 }

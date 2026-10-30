@@ -5,6 +5,19 @@ import { iso } from './ui.js';
 const z12 = () => Array(12).fill(0);
 const sum = (a) => a.reduce((x, y) => x + y, 0);
 
+// Basılan aç/kapa düğmesinin beklenen durumu: Pi yeni durumu bildirene kadar
+// (en çok 20 sn) ekranda bu gösterilir, böylece düğme anında tepki verir.
+export const pendingSwitch = new Map();
+function withPending(id, live) {
+  const p = pendingSwitch.get(id);
+  if (!p) return live;
+  if (Date.now() > p.until || (live && live.on === p.on && (live.ts || 0) * 1000 >= p.since)) {
+    pendingSwitch.delete(id);
+    return live;
+  }
+  return { ...(live || {}), on: p.on };
+}
+
 export function monthsOf(raw, id, y) {
   const m = raw.months?.[id] || {};
   return Array.from({ length: 12 }, (_, i) => Number(m[`${y}-${String(i + 1).padStart(2, '0')}`] || 0));
@@ -18,7 +31,7 @@ export function build(raw) {
   const S = raw.settings || {};
 
   const devices = Object.entries(raw.devices || {})
-    .map(([id, m]) => ({ id, ...m, live: raw.live?.[id] }))
+    .map(([id, m]) => ({ id, ...m, live: withPending(id, raw.live?.[id]) }))
     .sort((a, b) => (a.order ?? 99) - (b.order ?? 99) || String(a.name).localeCompare(b.name, 'tr'));
   const enabled = devices.filter((d) => d.enabled);
   const home = enabled.find((d) => d.type === 'ana_sayac');

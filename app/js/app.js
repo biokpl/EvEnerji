@@ -56,6 +56,19 @@ function applyTheme() {
   document.getElementById('themeBtn').innerHTML = icon(t === 'light' ? 'moon' : 'sun');
 }
 
+// Üst satır: kayıtlı değil, şu an AÇIK olan priz sayısı
+function liveSub(M) {
+  if (!M.enabled.length) return 'Fatura verisi · cihaz bekleniyor';
+  const sw = M.enabled.filter((d) => d.type !== 'ana_sayac' && d.type !== 'kablo_sarici');
+  if (!sw.length) return 'Canlı';
+  const now = Date.now() / 1000;
+  const reach = sw.filter((d) => d.live?.ts && now - d.live.ts < 120 && d.live.ok !== false);
+  if (!reach.length) return sw.length > 1 ? 'Prizler çevrimdışı' : 'Priz çevrimdışı';
+  const on = reach.filter((d) => d.live.on !== false).length;
+  if (on) return `Canlı · ${on} cihaz açık`;
+  return sw.length > 1 ? 'Canlı · tüm prizler kapalı' : 'Canlı · priz kapalı';
+}
+
 function header() {
   const conn = document.getElementById('conn');
   const stale = store.mode === 'live' && store.raw?.status?.ts && Date.now() / 1000 - store.raw.status.ts > 300;
@@ -65,7 +78,7 @@ function header() {
   else if (!store.online) sub = 'Bağlantı yok';
   else if (stale) sub = 'Pi yanıt vermiyor';
   else if (M?.activeSession) sub = 'Togg şarj oluyor';
-  else if (M) sub = M.enabled.length ? `Canlı · ${M.enabled.length} cihaz` : 'Fatura verisi · cihaz bekleniyor';
+  else if (M) sub = liveSub(M);
   document.getElementById('subtxt').textContent = sub;
   document.getElementById('banner').innerHTML = store.mode === 'demo'
     ? `<div class="banner">${icon('info')}<span>${store.reason} Kurulum bitince gerçek veriye kendiliğinden geçer.</span></div>` : '';
@@ -82,10 +95,10 @@ function dataSig() {
 const busy = () => sheetOpen() || document.activeElement?.matches('input,select,textarea');
 
 // silent: arka plan yenilemesi — veri aynıysa atla, değiştiyse animasyonsuz ve tek karede değiştir
-function refresh({ keepScroll = true, silent = false } = {}) {
+function refresh({ keepScroll = true, silent = false, force = false } = {}) {
   if (!store.raw) return;
   const sig = dataSig();
-  if (silent && (sig === shownSig || busy())) return;
+  if (silent && !force && (sig === shownSig || busy())) return;
   shownSig = sig;
   const y = window.scrollY;
   M = build(store.raw);

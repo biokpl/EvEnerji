@@ -1,7 +1,7 @@
 """Tarife motoru: yıllık son kaynak (SKTT) limiti, aylık maliyet, yıl sonu tahmini.
 
 Kurallar (EPDK, 2026):
-- Mesken için yıllık limit 4.000 kWh (2027 için 3.000-3.500 konuşuluyor).
+- Mesken için yıllık limit 4.000 kWh; EPDK kararıyla 1 Ocak 2027'den itibaren 3.000 kWh.
 - Takvim yılı içinde kümülatif tüketim limiti aşarsa, aşılan ayı izleyen
   ÜÇÜNCÜ ayın 1'inden itibaren son kaynak fiyatı uygulanır.
 - Yeni yılın limiti önceki yılın tüketimine bakılarak uygulanır: önceki yıl
@@ -17,6 +17,11 @@ from datetime import date
 GECIS_GECIKME_AY = 3  # aşılan ayı izleyen 3. ayın 1'i
 
 
+def yasal_limit(yil: int) -> float:
+    """Ayarlarda girilmemişse yıla göre yasal yıllık limit."""
+    return 3000.0 if yil >= 2027 else 4000.0
+
+
 @dataclass
 class Tarife:
     yil: int
@@ -30,7 +35,7 @@ class Tarife:
     @classmethod
     def from_dict(cls, yil: int, d: dict | None) -> "Tarife":
         d = d or {}
-        t = cls(yil=yil)
+        t = cls(yil=yil, limit_kwh=yasal_limit(yil))
         for k in ("limit_kwh", "normal_tl", "sktt_tl", "kademe_kwh_ay", "kademe2_tl"):
             if d.get(k) is not None:
                 setattr(t, k, float(d[k]))

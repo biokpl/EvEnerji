@@ -79,3 +79,10 @@ if __name__ == "__main__":
                 fails += 1; print("HATA", name, e)
     print("TÜM TESTLER GEÇTİ" if not fails else f"{fails} test başarısız")
     sys.exit(1 if fails else 0)
+
+
+def test_yasal_limit_2027():
+    # EPDK: 1 Ocak 2027'den itibaren 3.000 kWh; ayarda verilirse o kullanılır
+    assert Tarife.from_dict(2026, {}).limit_kwh == 4000
+    assert Tarife.from_dict(2027, {}).limit_kwh == 3000
+    assert Tarife.from_dict(2027, {"limit_kwh": 3500}).limit_kwh == 3500

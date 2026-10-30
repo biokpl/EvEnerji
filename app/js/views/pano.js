@@ -116,10 +116,10 @@ function insights(M) {
       `${ayDa(i)} Togg olmadan ev ≈ ${kwh(h - e, 0)} ile ucuz kademede (${num(k)} kWh'ye kadar ${num(M.t.normal_tl, 2)} TL) kalırdı. Togg'la ${kwh(h, 0)} oldu; ${kwh(h - k, 0)} ${num(M.t.kademe2_tl, 2)} TL'den faturalandı. Bu yüzden Togg'un kWh'si sana ortalama <b>${num(M.evAvgTl, 2)} TL</b>'ye geliyor.`));
   }
   // Gelecek yıl: tam yıl tüketim bu hızla limiti aşıyor mu?
-  const sel = M.scenarios.find((s) => s.selected) || M.scenarios.find((s) => s.L === 4000);
+  const sel = M.scenarios[0];
   if (sel?.fromJan) {
     out.push(alertBox('danger', 'trend', `${M.y + 1} son kaynak tarifesiyle başlar`,
-      `${M.y + 1} limiti ${num(sel.L)} kWh olursa bu yılki ≈ ${kwh(M.proj, 0)} tüketim yüzünden 1 Ocak'tan itibaren son kaynak fiyatı uygulanır.`));
+      `${M.y + 1} limiti ${num(sel.L)} kWh; bu yılki ≈ ${kwh(M.proj, 0)} tüketim yüzünden 1 Ocak'tan itibaren son kaynak fiyatı uygulanır.`));
   } else if (sel?.exceedNext) {
     out.push(alertBox('warn', 'trend', `${M.y + 1}'de limit aşılır`,
       `${M.y} güvende, ama bu hızla (günde ≈ ${kwh(M.rate, 1)}) ${M.y + 1}'de yıllık ≈ <b>${kwh(M.nextYear, 0)}</b> tüketirsin. ${num(sel.L)} kWh limiti <b>${ayDa(sel.exceedNext - 1)}</b> aşılır${sel.fromMonth ? `, son kaynak fiyatı <b>${ayDan(sel.fromMonth - 1)}</b> başlar` : ''} ve ${M.y + 2} yılının tamamı son kaynak tarifesinden faturalanır.`));
@@ -128,7 +128,7 @@ function insights(M) {
 }
 
 function scenarios(M) {
-  const max = Math.max(M.nextYear, M.proj, 4000) * 1.05;
+  const max = Math.max(M.nextYear, M.proj, ...M.scenarios.map((s) => s.L)) * 1.05;
   const status = (s) => {
     if (s.fromJan) return { c: 'var(--bad)', t: 'Ocak\'tan SKTT', sub: `+${num(s.extra)} TL` };
     if (s.fromMonth) return { c: 'var(--bad)', t: `${ayDan(s.fromMonth - 1)} SKTT`, sub: `+${num(s.extra)} TL · ${M.y + 2} tamamı` };
@@ -139,7 +139,7 @@ function scenarios(M) {
     const st = status(s);
     return `
     <div class="scen-row">
-      <div class="L">${num(s.L)}<small>kWh limit${s.selected ? ' · seçili' : ''}</small></div>
+      <div class="L">${num(s.L)}<small>kWh limit</small></div>
       <div class="bar"><i style="width:${(Math.min(M.nextYear, max) / max) * 100}%;background:${st.c}"></i>
         <i style="left:${(s.L / max) * 100}%;width:2px;background:var(--text);border-radius:0"></i></div>
       <div class="r" style="color:${st.c}">${st.t}<small>${st.sub}</small></div>
@@ -147,7 +147,7 @@ function scenarios(M) {
   }).join('');
   return `
   <div class="card">
-    <h2>${M.y + 1} senaryosu</h2>
+    <h2>${M.y + 1} limiti: ${num(M.tNext.limit_kwh)} kWh</h2>
     <p class="hint">Bu hızla ${M.y + 1}'de yıllık ≈ <b>${kwh(M.nextYear, 0)}</b> (çubuk) tüketirsin; dikey çizgi limit. ${M.y} toplamı ≈ ${kwh(M.proj, 0)}.</p>
     <div class="scen">${rows}</div>
     <p class="chart-note">Limit aşılırsa aşılan ayı izleyen 3. aydan itibaren son kaynak fiyatı (tahmini ${num(M.tNext.sktt_tl, 2)} TL/kWh) uygulanır ve ertesi yıl tamamen son kaynaktan faturalanır. Mevsim etkisi hesaba katılmadı.</p>

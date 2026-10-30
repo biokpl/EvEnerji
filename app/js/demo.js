@@ -99,7 +99,7 @@ export function buildDemo(now = new Date()) {
     },
     days, hours, months, sessions,
     settings: {
-      tariff: { [y]: { limit_kwh: 4000, normal_tl: 3.24, sktt_tl: 6.49, onceki_yil_kwh: 3610 }, [y + 1]: { limit_kwh: 3500 } },
+      tariff: { [y]: { limit_kwh: 4000, normal_tl: 3.24, sktt_tl: 6.49, onceki_yil_kwh: 3610 }, [y + 1]: { limit_kwh: 3000 } },
       alerts: { esikler: [70, 85, 95] },
       car: { battery_kwh: 88.5, efficiency: 0.9 },
     },

@@ -1,5 +1,6 @@
 // Ayarlar: tarife, geçmiş faturalar, uyarılar, araç, kontrol anahtarı, görünüm, dışa aktarım
 import { AY_K, downloadFile, esc, icon, num, toast } from '../ui.js';
+import { yasalLimit } from '../tariff.js';
 
 let yearSel = null;
 // "3,24" / "3.24" / "4.000" / "4000" hepsini doğru okur
@@ -25,7 +26,7 @@ export function renderAyarlar(el, M, app) {
       <div class="card-head"><h2>Tarife</h2>
         <div class="seg" id="ys">${[M.y, M.y + 1].map((y) => `<button data-y="${y}" class="${y === yr ? 'on' : ''}">${y}</button>`).join('')}</div></div>
       <p class="hint">Faturandaki <b>vergiler dahil</b> birim fiyatları gir. Varsayılanlar yaklaşık değerdir.</p>
-      <div class="field"><div><label for="lim">Yıllık limit (kWh)</label><small>2026: 4.000. ${M.y + 1} için EPDK kararı bekleniyor (3.000–3.500 konuşuluyor).</small></div><input class="input num" id="lim" inputmode="numeric" value="${T.limit_kwh ?? (yr === M.y ? 4000 : '')}" placeholder="${M.t.limit_kwh}"></div>
+      <div class="field"><div><label for="lim">Yıllık limit (kWh)</label><small>2026: 4.000 · 1 Ocak 2027'den itibaren 3.000 (EPDK).</small></div><input class="input num" id="lim" inputmode="numeric" value="${T.limit_kwh ?? yasalLimit(yr)}" placeholder="${M.t.limit_kwh}"></div>
       <div class="field"><div><label for="nt">Normal fiyat (TL/kWh)</label></div><input class="input num" id="nt" inputmode="decimal" value="${f(T.normal_tl)}" placeholder="${f(3.24)}"></div>
       <div class="field"><div><label for="st">Son kaynak fiyatı (TL/kWh)</label><small>Limit aşılınca uygulanan fiyat.</small></div><input class="input num" id="st" inputmode="decimal" value="${f(T.sktt_tl)}" placeholder="${f(6.49)}"></div>
       <div class="field"><div><label for="ky">Aylık kademe (kWh)</label><small>Aylık kademe uygulanıyorsa sınır; yoksa boş bırak.</small></div><input class="input num" id="ky" inputmode="numeric" value="${T.kademe_kwh_ay || ''}" placeholder="yok"></div>

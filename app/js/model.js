@@ -54,7 +54,8 @@ export function build(raw) {
 
   const TY = S.tariff?.[y] || {};
   const t = tarife(y, TY);
-  const tNext = tarife(y + 1, { ...TY, onceki_yil_kwh: null, ...S.tariff?.[y + 1] });
+  // gelecek yılın limiti bu yıldan devralınmaz: ayarda yoksa yasal limit (2027+: 3.000)
+  const tNext = tarife(y + 1, { ...TY, limit_kwh: null, onceki_yil_kwh: null, ...S.tariff?.[y + 1] });
 
   // Son 30 gün (ana sayaç)
   const days = (id) => raw.days?.[id] || {};
@@ -132,7 +133,7 @@ export function build(raw) {
   // (b) aşmazsa gelecek yıl içinde aşıldığı ayı izleyen 3. aydan itibaren son kaynak fiyatı.
   const nextMonths = Array.from({ length: 12 }, (_, i) => rate * new Date(y + 1, i + 1, 0).getDate());
   const nextYear = sum(nextMonths);
-  const scenarios = [3000, 3500, 4000].map((L) => {
+  const scenarios = [tNext.limit_kwh].map((L) => {
     const tl_ = { ...tNext, limit_kwh: L, onceki_yil_kwh: proj };
     const d = yilDurumu(tl_, nextMonths);
     const normal = yilDurumu({ ...tNext, limit_kwh: 1e12, onceki_yil_kwh: null }, nextMonths).toplamTl;

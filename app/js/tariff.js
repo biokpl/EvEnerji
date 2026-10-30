@@ -1,13 +1,16 @@
 // Tarife motoru — collector/tariff.py ile birebir aynı mantık.
-// Mesken yıllık limiti (2026: 4.000 kWh). Yıl içinde aşılırsa, aşılan ayı izleyen
+// Mesken yıllık limiti (2026: 4.000 kWh; EPDK kararıyla 1 Ocak 2027'den itibaren 3.000 kWh). Yıl içinde aşılırsa, aşılan ayı izleyen
 // 3. ayın 1'inden itibaren son kaynak (SKTT) fiyatı. Önceki yıl tüketimi bu yılın
 // limitini aşmışsa bütün yıl SKTT.
 export const GECIKME = 3;
 
 export const VARSAYILAN = { limit_kwh: 4000, normal_tl: 3.24, sktt_tl: 6.49, kademe_kwh_ay: 0, kademe2_tl: 0, onceki_yil_kwh: null };
 
+// Ayarlarda girilmemişse yıla göre yasal limit
+export const yasalLimit = (yil) => (yil >= 2027 ? 3000 : 4000);
+
 export function tarife(yil, d = {}) {
-  const t = { yil, ...VARSAYILAN };
+  const t = { yil, ...VARSAYILAN, limit_kwh: yasalLimit(yil) };
   for (const k of Object.keys(VARSAYILAN)) if (d && d[k] != null && d[k] !== '') t[k] = Number(d[k]);
   return t;
 }

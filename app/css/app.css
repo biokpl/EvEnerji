@@ -71,7 +71,7 @@ button, input, select, textarea { font: inherit; color: inherit; }
 .topbar::before {
   content: ''; position: absolute; z-index: -1; pointer-events: none;
   top: 0; bottom: 0; left: 50%; width: 100vw; transform: translateX(-50%);
-  /* tepede ince opak bant; ortası renksiz tam buzlu cam; alt uçta çok hafif buzlanma (geçişler çok noktalı, yumuşak) */
+  /* tepede ince opak bant; ortası ve altı renksiz tam buzlu cam (geçişler çok noktalı, yumuşak) */
   background: linear-gradient(
     var(--bg) 0%,
     color-mix(in srgb, var(--bg) 94%, transparent) 3%,
@@ -84,8 +84,8 @@ button, input, select, textarea { font: inherit; color: inherit; }
     color-mix(in srgb, var(--bg) 2%, transparent) 38%,
     transparent 52%);
   backdrop-filter: blur(14px) saturate(1.3); -webkit-backdrop-filter: blur(14px) saturate(1.3);
-  -webkit-mask-image: linear-gradient(#000 72%, rgba(0,0,0,.6) 84%, rgba(0,0,0,.3) 93%, rgba(0,0,0,.15));
-  mask-image: linear-gradient(#000 72%, rgba(0,0,0,.6) 84%, rgba(0,0,0,.3) 93%, rgba(0,0,0,.15));
+  -webkit-mask-image: linear-gradient(#000 88%, rgba(0,0,0,.8));
+  mask-image: linear-gradient(#000 88%, rgba(0,0,0,.8));
 }
 .logo {
   width: 38px; height: 38px; border-radius: 12px; flex: none; display: grid; place-items: center;

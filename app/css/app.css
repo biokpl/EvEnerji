@@ -65,7 +65,7 @@ button, input, select, textarea { font: inherit; color: inherit; }
 /* Başlık */
 .topbar {
   position: sticky; top: 0; z-index: 20; display: flex; align-items: center; gap: 12px;
-  padding: calc(14px + env(safe-area-inset-top)) 2px 12px;
+  padding: calc(8px + env(safe-area-inset-top)) 2px 6px;
 }
 /* Buzlu cam şerit: içerik sütunuyla sınırlı kalmasın, ekranın iki kenarına ve en üste kadar uzansın */
 .topbar::before {

@@ -163,9 +163,9 @@ button, input, select, textarea { font: inherit; color: inherit; }
 .trio { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-top: 16px; position: relative; z-index: 1; }
 .trio div { background: var(--card-hi); border-radius: 14px; padding: 10px 6px; text-align: center; }
 .trio b { display: block; font-size: 16.5px; font-weight: 800; font-variant-numeric: tabular-nums; }
-.trio span { font-size: 11px; color: var(--muted); font-weight: 600; line-height: 1.35; }
+.trio span { display: block; margin-top: 1px; font-size: 11px; color: var(--muted); font-weight: 600; line-height: 1.15; }
 .trio b small { font-size: 11px; color: var(--muted); font-weight: 700; }
-.trio b span { font: inherit; color: inherit; }
+.trio b span { display: inline; margin: 0; font: inherit; color: inherit; line-height: inherit; }
 
 /* Canlı kutucuklar */
 .kpis { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 14px; }
@@ -176,7 +176,8 @@ button, input, select, textarea { font: inherit; color: inherit; }
 .kpi .k-label { font-size: 12px; color: var(--muted); font-weight: 700; display: flex; align-items: center; gap: 6px; }
 .kpi .k-label svg { width: 15px; height: 15px; }
 .kpi .k-val { font-size: 27px; font-weight: 800; letter-spacing: -0.03em; margin-top: 6px; font-variant-numeric: tabular-nums; }
-.kpis-c .k-val { text-align: center; }
+.kpis-c .kpi { text-align: center; }
+.kpis-c .k-label { justify-content: center; }
 .kpi .k-val small { font-size: 14px; color: var(--muted); font-weight: 700; margin-left: 2px; }
 .kpi .k-sub { font-size: 11.5px; color: var(--muted); margin-top: 2px; font-weight: 600; }
 .kpi.charging { border-color: color-mix(in srgb, var(--ev) 45%, transparent); }

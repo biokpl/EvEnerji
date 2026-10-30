@@ -32,9 +32,14 @@ export function mount(el, option) {
   return ch;
 }
 
+// Sayfa yeniden çizilirken eski grafikleri temizler; açık alt paneldeki (cihaz detayı) grafiklere dokunmaz
 export function disposeAll() {
-  instances.forEach((ch) => ch.dispose());
-  instances.clear();
+  instances.forEach((ch) => {
+    const dom = ch.getDom();
+    if (dom?.isConnected && dom.closest('.sheet')) return;
+    ch.dispose();
+    instances.delete(ch);
+  });
 }
 
 let rt;

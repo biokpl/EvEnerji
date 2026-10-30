@@ -1,6 +1,21 @@
 // Cihazlar: tüm prizler ve sayaçlar; aç/kapa, düzenle, yeni priz ekle
 import { pendingSwitch } from '../model.js';
-import { DEVICE_ICONS, closeSheet, esc, icon, kwh, num, openSheet, toast, watt, ago } from '../ui.js';
+import { store } from '../data.js';
+import { axisStyle, colors, mount } from '../charts.js';
+import { AYLAR, DEVICE_ICONS, GUN_K, closeSheet, esc, icon, kwh, num, openSheet, tl, toast, watt, ago } from '../ui.js';
+
+// Uygulama açıkken gelen canlı güç ölçümleri (cihaz başına son ~2 saat): detay ekranındaki canlı grafik
+const trace = new Map();
+store.subscribe((kind) => {
+  if (kind !== 'live') return;
+  for (const [id, L] of Object.entries(store.raw?.live || {})) {
+    if (!L?.ts || L.w == null) continue;
+    const arr = trace.get(id) || [];
+    if (!arr.length || arr[arr.length - 1][0] !== L.ts * 1000) arr.push([L.ts * 1000, L.w]);
+    if (arr.length > 720) arr.shift();
+    trace.set(id, arr);
+  }
+});
 
 const TYPES = { ev_sarj: 'Araç şarjı', priz: 'Priz', ana_sayac: 'Ana sayaç', kablo_sarici: 'Kablo sarıcı' };
 // 17 hazır renk + sonda "özel renk" düğmesi (6 sütunlu ızgarada 3 tam satır)
@@ -106,6 +121,76 @@ function addHelp() {
     <button class="btn ghost" id="ok" style="margin-top:12px">Tamam</button>`, (sh) => { sh.querySelector('#ok').onclick = () => closeSheet(); });
 }
 
+// Cihaz detayı: canlı güç (açıkken anlık güncellenir), bugün saatlik, son 30 gün, bu ay
+function detailSheet(M, id, app) {
+  const d = M.devices.find((x) => x.id === id);
+  if (!d) return;
+  const col = d.color || '#3b82f6';
+  const ym = `${M.y}-${String(M.mi + 1).padStart(2, '0')}`;
+  const month = Number(M.raw.months?.[id]?.[ym] || 0);
+  const d30 = M.lastN(id, 30);
+  const sum30 = d30.reduce((a, [, v]) => a + v, 0);
+  const hours = (M.raw.hours?.[id]?.[M.today] || Array(24).fill(0)).slice(0, M.now.getHours() + 1);
+  const live = () => store.raw?.live?.[id] || {};
+  const liveHtml = () => {
+    const L = live();
+    const stale = !L.ts || Date.now() / 1000 - L.ts > 120;
+    if (stale || L.ok === false) return `<span class="muted">Çevrimdışı${L.ts ? ' · ' + ago(L.ts) : ''}</span>`;
+    return `<b class="big">${watt(L.w)}</b><span>${L.v ? num(L.v) + ' V' : ''}${L.a != null ? ' · ' + num(L.a, 2) + ' A' : ''} · ${L.on === false ? 'kapalı' : 'açık'}</span>`;
+  };
+  const sh = openSheet(`
+    <div class="dt-head"><div class="d-ic" style="--dc:${esc(col)}">${icon(d.icon || 'plug')}</div>
+      <div><h3 style="margin:0">${esc(d.name)}</h3><div class="sh-sub" style="margin:2px 0 0">${esc(TYPES[d.type] || d.type)}${d.room ? ' · ' + esc(d.room) : ''}</div></div></div>
+    <div class="dt-live" id="dl">${liveHtml()}</div>
+    <div class="kpis" style="margin:12px 0">
+      <div class="kpi"><div class="k-label">Bugün</div><div class="k-val">${num(live().today ?? hours.reduce((a, b) => a + b, 0), 2)}<small>kWh</small></div><div class="k-sub">${tl((live().today || 0) * M.priceNow)}</div></div>
+      <div class="kpi"><div class="k-label">${AYLAR[M.mi]}</div><div class="k-val">${num(month, month < 10 ? 2 : 1)}<small>kWh</small></div><div class="k-sub">${tl(month * M.priceNow)} · 30 günde ${kwh(sum30)}</div></div>
+    </div>
+    <div class="dt-title">Canlı güç <small>uygulama açıkken</small></div><div id="dc-live" class="dt-chart"></div>
+    <div class="dt-title">Bugün, saatlik <small>kWh</small></div><div id="dc-h" class="dt-chart"></div>
+    <div class="dt-title">Son 30 gün <small>kWh</small></div><div id="dc-d" class="dt-chart"></div>
+    <div class="btn-row" style="margin-top:14px">
+      <button class="btn ghost" id="close">Kapat</button>
+      <button class="btn ghost" id="edit">${icon('edit')}Düzenle</button>
+    </div>`, (sh) => {
+    sh.querySelector('#close').onclick = () => closeSheet();
+    sh.querySelector('#edit').onclick = () => editSheet(M, id, app);
+  });
+  const c = colors(), ax = axisStyle(c);
+  const grid = { left: 40, right: 8, top: 10, bottom: 22 };
+  const yAx = { type: 'value', ...ax, axisLine: { show: false }, splitNumber: 3 };
+  // sayfa açılış animasyonu bitince çiz (boyutu doğru ölçülsün)
+  setTimeout(() => {
+    const lc = mount(sh.querySelector('#dc-live'), {
+      grid, tooltip: { trigger: 'axis', valueFormatter: (v) => watt(v) },
+      xAxis: { type: 'time', ...ax, axisLabel: { ...ax.axisLabel, hideOverlap: true }, splitLine: { show: false } },
+      yAxis: { ...yAx, axisLabel: { ...ax.axisLabel, formatter: (v) => (v >= 1000 ? `${num(v / 1000, 1)}k` : v) } },
+      series: [{ type: 'line', data: trace.get(id) || [], showSymbol: false, smooth: 0.25, lineStyle: { color: col, width: 2 },
+        areaStyle: { color: col, opacity: 0.18 } }],
+    });
+    mount(sh.querySelector('#dc-h'), {
+      grid, tooltip: { trigger: 'axis', valueFormatter: (v) => `${num(v, 3)} kWh` },
+      xAxis: { type: 'category', data: hours.map((_, i) => `${i}`), ...ax },
+      yAxis: yAx,
+      series: [{ type: 'bar', data: hours.map((v) => +v.toFixed(4)), barMaxWidth: 14, itemStyle: { color: col, borderRadius: [3, 3, 0, 0] } }],
+    });
+    mount(sh.querySelector('#dc-d'), {
+      grid, tooltip: { trigger: 'axis', valueFormatter: (v) => `${num(v, 2)} kWh` },
+      xAxis: { type: 'category', data: d30.map(([k]) => { const dt = new Date(k); return `${dt.getDate()} ${GUN_K[dt.getDay()]}`; }), ...ax,
+        axisLabel: { ...ax.axisLabel, hideOverlap: true } },
+      yAxis: yAx,
+      series: [{ type: 'bar', data: d30.map(([, v]) => +v.toFixed(3)), barMaxWidth: 12, itemStyle: { color: col, borderRadius: [3, 3, 0, 0] } }],
+    });
+    // açık kaldıkça canlı değer ve grafik güncellenir
+    const off = store.subscribe((kind) => {
+      if (!sh.isConnected) return off();
+      if (kind !== 'live') return;
+      sh.querySelector('#dl').innerHTML = liveHtml();
+      lc?.setOption({ series: [{ data: trace.get(id) || [] }] });
+    });
+  }, 340);
+}
+
 export function renderCihazlar(el, M, app) {
   const list = M.devices;
   el.innerHTML = `
@@ -135,7 +220,11 @@ export function renderCihazlar(el, M, app) {
     try { await app.store.patch('devices', Object.fromEntries(ids.map((id, k) => [`${id}/order`, k]))); }
     catch { toast('Sıra kaydedilemedi'); }
   }));
-  el.querySelectorAll('[data-edit]').forEach((b) => b.addEventListener('click', () => { if (!sorting) editSheet(M, b.dataset.edit, app); }));
+  el.querySelectorAll('[data-edit]').forEach((b) => b.addEventListener('click', () => {
+    if (sorting) return;
+    const d = M.devices.find((x) => x.id === b.dataset.edit);
+    if (d?.type === 'kablo_sarici') editSheet(M, d.id, app); else detailSheet(M, b.dataset.edit, app);
+  }));
   el.querySelectorAll('[data-sw]').forEach((b) => b.addEventListener('click', async () => {
     const id = b.dataset.sw;
     const turnOn = !b.classList.contains('on');

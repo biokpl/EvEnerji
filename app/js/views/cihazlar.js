@@ -3,7 +3,12 @@ import { pendingSwitch } from '../model.js';
 import { DEVICE_ICONS, closeSheet, esc, icon, kwh, num, openSheet, toast, watt, ago } from '../ui.js';
 
 const TYPES = { ev_sarj: 'Araç şarjı', priz: 'Priz', ana_sayac: 'Ana sayaç', kablo_sarici: 'Kablo sarıcı' };
-const COLORS = ['#22d3d6', '#3b82f6', '#9b8cff', '#f472b6', '#fb923c', '#34d399', '#facc15', '#94a3b8'];
+// 17 hazır renk + sonda "özel renk" düğmesi (6 sütunlu ızgarada 3 tam satır)
+const COLORS = [
+  '#22d3d6', '#38bdf8', '#3b82f6', '#6366f1', '#9b8cff', '#d946ef',
+  '#f472b6', '#ef4444', '#fb923c', '#f59e0b', '#facc15', '#a3e635',
+  '#34d399', '#14b8a6', '#a16207', '#e5e7eb', '#94a3b8',
+];
 const busy = new Set();
 
 function devCard(M, d) {
@@ -38,7 +43,7 @@ function devCard(M, d) {
 
 function editSheet(M, id, app, fresh = null) {
   const d = fresh || M.devices.find((x) => x.id === id);
-  let ic = d.icon || 'plug', col = d.color || COLORS[1];
+  let ic = d.icon || 'plug', col = d.color || COLORS[2];
   openSheet(`
     <h3>${fresh ? 'Yeni prizi ekle' : esc(d.name)}</h3>
     <div class="sh-sub">${fresh ? esc(fresh.product || 'Tuya priz') : `Kimlik: ${esc(d.id)} · ${esc(d.provider || '')}`}</div>
@@ -50,14 +55,21 @@ function editSheet(M, id, app, fresh = null) {
     <div style="margin:14px 0 8px;font-weight:800;font-size:14px">İkon</div>
     <div class="icon-pick" id="ip">${DEVICE_ICONS.map((n) => `<button data-i="${n}" class="${n === ic ? 'on' : ''}" aria-label="${n}">${icon(n)}</button>`).join('')}</div>
     <div style="margin:14px 0 8px;font-weight:800;font-size:14px">Renk</div>
-    <div class="icon-pick" id="cp">${COLORS.map((c) => `<button data-c="${c}" class="${c === col ? 'on' : ''}" aria-label="renk ${c}"><i style="width:20px;height:20px;border-radius:50%;background:${c};display:block"></i></button>`).join('')}</div>
+    <div class="icon-pick" id="cp">${COLORS.map((c) => `<button data-c="${c}" class="${c === col ? 'on' : ''}" aria-label="renk ${c}"><i style="width:20px;height:20px;border-radius:50%;background:${c};display:block"></i></button>`).join('')}
+      <label class="custom-col ${COLORS.includes(col) ? '' : 'on'}" aria-label="Özel renk seç"><i style="${COLORS.includes(col) ? '' : `background:${esc(col)}`}"></i><input type="color" id="cc" value="${esc(/^#[0-9a-f]{6}$/i.test(col) ? col : '#3b82f6')}"></label></div>
     <div class="field" style="margin-top:6px"><div><label>Etkin</label><small>Kapalıysa ölçülmez ve listede soluk görünür.</small></div><button class="switch ${d.enabled !== false ? 'on' : ''}" id="en"></button></div>
     <div class="btn-row" style="margin-top:14px">
       <button class="btn ghost" id="cancel">Vazgeç</button>
       <button class="btn primary" id="save">${icon('check')}${fresh ? 'Ekle' : 'Kaydet'}</button>
     </div>`, (sh) => {
     sh.querySelector('#ip').onclick = (e) => { const b = e.target.closest('[data-i]'); if (!b) return; ic = b.dataset.i; sh.querySelectorAll('#ip button').forEach((x) => x.classList.toggle('on', x === b)); };
-    sh.querySelector('#cp').onclick = (e) => { const b = e.target.closest('[data-c]'); if (!b) return; col = b.dataset.c; sh.querySelectorAll('#cp button').forEach((x) => x.classList.toggle('on', x === b)); };
+    const cust = sh.querySelector('.custom-col');
+    sh.querySelector('#cp').onclick = (e) => { const b = e.target.closest('[data-c]'); if (!b) return; col = b.dataset.c; cust.classList.remove('on'); sh.querySelectorAll('#cp button').forEach((x) => x.classList.toggle('on', x === b)); };
+    sh.querySelector('#cc').oninput = (e) => {
+      col = e.target.value;
+      cust.querySelector('i').style.background = col; cust.classList.add('on');
+      sh.querySelectorAll('#cp button').forEach((x) => x.classList.remove('on'));
+    };
     const en = sh.querySelector('#en');
     en.onclick = () => en.classList.toggle('on');
     sh.querySelector('#cancel').onclick = () => closeSheet();
@@ -106,7 +118,7 @@ export function renderCihazlar(el, M, app) {
   el.querySelector('#add').onclick = addHelp;
   el.querySelectorAll('[data-add]').forEach((b) => b.addEventListener('click', () => {
     const [id, d] = M.discovered.find(([x]) => x === b.dataset.add);
-    editSheet(M, id, app, { id, name: d.name, provider: d.provider || 'tuya', type: 'priz', icon: 'plug', color: COLORS[1], enabled: true, product: d.product });
+    editSheet(M, id, app, { id, name: d.name, provider: d.provider || 'tuya', type: 'priz', icon: 'plug', color: COLORS[2], enabled: true, product: d.product });
   }));
   el.querySelectorAll('[data-edit]').forEach((b) => b.addEventListener('click', () => editSheet(M, b.dataset.edit, app)));
   el.querySelectorAll('[data-sw]').forEach((b) => b.addEventListener('click', async () => {

@@ -346,6 +346,11 @@ select.input { padding-right: 6px; }
 .icon-pick button { aspect-ratio: 1; border-radius: 12px; border: 1px solid var(--line); background: var(--card-hi); display: grid; place-items: center; cursor: pointer; color: var(--muted); }
 .icon-pick button.on { border-color: var(--accent); color: var(--accent); }
 .icon-pick svg { width: 20px; height: 20px; }
+/* Özel renk: gökkuşağı halkalı düğme, içine dokununca sistemin renk seçicisi açılır */
+.custom-col { position: relative; aspect-ratio: 1; border-radius: 12px; border: 1px solid var(--line); background: var(--card-hi); display: grid; place-items: center; cursor: pointer; }
+.custom-col.on { border-color: var(--accent); }
+.custom-col i { width: 20px; height: 20px; border-radius: 50%; display: block; background: conic-gradient(#ef4444, #facc15, #34d399, #22d3d6, #3b82f6, #d946ef, #ef4444); }
+.custom-col input { position: absolute; inset: 0; width: 100%; height: 100%; opacity: 0; cursor: pointer; border: 0; padding: 0; }
 .steps { margin: 0; padding-left: 20px; font-size: 13px; line-height: 1.6; color: var(--muted); }
 .steps b { color: var(--text); }
 

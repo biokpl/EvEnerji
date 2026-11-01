@@ -181,7 +181,16 @@ export function build(raw) {
   car.learnedN = effSamples.length;
   car.eff = car.learnedEff ?? car.efficiency;
   const socAdd = (kwhWall) => (kwhWall * car.eff) / cap * 100;
+  const hedef = Number(car.hedef_yuzde) || 100;
   for (const s of sessions) {
+    // Veri girilmediyse ve araç doldu ise: bitiş = hedef, başlangıç = hedef − bu şarjda eklenen.
+    // Önceki şarj nerede yapılmış olursa olsun doğru (yalnız bu oturumun kWh'sine bakar).
+    // Verim öğrenmede kullanılmaz (kendi tahminiyle kendini doğrulamasın).
+    if (s.full && s.socStart == null && s.socEnd == null && (s.kwh || 0) > 0.5) {
+      s.socEnd = hedef;
+      s.socStart = Math.max(0, Math.round(hedef - socAdd(s.kwh)));
+      s.socAuto = true;
+    }
     if (s.socStart != null) s.socEst = Math.min(100, s.socStart + socAdd(s.kwh || 0));
     // Pi gücün kademeli düştüğünü gördüyse araç hedefine ulaşmıştır: bitiş = hedef
     if (s.full && s.socStart != null && s.socEnd == null) s.socEst = Math.max(s.socStart, Number(car.hedef_yuzde) || 100);

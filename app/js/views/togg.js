@@ -14,7 +14,7 @@ function sessItem(M, s) {
     <div class="sess-date"><b>${d.getDate()}</b><span>${AY_K[d.getMonth()]}</span></div>
     <div class="sess-main">
       <div class="t">${live ? 'Şarj sürüyor' : `${GUN_K[d.getDay()]} ${hm(s.start)}${s.end ? ' – ' + hm(s.end) : ''}`}</div>
-      <div class="s">${live ? `Başlangıç ${hm(s.start)}` : dur(s.minutes ?? ((s.end - s.start) / 60))}${s.socStart != null ? ` · %${num(s.socStart)}→${s.socEnd != null || s.full ? '' : '≈'}%${num(s.socEnd ?? s.socEst)}` : ''}${s.per100 ? ` · ${num(s.per100, 1)} kWh/100 km` : ''}${s.odo ? ` · ${num(s.odo)} km` : ''}</div>
+      <div class="s">${live ? `Başlangıç ${hm(s.start)}` : dur(s.minutes ?? ((s.end - s.start) / 60))}${s.socStart != null ? ` · ${s.socAuto ? '≈' : ''}%${num(s.socStart)}→${s.socEnd != null || s.full ? '' : '≈'}%${num(s.socEnd ?? s.socEst)}` : ''}${s.per100 ? ` · ${num(s.per100, 1)} kWh/100 km` : ''}${s.odo ? ` · ${num(s.odo)} km` : ''}</div>
     </div>
     <div class="sess-amt"><b>${num(s.kwh, 1)} kWh</b>${tl(cost)}</div>
   </button>`;
@@ -56,7 +56,7 @@ function openSession(M, s, app) {
   const sktt = s.tl_sktt ?? s.kwh * M.t.sktt_tl;
   const soc = (s.kwh * M.car.eff) / M.car.battery_kwh * 100;
   const ended = !!s.end;
-  const sEff = s.socStart != null && s.socEnd != null && s.kwh > 1 ? ((s.socEnd - s.socStart) / 100) * M.car.battery_kwh / s.kwh : null;
+  const sEff = !s.socAuto && s.socStart != null && s.socEnd != null && s.kwh > 1 ? ((s.socEnd - s.socStart) / 100) * M.car.battery_kwh / s.kwh : null;
   const d = new Date(s.start * 1000);
   openSheet(`
     <h3>${d.getDate()} ${AYLAR[d.getMonth()]} ${d.getFullYear()}</h3>
@@ -71,14 +71,14 @@ function openSession(M, s, app) {
       <div><b>${s.avg_w ? watt(s.avg_w) : '–'}</b><span>ortalama</span></div>
       <div><b>${num(sktt, 0)}</b><span>SKTT'de ₺</span></div>
     </div>
-    ${s.socStart != null ? `<p class="chart-note" style="margin:4px 0 6px">%${num(s.socStart)} → ${s.socEnd != null ? `<b>%${num(s.socEnd)}</b>` : (s.full ? `%${num(s.socEst)} (Araç Doldu)` : `≈ %${num(s.socEst)} (Tahmin)`)}${s.km ? ` · +${num(s.km)} km Menzil` : ''}${sEff ? ` · Bu Şarjda Verim %${num(sEff * 100)}` : ''}</p>` : ''}
+    ${s.socStart != null ? `<p class="chart-note" style="margin:4px 0 6px">${s.socAuto ? '≈ ' : ''}%${num(s.socStart)} → ${s.socAuto ? `<b>%${num(s.socEnd)}</b> (Araç Doldu · Başlangıç Hesaplandı)` : s.socEnd != null ? `<b>%${num(s.socEnd)}</b>` : (s.full ? `%${num(s.socEst)} (Araç Doldu)` : `≈ %${num(s.socEst)} (Tahmin)`)}${s.km ? ` · +${num(s.km)} km Menzil` : ''}${sEff ? ` · Bu Şarjda Verim %${num(sEff * 100)}` : ''}</p>` : ''}
     <div class="field">
       <div><label for="ss">Başlangıç %</label><small>Şarj başlarken araçtaki yüzde.</small></div>
-      <input class="input num" id="ss" inputmode="numeric" placeholder="%" value="${s.socStart ?? ''}">
+      <input class="input num" id="ss" inputmode="numeric" placeholder="${s.socAuto ? '≈' + num(s.socStart) : '%'}" value="${s.socAuto ? '' : s.socStart ?? ''}">
     </div>
     ${ended ? `<div class="field">
       <div><label for="se">Bitiş %</label><small>Girersen aracının gerçek şarj verimini öğrenirim.</small></div>
-      <input class="input num" id="se" inputmode="numeric" placeholder="%" value="${s.socEnd ?? ''}">
+      <input class="input num" id="se" inputmode="numeric" placeholder="${s.socAuto ? num(s.socEnd) : '%'}" value="${s.socAuto ? '' : s.socEnd ?? ''}">
     </div>` : ''}
     <div class="field">
       <div><label for="odo">Kilometre sayacı</label><small>Şarj başlarken aracın km'si. İki şarjda girersen kWh/100 km hesaplanır.</small></div>

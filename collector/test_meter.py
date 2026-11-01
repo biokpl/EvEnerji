@@ -91,3 +91,24 @@ def test_oturum_sik_olcumde_erken_baslamaz():
     assert ev[:4] == [None] * 4
     assert ev[4] == "basladi"
     assert s.active["start"] == 1000
+
+
+def _oturum(guc_listesi):
+    s = SessionTracker({})
+    t, son = 1000, None
+    for w in guc_listesi:
+        ev, ses = s.update(t, w, 0.01)
+        if ev == "bitti":
+            son = ses
+        t += 3
+    return son
+
+
+def test_oturum_doldu_isareti():
+    # araç hedefe ulaşınca güç kademeli düşer -> full
+    dolu = _oturum([2200] * 10 + [1500, 900, 400, 150] + [0] * 110)
+    assert dolu and dolu["full"] is True
+    # fiş çekilince güç birden kesilir -> full değil
+    cekildi = _oturum([2200] * 10 + [0] * 110)
+    assert cekildi and cekildi["full"] is False
+    assert "tail_w" not in cekildi

@@ -204,6 +204,21 @@ button, input, select, textarea { font: inherit; color: inherit; }
 .charge .s { font-size: 12px; color: var(--muted); font-weight: 600; }
 .progress { height: 8px; border-radius: 9px; background: var(--card-hi); overflow: hidden; margin-top: 12px; }
 .progress i { display: block; height: 100%; border-radius: 9px; background: linear-gradient(90deg, var(--accent2), var(--ev)); transition: width .8s; }
+/* Şarj yüzdesi: soluk kısım başlangıç, renkli kısım bu şarjda eklenen; dikey çizgi hedef */
+.progress.soc { display: flex; position: relative; overflow: visible; }
+.progress.soc i { border-radius: 0; }
+.progress.soc i:first-child { border-radius: 9px 0 0 9px; }
+.progress.soc i:last-of-type { border-radius: 0 9px 9px 0; }
+.progress.soc i.base { background: color-mix(in srgb, var(--ev) 50%, var(--card-hi)); }
+.progress.soc .tgt { position: absolute; top: -3px; bottom: -3px; width: 2px; margin-left: -1px; border-radius: 2px; background: var(--text); opacity: .55; }
+.soc-line { display: flex; align-items: center; gap: 4px; margin-top: 12px; font-size: 13px; font-weight: 700; color: var(--muted); }
+.soc-line b { font-size: 17px; color: var(--ev); font-weight: 800; }
+.soc-edit { margin-left: auto; background: none; border: 0; color: var(--muted); padding: 4px; cursor: pointer; }
+.soc-edit svg { width: 16px; height: 16px; }
+.soc-ask { display: flex; align-items: center; gap: 6px; width: 100%; margin-top: 12px; padding: 9px 12px; border-radius: 12px;
+  border: 1px dashed color-mix(in srgb, var(--ev) 55%, transparent); background: color-mix(in srgb, var(--ev) 8%, transparent);
+  color: var(--text); font: inherit; font-size: 13px; font-weight: 700; cursor: pointer; text-align: left; }
+.soc-ask svg { width: 16px; height: 16px; color: var(--ev); flex: none; }
 
 /* Uyarılar */
 .alerts { display: grid; gap: 10px; }

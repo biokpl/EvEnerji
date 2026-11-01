@@ -79,7 +79,17 @@ export function chargeCard(M) {
   const s = M.activeSession;
   if (!s) return '';
   const min = (Date.now() / 1000 - s.start) / 60;
-  const added = (s.kwh * M.car.efficiency) / M.car.battery_kwh * 100;
+  const km = s.km ? ` · +${num(s.km)} km` : '';
+  const known = s.socNow != null;
+  // Yüzde biliniyorsa: tahmini şarj durumu ve hedefe kalan süre; bilinmiyorsa girme düğmesi
+  const socLine = known
+    ? `<div class="soc-line"><b>≈ %${num(s.socNow)}</b>${s.socNow >= s.target - 0.5 ? ` · hedef %${num(s.target)} doldu` : s.etaMin != null ? ` · hedef %${num(s.target)} · ≈ ${dur(s.etaMin)} kaldı` : ` · hedef %${num(s.target)}`}
+        <button class="soc-edit" data-soc aria-label="Şarj yüzdesini düzelt">${icon('edit')}</button></div>`
+    : `<button class="soc-ask" data-soc>${icon('plus')}Araçta şu an kaç %? Gir, kalan süreyi hesaplayayım</button>`;
+  const bar = known
+    ? `<div class="progress soc"><i class="base" style="width:${Math.min(100, s.socStart)}%"></i><i style="width:${Math.max(0, Math.min(100, s.socNow) - Math.min(100, s.socStart))}%"></i>
+        <span class="tgt" style="left:${Math.min(100, s.target)}%"></span></div>`
+    : `<div class="progress"><i style="width:${Math.min(100, s.added)}%"></i></div>`;
   return `
   <div class="card no-anim">
     <div class="charge">
@@ -87,10 +97,11 @@ export function chargeCard(M) {
       <div>
         <div class="t"><span class="pulse" style="display:inline-block;margin-right:6px"></span>Şarj ediliyor · ${esc(s.dev.name)}</div>
         <div class="v">${kwh(s.kwh, 2)} · ${tl(s.kwh * M.priceNow)}</div>
-        <div class="s">${watt(M.evW)} · ${dur(min)} · bataryaya ≈ +${pct(added)}</div>
+        <div class="s">${watt(M.evW)} · ${dur(min)} · bataryaya ≈ +${pct(s.added)}${km}</div>
       </div>
     </div>
-    <div class="progress"><i style="width:${Math.min(100, added)}%"></i></div>
+    ${socLine}
+    ${bar}
   </div>`;
 }
 

@@ -16,6 +16,7 @@ SESSION_START_S = 10         # ve en az kaç saniye (ölçüm sıklığından ba
 SESSION_END_W = 50
 SESSION_END_S = 300          # bu kadar süre düşük güç -> bitti
 SESSION_MIN_KWH = 0.05       # bundan küçükse oturum sayılmaz
+FULL_TAIL_RATIO = 0.6        # bitişten önceki son güç tepenin bu oranından düşükse: araç doldu
 
 
 def day_key(ts: float) -> str:
@@ -95,11 +96,17 @@ class SessionTracker:
         a["kwh"] += kwh_added
         a["peak_w"] = max(a["peak_w"], w)
         a["last_w"] = w
+        if w >= SESSION_END_W:
+            a["tail_w"] = w          # şarj sürerken görülen son güç
         if w < SESSION_END_W:
             st["low_since"] = st["low_since"] or ts
             if ts - st["low_since"] >= SESSION_END_S:
                 a["end"] = int(st["low_since"])
                 a["active"] = False
+                # Araç hedefine ulaşınca gücü kademeli düşürür (son güç tepenin çok altında);
+                # fiş çekilince güç birden kesilir (son güç ≈ tepe)
+                tail = a.pop("tail_w", None)
+                a["full"] = bool(tail is not None and tail < FULL_TAIL_RATIO * a["peak_w"])
                 st["active"], st["low_since"] = None, None
                 if a["kwh"] < SESSION_MIN_KWH:
                     return None, None

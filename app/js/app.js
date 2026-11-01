@@ -3,7 +3,7 @@ import { build } from './model.js';
 import { disposeAll, setQuiet } from './charts.js';
 import { closeSheet, hydrateIcons, icon, sheetOpen, toast } from './ui.js';
 import { renderPano, updatePano } from './views/pano.js';
-import { renderTogg, updateTogg } from './views/togg.js';
+import { openSocSheet, renderTogg, updateTogg } from './views/togg.js';
 import { renderEv } from './views/ev.js';
 import { renderCihazlar, updateCihazlar } from './views/cihazlar.js';
 import { renderSarici } from './views/sarici.js';
@@ -133,6 +133,11 @@ function onLive() {
     window.scrollTo(0, y);
   }
 }
+
+// Şarj kartı canlı veride yeniden çizildiği için "yüzde gir" düğmesi buradan yakalanır
+viewEl.addEventListener('click', (e) => {
+  if (e.target.closest('[data-soc]') && M) openSocSheet(M, app);
+});
 
 document.getElementById('nav').addEventListener('click', (e) => {
   const b = e.target.closest('button[data-tab]');

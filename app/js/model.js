@@ -161,7 +161,48 @@ export function build(raw) {
   const eff = withOdo.filter((s) => s.per100);
   const per100 = eff.length ? sum(eff.map((s) => s.per100)) / eff.length : null;
 
+  // Şarj yüzdesi (SoC): araç veri vermediği için prizden ölçülen kWh ile tahmin.
+  // Kullanıcı başlangıç (ve isterse bitiş) yüzdesini girer: settings/soc/{oturum} = {basla, bitis}
+  const car = { battery_kwh: 88.5, efficiency: 0.9, public_tl: 9, hedef_yuzde: 100, ...(S.car || {}) };
+  const cap = Number(car.battery_kwh) || 88.5;
+  const socIn = S.soc || {};
+  for (const s of sessions) {
+    const v = socIn[s.sid] || {};
+    s.socStart = Number.isFinite(v.basla) ? v.basla : null;
+    s.socEnd = Number.isFinite(v.bitis) ? v.bitis : null;
+  }
+  // Gerçek şarj verimi: başlangıç ve bitişi girilmiş oturumlardan (duvar kWh → batarya kWh)
+  const effSamples = sessions
+    .filter((s) => s.socStart != null && s.socEnd != null && s.kwh > 1 && s.socEnd > s.socStart)
+    .map((s) => ((s.socEnd - s.socStart) / 100) * cap / s.kwh)
+    .filter((e) => e > 0.7 && e <= 1);
+  const median = (a) => { const b = [...a].sort((x, y) => x - y); const m = b.length >> 1; return b.length % 2 ? b[m] : (b[m - 1] + b[m]) / 2; };
+  car.learnedEff = effSamples.length ? median(effSamples) : null;
+  car.learnedN = effSamples.length;
+  car.eff = car.learnedEff ?? car.efficiency;
+  const socAdd = (kwhWall) => (kwhWall * car.eff) / cap * 100;
+  for (const s of sessions) {
+    if (s.socStart != null) s.socEst = Math.min(100, s.socStart + socAdd(s.kwh || 0));
+    // Pi gücün kademeli düştüğünü gördüyse araç hedefine ulaşmıştır: bitiş = hedef
+    if (s.full && s.socStart != null && s.socEnd == null) s.socEst = Math.max(s.socStart, Number(car.hedef_yuzde) || 100);
+    if (per100) s.km = ((s.kwh || 0) / per100) * 100;   // bu şarjla eklenen menzil
+  }
+
   const activeSession = evs.map((d) => d.live?.session && (d.live?.w || 0) > 50 ? { dev: d, ...d.live.session } : null).find(Boolean) || null;
+  if (activeSession) {
+    const a = activeSession, v = socIn[a.id] || {};
+    const w = a.dev.live?.w || 0;
+    a.socStart = Number.isFinite(v.basla) ? v.basla : null;
+    a.added = socAdd(a.kwh || 0);
+    a.km = per100 ? ((a.kwh || 0) / per100) * 100 : null;
+    if (a.socStart != null) {
+      a.socNow = Math.min(100, a.socStart + a.added);
+      a.target = Math.max(a.socNow, Number(car.hedef_yuzde) || 100);
+      const remainWall = ((a.target - a.socNow) / 100) * cap / car.eff;   // duvardan çekilecek kWh
+      a.etaMin = w > 300 ? (remainWall / (w / 1000)) * 60 : null;
+      a.remainKwh = remainWall;
+    }
+  }
 
   return {
     raw, now, y, mi, today, S, t, tNext, durum, projDurum, devices, enabled, home, evs, plugs, winderDev,
@@ -175,7 +216,7 @@ export function build(raw) {
     todayEv: evs.reduce((a, d) => a + Math.max(Number(days(d.id)[today] || 0), Number(d.live?.today || 0)), 0),
     lastN, days, histMonth, histTotal, history: S.ev_history || null,
     evDay: (k) => evs.reduce((a, d) => a + Number(days(d.id)[k] || 0), 0) + Number(hist[k] || 0),
-    car: { battery_kwh: 88.5, efficiency: 0.9, public_tl: 9, ...(S.car || {}) },
+    car,
     winder: raw.winder?.state || null,
     discovered: Object.entries(raw.discovered || {}).filter(([id]) => !raw.devices?.[id]),
   };

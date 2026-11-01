@@ -14,16 +14,49 @@ function sessItem(M, s) {
     <div class="sess-date"><b>${d.getDate()}</b><span>${AY_K[d.getMonth()]}</span></div>
     <div class="sess-main">
       <div class="t">${live ? 'Şarj sürüyor' : `${GUN_K[d.getDay()]} ${hm(s.start)}${s.end ? ' – ' + hm(s.end) : ''}`}</div>
-      <div class="s">${live ? `Başlangıç ${hm(s.start)}` : dur(s.minutes ?? ((s.end - s.start) / 60))}${s.per100 ? ` · ${num(s.per100, 1)} kWh/100 km` : ''}${s.odo ? ` · ${num(s.odo)} km` : ''}</div>
+      <div class="s">${live ? `Başlangıç ${hm(s.start)}` : dur(s.minutes ?? ((s.end - s.start) / 60))}${s.socStart != null ? ` · %${num(s.socStart)}→${s.socEnd != null || s.full ? '' : '≈'}%${num(s.socEnd ?? s.socEst)}` : ''}${s.per100 ? ` · ${num(s.per100, 1)} kWh/100 km` : ''}${s.odo ? ` · ${num(s.odo)} km` : ''}</div>
     </div>
     <div class="sess-amt"><b>${num(s.kwh, 1)} kWh</b>${tl(cost)}</div>
   </button>`;
 }
 
+const socVal = (v) => { const x = parseFloat(String(v).replace(',', '.')); return Number.isFinite(x) && x >= 0 && x <= 100 ? Math.round(x) : null; };
+
+// Şarj sürerken: aracın şu anki yüzdesini sor, bu şarjda eklenen kadarını düşüp başlangıç olarak kaydet
+export function openSocSheet(M, app) {
+  const s = M.activeSession;
+  if (!s) return;
+  openSheet(`
+    <h3>Şarj yüzdesi</h3>
+    <div class="sh-sub">Aracın ekranındaki ya da Togg uygulamasındaki değer</div>
+    <div class="field"><div><label for="socn">Araçta şu an</label><small>Gerisini prizden ölçülen enerjiyle tahmin ederim.</small></div>
+      <input class="input num" id="socn" inputmode="numeric" placeholder="%" value="${s.socNow != null ? Math.round(s.socNow) : ''}"></div>
+    <div class="field"><div><label for="hdf">Hedef</label><small>Araçta ayarlı şarj sınırı.</small></div>
+      <input class="input num" id="hdf" inputmode="numeric" placeholder="%" value="${Math.round(Number(M.car.hedef_yuzde) || 100)}"></div>
+    <div class="btn-row" style="margin-top:14px">
+      <button class="btn ghost" id="cancel">Vazgeç</button>
+      <button class="btn primary" id="save">${icon('check')}Kaydet</button>
+    </div>`, (sh) => {
+    sh.querySelector('#cancel').onclick = () => closeSheet();
+    sh.querySelector('#save').onclick = async () => {
+      const now = socVal(sh.querySelector('#socn').value), hdf = socVal(sh.querySelector('#hdf').value);
+      if (now == null) return toast('0–100 arası bir yüzde gir');
+      const basla = Math.max(0, Math.round((now - s.added) * 10) / 10);
+      try {
+        await app.store.put(`settings/soc/${s.id}`, { basla });
+        if (hdf != null && hdf !== Number(M.car.hedef_yuzde)) await app.store.put('settings/car/hedef_yuzde', hdf);
+        closeSheet(); toast('Kaydedildi');
+      } catch { toast('Kaydedilemedi'); }
+    };
+  });
+}
+
 function openSession(M, s, app) {
   const cost = s.tl ?? s.kwh * M.priceNow;
   const sktt = s.tl_sktt ?? s.kwh * M.t.sktt_tl;
-  const soc = (s.kwh * M.car.efficiency) / M.car.battery_kwh * 100;
+  const soc = (s.kwh * M.car.eff) / M.car.battery_kwh * 100;
+  const ended = !!s.end;
+  const sEff = s.socStart != null && s.socEnd != null && s.kwh > 1 ? ((s.socEnd - s.socStart) / 100) * M.car.battery_kwh / s.kwh : null;
   const d = new Date(s.start * 1000);
   openSheet(`
     <h3>${d.getDate()} ${AYLAR[d.getMonth()]} ${d.getFullYear()}</h3>
@@ -38,6 +71,15 @@ function openSession(M, s, app) {
       <div><b>${s.avg_w ? watt(s.avg_w) : '–'}</b><span>ortalama</span></div>
       <div><b>${num(sktt, 0)}</b><span>SKTT'de ₺</span></div>
     </div>
+    ${s.socStart != null ? `<p class="chart-note" style="margin:4px 0 6px">%${num(s.socStart)} → ${s.socEnd != null ? `<b>%${num(s.socEnd)}</b>` : (s.full ? `%${num(s.socEst)} (araç doldurdu)` : `≈ %${num(s.socEst)} (tahmin)`)}${s.km ? ` · +${num(s.km)} km menzil` : ''}${sEff ? ` · bu şarjda verim %${num(sEff * 100)}` : ''}</p>` : ''}
+    <div class="field">
+      <div><label for="ss">Başlangıç %</label><small>Şarj başlarken araçtaki yüzde.</small></div>
+      <input class="input num" id="ss" inputmode="numeric" placeholder="%" value="${s.socStart ?? ''}">
+    </div>
+    ${ended ? `<div class="field">
+      <div><label for="se">Bitiş %</label><small>Girersen aracının gerçek şarj verimini öğrenirim.</small></div>
+      <input class="input num" id="se" inputmode="numeric" placeholder="%" value="${s.socEnd ?? ''}">
+    </div>` : ''}
     <div class="field">
       <div><label for="odo">Kilometre sayacı</label><small>Şarj başlarken aracın km'si. İki şarjda girersen kWh/100 km hesaplanır.</small></div>
       <input class="input num" id="odo" inputmode="numeric" placeholder="km" value="${s.odo ?? ''}">
@@ -54,9 +96,16 @@ function openSession(M, s, app) {
     sh.querySelector('#save').onclick = async () => {
       const odo = parseInt(sh.querySelector('#odo').value.replace(/\D/g, ''), 10);
       const note = sh.querySelector('#note').value.trim();
+      const basla = socVal(sh.querySelector('#ss').value);
+      const bitis = ended ? socVal(sh.querySelector('#se').value) : null;
+      if (basla != null && bitis != null && bitis <= basla) return toast('Bitiş yüzdesi başlangıçtan büyük olmalı');
       try {
         await app.store.put(`sessions/${s.dev}/${s.sid}/odo`, Number.isFinite(odo) ? odo : null);
         await app.store.put(`sessions/${s.dev}/${s.sid}/note`, note || null);
+        const soc = {};
+        if (basla != null) soc.basla = basla;
+        if (bitis != null) soc.bitis = bitis;
+        await app.store.put(`settings/soc/${s.sid}`, Object.keys(soc).length ? soc : null);
         closeSheet(); toast('Kaydedildi');
       } catch { toast('Kaydedilemedi'); }
     };

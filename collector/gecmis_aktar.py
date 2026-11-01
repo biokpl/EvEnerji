@@ -4,6 +4,9 @@
   python gecmis_aktar.py <cihaz_id> <pi_baslangic>     ör. camasir_ve_kurutma 2026-10-30T20:38:47
   sudo systemctl start ev-enerji
 
+Kesinti doldurma (Pi bir süre prize ulaşamadıysa):
+  python gecmis_aktar.py <cihaz_id> <kesinti_bas> <kesinti_bit>
+
 Tuya bulutu prizin enerji artış kayıtlarını (add_ele) yalnız SON 7 GÜN tutar; yeni bir
 priz eklenince bu araç hemen çalıştırılırsa o 7 gün kaybolmaz.
 - Kayıtlar <pi_baslangic> öncesiyle sınırlanır (Pi'nin ölçtüğüyle üst üste binmez).
@@ -29,9 +32,9 @@ CFG = json.loads((HERE / "config.json").read_text(encoding="utf-8"))
 STATE_FILE = HERE / "state.json"
 
 
-def fetch_logs(cloud, tuya_id: str, end_ms: int) -> list[dict]:
-    """Son 7 günün add_ele kayıtları (sayfalı), end_ms öncesi."""
-    start_ms = end_ms - 7 * 86400 * 1000
+def fetch_logs(cloud, tuya_id: str, end_ms: int, start_ms: int | None = None) -> list[dict]:
+    """add_ele kayıtları (sayfalı), [start_ms, end_ms) arası; start yoksa son 7 gün."""
+    start_ms = start_ms or end_ms - 7 * 86400 * 1000
     out, row, seen = [], None, set()
     for _ in range(100):
         q = {"codes": "add_ele", "start_time": str(start_ms), "end_time": str(end_ms), "size": "100"}
@@ -43,7 +46,7 @@ def fetch_logs(cloud, tuya_id: str, end_ms: int) -> list[dict]:
         res = r.get("result") or {}
         for x in res.get("logs") or []:
             k = (x["event_time"], x["value"])
-            if k not in seen and int(x["event_time"]) < end_ms:
+            if k not in seen and start_ms <= int(x["event_time"]) < end_ms:
                 seen.add(k)
                 out.append(x)
         row = res.get("last_row_key")
@@ -54,10 +57,18 @@ def fetch_logs(cloud, tuya_id: str, end_ms: int) -> list[dict]:
 
 
 def main():
-    if len(sys.argv) != 3:
+    if len(sys.argv) not in (3, 4):
         sys.exit(__doc__)
     did, start_iso = sys.argv[1], sys.argv[2]
-    pi_start = datetime.fromisoformat(start_iso)
+    gap_end = sys.argv[3] if len(sys.argv) == 4 else None
+    if gap_end:   # kesinti modu: <bas> ile <bit> arası Pi'nin ölçemediği aralık
+        gap_start = datetime.fromisoformat(start_iso)
+        pi_start = datetime.fromisoformat(gap_end)
+        key = f"{did}@{start_iso}"
+    else:
+        gap_start = None
+        pi_start = datetime.fromisoformat(start_iso)
+        key = did
     if subprocess.run(["systemctl", "is-active", "--quiet", "ev-enerji"]).returncode == 0:
         sys.exit("Önce servisi durdur: sudo systemctl stop ev-enerji")
 
@@ -67,8 +78,8 @@ def main():
     tuya_id = local[did]["tuya"]["dev_id"]
     state = json.loads(STATE_FILE.read_text(encoding="utf-8"))
     imp = state.setdefault("imported", {})
-    if did in imp:
-        sys.exit(f"{did} daha önce aktarılmış ({imp[did]}).")
+    if key in imp:
+        sys.exit(f"{key} daha önce aktarılmış ({imp[key]}).")
     meter = state.get("meters", {}).get(did)
     if meter is None:
         sys.exit(f"{did}: Pi henüz bu cihazı ölçmemiş (state.json'da yok)")
@@ -82,7 +93,8 @@ def main():
         if st.get("code") == "add_ele":
             v = st.get("values")
             scale = int((json.loads(v) if isinstance(v, str) else v or {}).get("scale", 3))
-    logs = fetch_logs(cloud, tuya_id, int(pi_start.timestamp() * 1000))
+    logs = fetch_logs(cloud, tuya_id, int(pi_start.timestamp() * 1000),
+                      int(gap_start.timestamp() * 1000) if gap_start else None)
     if not logs:
         sys.exit("Aktarılacak kayıt yok.")
 
@@ -110,7 +122,7 @@ def main():
     for ym in sorted({dk[:7] for dk in days}):
         upd[f"months/{did}/{ym}"] = round(sum(v for k, v in meter["days"].items() if k.startswith(ym)), 3)
 
-    imp[did] = {"until": start_iso, "kwh": round(sum(days.values()), 3), "at": datetime.now().isoformat(timespec="seconds")}
+    imp[key] = {"until": gap_end or start_iso, "kwh": round(sum(days.values()), 3), "at": datetime.now().isoformat(timespec="seconds")}
     tmp = STATE_FILE.with_suffix(".tmp")
     tmp.write_text(json.dumps(state, ensure_ascii=False), encoding="utf-8")
     tmp.replace(STATE_FILE)

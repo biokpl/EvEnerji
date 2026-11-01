@@ -75,6 +75,8 @@ function kpis(M) {
   </div>`;
 }
 
+const FLOW_MS = 2200;   // akan ışığın bir turu (CSS'teki süreyle aynı)
+
 export function chargeCard(M) {
   const s = M.activeSession;
   if (!s) return '';
@@ -86,10 +88,13 @@ export function chargeCard(M) {
     ? `<div class="soc-line"><b>≈ %${num(s.socNow)}</b>${s.socNow >= s.target - 0.5 ? ` · Hedef %${num(s.target)} · Araç Doldu` : s.etaMin != null ? ` · Hedef %${num(s.target)} · ≈ ${dur(s.etaMin)} Kaldı` : ` · Hedef %${num(s.target)}`}
         <button class="soc-edit" data-soc aria-label="Şarj yüzdesini düzelt">${icon('edit')}</button></div>`
     : `<button class="soc-ask" data-soc>${icon('plus')}Araçta Şu An Kaç %? Gir, Kalan Süreyi Hesaplayayım</button>`;
+  // Akan ışık: kart 3 sn'de bir yeniden çizildiği için animasyonun evresi saate bağlanır, kesilmeden akar
+  const full = known && s.socNow >= s.target - 0.5;
+  const flow = full ? '' : ` class="flow" style="--fd:-${(Date.now() % FLOW_MS) / 1000}s;`;
   const bar = known
-    ? `<div class="progress soc"><i class="base" style="width:${Math.min(100, s.socStart)}%"></i><i style="width:${Math.max(0, Math.min(100, s.socNow) - Math.min(100, s.socStart))}%"></i>
+    ? `<div class="progress soc"><i class="base" style="width:${Math.min(100, s.socStart)}%"></i><i${flow || ' style="'}width:${Math.max(0, Math.min(100, s.socNow) - Math.min(100, s.socStart))}%"></i>
         <span class="tgt" style="left:${Math.min(100, s.target)}%"></span></div>`
-    : `<div class="progress"><i style="width:${Math.min(100, s.added)}%"></i></div>`;
+    : `<div class="progress"><i${flow || ' style="'}width:${Math.min(100, s.added)}%"></i></div>`;
   return `
   <div class="card no-anim">
     <div class="charge">

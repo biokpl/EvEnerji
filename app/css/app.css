@@ -130,6 +130,7 @@ button, input, select, textarea { font: inherit; color: inherit; }
 .view > *:nth-child(n+5) { animation-delay: 0.16s; }
 .no-anim, .no-anim * { animation-name: none !important; }
 .no-anim .pulse { animation-name: pulse !important; }
+.no-anim .flow::after { animation-name: flow !important; }
 @keyframes rise { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
 
 /* Limit halkası */
@@ -210,6 +211,13 @@ button, input, select, textarea { font: inherit; color: inherit; }
 .progress.soc i:first-child { border-radius: 9px 0 0 9px; }
 .progress.soc i:last-of-type { border-radius: 0 9px 9px 0; }
 .progress.soc i.base { background: color-mix(in srgb, var(--ev) 50%, var(--card-hi)); }
+/* Şarj sürerken eklenen kısımda soldan sağa akan ışık (--fd: saate bağlı evre, yeniden çizimde kesilmez) */
+.progress i.flow { position: relative; overflow: hidden; }
+.progress i.flow::after { content: ""; position: absolute; top: 0; bottom: 0; left: 0; width: 60%;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, .55), transparent);
+  animation: flow 2.2s ease-in-out infinite; animation-delay: var(--fd, 0s); }
+@keyframes flow { 0% { transform: translateX(-110%); } 70%, 100% { transform: translateX(270%); } }
+@media (prefers-reduced-motion: reduce) { .progress i.flow::after { animation: none; display: none; } }
 .progress.soc .tgt { position: absolute; top: -3px; bottom: -3px; width: 2px; margin-left: -1px; border-radius: 2px; background: var(--text); opacity: .55; }
 .soc-line { display: flex; align-items: center; gap: 4px; margin-top: 12px; font-size: 13px; font-weight: 700; color: var(--muted); }
 .soc-line b { font-size: 17px; color: var(--ev); font-weight: 800; }

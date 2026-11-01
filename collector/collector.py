@@ -119,6 +119,11 @@ class Collector:
         self.meta = meta
         self.settings = self.fb.safe(self.fb.get, "settings") or self.settings
         self.winder = self.fb.safe(self.fb.get, "winder/state") or {}
+        for did in [d for d in self.providers if d not in meta]:   # uygulamadan silinmiş
+            self.providers.pop(did, None)
+            self.meters.pop(did, None)
+            self.fb.safe(self.fb.delete, f"live/{did}")
+            log.info("Cihaz kaldırıldı: %s", did)
         for did, m in meta.items():
             if not m.get("enabled") or m.get("provider") == "esp32":
                 self.providers.pop(did, None)

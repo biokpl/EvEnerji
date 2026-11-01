@@ -83,7 +83,7 @@ export function chargeCard(M) {
   return `
   <div class="card no-anim">
     <div class="charge">
-      <div class="car-wrap"><img class="car-img" src="img/t10x.webp" alt="Togg T10X" width="120"><span class="plug-dot"></span></div>
+      <div class="car-wrap"><img class="car-img" src="img/t10x.webp" alt="Togg T10X" width="120" height="63"><span class="plug-dot"></span></div>
       <div>
         <div class="t"><span class="pulse" style="display:inline-block;margin-right:6px"></span>Şarj ediliyor · ${esc(s.dev.name)}</div>
         <div class="v">${kwh(s.kwh, 2)} · ${tl(s.kwh * M.priceNow)}</div>

@@ -157,6 +157,11 @@ store.subscribe((kind) => {
 });
 
 applyTheme();
+// Araç resmini açılışta bir kez çözüp bellekte tut: Pano/Togg sekmesinde beklemeden görünsün
+const carImg = new Image();
+carImg.src = 'img/t10x.webp';
+carImg.decode?.().catch(() => {});
+window.__evCarImg = carImg;
 viewEl.innerHTML = `<div class="empty" style="padding-top:80px">${icon('bolt')}<br>Veriler yükleniyor…</div>`;
 store.init();
 if (keySaved) setTimeout(() => toast('Kontrol anahtarı kaydedildi ✓ Prizleri artık buradan açıp kapatabilirsin', 4500), 1200);

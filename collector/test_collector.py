@@ -219,3 +219,84 @@ def test_erken_bitti_bekleme_otomatik_artar():
     assert c.fb.data["devices"]["camasir"]["bitti_dk"] == 3
     assert c.fb.data["devices"]["camasir"]["bitti_dk_oto"] is True
     assert "1 → 3 dk" in sent[1][1], sent[1]
+
+
+def test_bekci_bozuk_yanitta_yeniden_baslatir():
+    c, plug = make()
+    plug.proto_bad_since = C.time.monotonic() - 700      # 11,6 dk bozuk yanıt
+    c.state["self_restart_ts"] = 0
+    c.running = True
+    c.watchdog()
+    assert c.running is False and c.restart_requested
+    # saatte bir: hemen ardından tekrar tetiklenmez
+    c2, plug2 = make()
+    plug2.proto_bad_since = C.time.monotonic() - 700
+    c2.state["self_restart_ts"] = time.time() - 600
+    c2.running = True
+    c2.watchdog()
+    assert c2.running is True
+
+
+def test_tuya_hata_sonrasi_kapatir_ve_ara_verir():
+    import providers.tuya_local as T
+    kapanan = []
+
+    class FakeDev:
+        def status(self): return {"Error": "Unexpected Payload from Device"}
+        def close(self): kapanan.append(1)
+    p = T.TuyaPlug.__new__(T.TuyaPlug)
+    p.t, p.dps, p.scale = {"dev_id": "x"}, T.DEFAULT_DPS, T.DEFAULT_SCALE
+    p.fails, p.skip_until, p.last_err, p.proto_bad_since = 0, 0.0, "", None
+    p.versions, p.vi = [3.4, 3.5, 3.3], 0
+    p._connect = lambda: FakeDev()
+    p.d = FakeDev()
+    for _ in range(6):
+        assert p.read().ok is False
+    assert len(kapanan) == 6                        # her hatada kapatıldı
+    assert p.skip_until > T.time.monotonic()        # 6 hatadan sonra ara
+    assert p.proto_bad_since is not None            # protokol hatası izleniyor
+    p.d.status = lambda: {"Error": "Network Error: Unable to Connect"}
+    p.skip_until = 0
+    p.read()
+    assert p.proto_bad_since is None                # priz kapalı: bekçi tetiklenmez
+
+
+def test_tuya_bozuk_yanitta_surum_degistirir():
+    import providers.tuya_local as T
+    surumler = []
+
+    class Dev:
+        def __init__(self, v): self.v = v
+        def status(self):
+            return {"dps": {"1": True, "19": 100}} if self.v == 3.5 else {"Error": "Unexpected Payload from Device"}
+        def close(self): pass
+    p = T.TuyaPlug.__new__(T.TuyaPlug)
+    p.t, p.dps, p.scale = {"dev_id": "x"}, T.DEFAULT_DPS, T.DEFAULT_SCALE
+    p.fails, p.skip_until, p.last_err, p.proto_bad_since = 0, 0.0, "", None
+    p.versions, p.vi = [3.4, 3.5, 3.3], 0
+
+    def conn():
+        surumler.append(p.versions[p.vi])
+        return Dev(p.versions[p.vi])
+    p._connect = conn
+    p.d = conn()
+    sonuc = [p.read().ok for _ in range(4)]
+    assert sonuc == [False, False, False, True], sonuc   # 3 hatadan sonra 3.5'e geçip okudu
+    assert surumler == [3.4, 3.5]
+
+
+def test_kesif_bulamadigi_surumu_ezmez():
+    import discover as D
+    import json, tempfile, os
+    from pathlib import Path
+
+    class FakeCloud:
+        def __init__(self, **k): pass
+        def getdevices(self, verbose=False):
+            return [{"id": "t1", "key": "k", "name": "Priz", "category": "cz"}]
+    D.tinytuya.Cloud = FakeCloud
+    D.tinytuya.deviceScan = lambda **k: {}          # tarama prizi görmedi
+    f = Path(tempfile.mkdtemp()) / "devices_local.json"
+    f.write_text(json.dumps({"priz": {"provider": "tuya", "tuya": {"dev_id": "t1", "local_key": "k", "ip": "1.2.3.4", "version": 3.4}}}))
+    D.sync({"api_key": "a", "api_secret": "b"}, f, {"priz"})
+    assert json.loads(f.read_text())["priz"]["tuya"]["version"] == 3.4

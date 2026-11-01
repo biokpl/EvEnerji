@@ -43,6 +43,7 @@ HERE = Path(__file__).resolve().parent
 CFG_FILE = HERE / "config.json"
 LOCAL_FILE = HERE / "devices_local.json"
 STATE_FILE = HERE / "state.json"
+WATCHDOG_S = 600   # ağdaki priz bu kadar süre bozuk yanıt verirse servis yeniden başlar
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(name)s %(levelname)s %(message)s",
                     handlers=[logging.StreamHandler(sys.stdout)])
@@ -443,6 +444,7 @@ class Collector:
                 self.refresh_devices()
                 self.t_meta = t0
             self.poll_once()
+            self.watchdog()
             if t0 - self.t_flush >= self.flush_every:
                 self.flush()
                 self.t_flush = t0
@@ -458,6 +460,28 @@ class Collector:
         self.flush()
         log.info("Durdu")
 
+    def watchdog(self):
+        """Ağdaki bir priz uzun süre bozuk yanıt veriyorsa servisi yeniden başlat.
+
+        Deneyim: yeniden başlatma bu durumu hemen düzeltiyor (süreç içinde biriken bağlantılar).
+        systemd Restart=always ile 15 sn sonra geri gelir. Saatte en fazla bir kez.
+        """
+        now_m, now = time.monotonic(), time.time()
+        for did, prov in self.providers.items():
+            since = getattr(prov, "proto_bad_since", None)
+            if since is None or now_m - since < WATCHDOG_S:
+                continue
+            if now - float(self.state.get("self_restart_ts", 0)) < 3600:
+                return
+            log.warning("Bekçi: %s %d dk'dır bozuk yanıt veriyor; servis yeniden başlatılıyor", did, WATCHDOG_S // 60)
+            self.state["self_restart_ts"] = now
+            self.restart_requested = True
+            self.running = False
+            return
+
 
 if __name__ == "__main__":
-    Collector().run()
+    c = Collector()
+    c.run()
+    if getattr(c, "restart_requested", False):
+        sys.exit(3)   # systemd yeniden başlatır

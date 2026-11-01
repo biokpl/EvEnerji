@@ -41,11 +41,14 @@ def sync(tc: dict, local_file: Path, known_ids: set[str]) -> dict:
     for d in devs:
         tid = d["id"]
         net = ips.get(tid, {})
+        # Sürüm yalnız tarama prizi gördüyse yazılır. Görmediyse varsayılanla EZİLMEZ: kısa taramada
+        # yayın yapmayan priz 3.3 sanılıp sonraki açılışta okunamıyordu ("Unexpected Payload").
         entry = {"dev_id": tid, "local_key": d["key"], "ip": net.get("ip", ""),
-                 "version": float(net.get("version") or 3.3)}
+                 "version": float(net["version"]) if net.get("version") else None}
         if tid in by_tuya:  # anahtar/IP değişmiş olabilir
             local[by_tuya[tid]]["tuya"].update({k: v for k, v in entry.items() if v})
             continue
+        entry["version"] = entry["version"] or 3.4   # yeni priz, tarama görmediyse: güncel prizler 3.4
         if d.get("category") not in SOCKET_CATEGORIES:
             continue
         did = slug(d.get("name", ""), tid)

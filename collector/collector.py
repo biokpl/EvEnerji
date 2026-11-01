@@ -34,7 +34,7 @@ from datetime import date, datetime, timedelta
 from pathlib import Path
 
 from fb import FB
-from meter import DeviceMeter, SessionTracker, day_key, merge_months
+from meter import DeviceMeter, JobTracker, SessionTracker, day_key, merge_months
 from notify import Notifier
 from providers import Reading, make_provider
 from tariff import Tarife, birim_fiyat, gunluk_butce, yil_durumu, yil_sonu_tahmini
@@ -66,7 +66,7 @@ def save_json(p: Path, data) -> None:
 
 def fmt_tl(x: float) -> str:
     s = f"{x:,.0f}".replace(",", ".")
-    return f"{s} TL"
+    return f"{s} ₺"
 
 
 def fmt_kwh(x: float) -> str:
@@ -95,6 +95,7 @@ class Collector:
         self.shared: dict = {"save_cfg": self.save_cfg}
         self.meters: dict[str, DeviceMeter] = {}
         self.sessions: dict[str, SessionTracker] = {}
+        self.jobs: dict[str, JobTracker] = {}   # prizlerde "iş bitti" algılama
         self.settings: dict = {}
         self.winder: dict = {}
         self.live: dict[str, Reading] = {}
@@ -129,6 +130,7 @@ class Collector:
         for did in [d for d in self.providers if d not in meta]:   # uygulamadan silinmiş
             self.providers.pop(did, None)
             self.meters.pop(did, None)
+            self.jobs.pop(did, None)
             self.fb.safe(self.fb.delete, f"live/{did}")
             log.info("Cihaz kaldırıldı: %s", did)
         for did, m in meta.items():
@@ -145,6 +147,8 @@ class Collector:
                 self.meters[did] = DeviceMeter(did, self.state["meters"], self.poll)
                 if m.get("type") == "ev_sarj":
                     self.sessions[did] = SessionTracker(self.state.setdefault(f"sess_{did}", {}))
+                elif m.get("type") == "priz":
+                    self.jobs[did] = JobTracker(self.state.setdefault("jobs", {}).setdefault(did, {}))
                 log.info("Cihaz eklendi: %s (%s)", m.get("name", did), local[did]["provider"])
             except Exception as e:
                 log.error("%s başlatılamadı: %s", did, e)
@@ -207,6 +211,10 @@ class Collector:
                     self.on_session_start(did, m, sess)
                 elif ev == "bitti":
                     self.on_session_end(did, m, sess)
+            if did in self.jobs:
+                job = self.jobs[did].update(now, w, added)
+                if job:
+                    self.on_job_end(did, m, job)
             self.check_safety(did, m, r, now)
         if live_out:
             self.fb.safe(self.fb.patch, "live", live_out)
@@ -231,8 +239,24 @@ class Collector:
         msg = f"{fmt_kwh(s['kwh'])} · {fmt_tl(s['tl'])} · {h} sa {mi} dk"
         if self.winder.get("online") and self.winder.get("state") == "acik":
             msg += "\nKablo açıkta: uygulamadan sarabilirsin."
-        self.ntfy.send(f"{m.get('name', 'Araç')} şarjı bitti", msg, tags="white_check_mark",
-                       open_tab="togg")
+        if m.get("bitti_bildirim", True):
+            # Pi gücün kademeli düştüğünü gördüyse araç hedefine ulaştı
+            title = f"{m.get('name', 'Araç')}: Araç Doldu" if s.get("full") else f"{m.get('name', 'Araç')} şarjı bitti"
+            self.ntfy.send(title, msg, tags="white_check_mark", open_tab="togg")
+
+    def on_job_end(self, did, m, job):
+        mins = (job["end"] - job["start"]) / 60
+        log.info("İş bitti: %s %.0f dk %.3f kWh", did, mins, job["kwh"])
+        if not m.get("bitti_bildirim", True):
+            return
+        price, _ = self.price_now()
+        h, mi = divmod(int(round(mins)), 60)
+        sure = f"{h} sa {mi} dk" if h else f"{mi} dk"
+        kwh = f"{job['kwh']:.2f}".replace(".", ",") + " kWh"
+        msg = f"{sure} · {kwh} · {fmt_tl(job['kwh'] * price)}"
+        # bildirim ağı beklerken ölçüm döngüsü durmasın
+        self.pool.submit(self.ntfy.send, f"{m.get('name', did)} bitti", msg,
+                         tags="white_check_mark", open_tab="cihazlar")
 
     def check_safety(self, did, m, r: Reading, now):
         sf = self.cfg.get("safety", {})

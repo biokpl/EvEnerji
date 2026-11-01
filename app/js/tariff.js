@@ -84,3 +84,41 @@ export function gunlukButce(limit, ytd, bugun) {
 }
 
 export const kalanGun = (bugun) => gunYil(bugun.getFullYear()) - yilinGunu(bugun) + 1;
+
+// ---------------------------------------------------------------- üç zamanlı tarife
+// Saat dilimleri (EPDK): gündüz 06–17, puant 17–22, gece 22–06. Üç zamanlıda kademe yok.
+export const UC_ZAMAN = { gunduz: 4.82, puant: 6.79, gece: 3.23 };   // ₺/kWh vergiler dahil (Nisan 2026)
+export const dilim = (h) => (h >= 6 && h < 17 ? 'gunduz' : h >= 17 && h < 22 ? 'puant' : 'gece');
+// Saatlik ölçümü olmayan ev tüketimi için varsayılan dağılım (ana şalter gelince gerçeği kullanılır)
+export const EV_PROFIL = { gunduz: 0.45, puant: 0.35, gece: 0.2 };
+
+/**
+ * Aylık tek / üç zamanlı karşılaştırma.
+ * olculen: {gunduz, puant, gece} saatlik ölçülen kWh (n günde), toplam: evin n gündeki toplam kWh'si,
+ * togg: Togg'un n gündeki kWh'si ("hep gece" senaryosu için).
+ */
+export function ucZamanKiyas(t, fiyat, olculen, toplam, n, togg = 0) {
+  const k = 30 / Math.max(1, n);
+  const olc = olculen.gunduz + olculen.puant + olculen.gece;
+  const kalan = Math.max(0, toplam - olc);
+  const band = (b) => olculen[b] + kalan * EV_PROFIL[b];
+  const ucMaliyet = (g) => (g.gunduz * fiyat.gunduz + g.puant * fiyat.puant + g.gece * fiyat.gece) * k;
+  const simdi = { gunduz: band('gunduz'), puant: band('puant'), gece: band('gece') };
+  // Togg'un ölçülmüş saatleri biliniyorsa onları, bilinmiyorsa ev profilindeki payını geceye taşı
+  const toggOlc = Math.min(togg, olc);
+  const toggKalan = Math.max(0, togg - toggOlc);
+  const hepGece = { ...simdi };
+  for (const b of ['gunduz', 'puant']) {
+    const tasi = toggKalan * EV_PROFIL[b] + (olc > 0 ? (olculen[b] / olc) * toggOlc : 0);
+    hepGece[b] -= tasi;
+    hepGece.gece += tasi;
+  }
+  const ayKwh = Math.max(toplam, olc) * k;
+  return {
+    ayKwh,
+    tek: ayMaliyeti(t, ayKwh, false),
+    uc: ucMaliyet(simdi),
+    ucHepGece: ucMaliyet(hepGece),
+    geceOran: (simdi.gece) / Math.max(1e-9, simdi.gunduz + simdi.puant + simdi.gece),
+  };
+}

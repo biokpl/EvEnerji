@@ -112,6 +112,32 @@ function openSession(M, s, app) {
   });
 }
 
+// Üç zamanlı tarife: son 30 günün saatlik ölçümüyle aylık fatura karşılaştırması
+function ucCard(M) {
+  const u = M.ucz;
+  if (!u) return '';
+  const fark = u.tek - u.ucHepGece;
+  const verdict = fark > 20
+    ? `Togg'u gece (22–06) şarj edersen üç zamanlıda ayda ≈ <b>${num(fark)} ₺</b> daha az ödersin.`
+    : u.tek - u.uc > 20 ? `Şu anki kullanımınla bile üç zamanlı ayda ≈ <b>${num(u.tek - u.uc)} ₺</b> daha ucuz.`
+      : 'Şu anki tüketimle tek zamanlı daha uygun ya da fark çok küçük.';
+  const togg = u.toggGece != null
+    ? `Togg şarjında gece diliminin payı: <b>%${num(u.toggGece * 100)}</b>.`
+    : "Togg'un hangi saatlerde şarj olduğu ilk ev şarjlarından sonra ölçülecek.";
+  return `
+    <div class="card">
+      <div class="card-head"><h2>Üç Zamanlı Tarife</h2><span class="muted" style="font-size:12px;font-weight:700">${u.n < 7 ? 'Ön Tahmin' : `Son ${u.n} Gün`}</span></div>
+      <p class="hint">Aylık fatura (≈ ${num(u.ayKwh)} kWh) iki tarifede:</p>
+      <div class="mini-stats" style="grid-template-columns:1fr 1fr 1fr">
+        <div><b>${num(u.tek)}</b><span>Tek Zamanlı ₺</span></div>
+        <div><b>${num(u.uc)}</b><span>Üç Zamanlı ₺</span></div>
+        <div><b style="color:${fark > 20 ? 'var(--good)' : 'inherit'}">${num(u.ucHepGece)}</b><span>Togg Hep Gece ₺</span></div>
+      </div>
+      <p class="chart-note">${verdict} ${togg}</p>
+      <p class="chart-note">Üç zamanlıda kademe yok; gece ${num(u.fiyat.gece, 2)} · gündüz ${num(u.fiyat.gunduz, 2)} · puant ${num(u.fiyat.puant, 2)} ₺/kWh (Ayarlar'dan değişir).${u.varsayim ? ' Ana şalter olmadığı için evin geri kalanının saat dağılımı varsayıldı (gündüz %45 · puant %35 · gece %20).' : ''} Limit aşılırsa iki tarifede de son kaynak fiyatı uygulanır.</p>
+    </div>`;
+}
+
 export function renderTogg(el, M, app) {
   if (!M.evs.length && !M.histTotal) {
     el.innerHTML = `<div class="card"><div class="empty">${icon('car')}<br>Araç şarj prizi tanımlı değil.<br>Cihazlar sekmesinden prizin türünü <b>Araç şarjı</b> yap.</div></div>`;
@@ -160,6 +186,7 @@ export function renderTogg(el, M, app) {
       </div>
       <p class="chart-note">İstasyonla kıyas: aynı ${num(M.evYtd)} kWh halka açık istasyonda ${num(M.car.public_tl, 2)} ₺/kWh'den ≈ <b>${num(M.evYtd * M.car.public_tl)} ₺</b> ederdi (fiyat Ayarlar'da).</p>
     </div>
+    ${ucCard(M)}
     <div class="card">
       <div class="card-head"><h2>Şarj oturumları</h2><span class="muted" style="font-size:12px;font-weight:700">${M.sessions.length} kayıt</span></div>
       ${M.sessions.length ? `<div class="sess">${list.map((s) => sessItem(M, s)).join('')}</div>` : '<div class="empty">Henüz oturum yok. Şarj başlayınca otomatik görünür.</div>'}

@@ -153,3 +153,37 @@ if __name__ == "__main__":
                 fails += 1; print("HATA", name, repr(e))
     print("TUM TESTLER GECTI" if not fails else f"{fails} test başarısız")
     sys.exit(1 if fails else 0)
+
+
+def _priz_calistir(bildirim):
+    c, _ = make()
+    plug = FakePlug()
+    c.meta = {"camasir": {"name": "Çamaşır", "type": "priz", "enabled": True, "bitti_bildirim": bildirim}}
+    c.providers = {"camasir": plug}
+    c.meters = {"camasir": C.DeviceMeter("camasir", c.state["meters"], 3)}
+    c.sessions = {}
+    c.jobs = {"camasir": C.JobTracker({})}
+    t, real = time.time(), time.time
+    try:
+        def step(w):
+            nonlocal t
+            plug.w = w
+            C.time.time = lambda: t
+            c.poll_once()
+            t += 3
+        for _ in range(400): step(1800.0)    # 20 dk çalışma
+        for _ in range(120): step(2.0)       # 6 dk bekleme
+    finally:
+        C.time.time = real
+    c.pool.shutdown(wait=True)
+    return c.ntfy.sent
+
+
+def test_priz_is_bitti_bildirimi():
+    sent = _priz_calistir(True)
+    assert len(sent) == 1 and sent[0][0] == "Çamaşır bitti", sent
+    assert "20 dk" in sent[0][1] and "kWh" in sent[0][1] and "₺" in sent[0][1], sent
+
+
+def test_priz_bildirimi_kapaliysa_gonderilmez():
+    assert _priz_calistir(False) == []

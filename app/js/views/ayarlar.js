@@ -31,6 +31,10 @@ export function renderAyarlar(el, M, app) {
       <div class="field"><div><label for="st">Son kaynak fiyatı (₺/kWh)</label><small>Limit aşılınca uygulanan fiyat.</small></div><input class="input num" id="st" inputmode="decimal" value="${f(T.sktt_tl)}" placeholder="${f(6.49)}"></div>
       <div class="field"><div><label for="ky">Aylık kademe (kWh)</label><small>Aylık kademe uygulanıyorsa sınır; yoksa boş bırak.</small></div><input class="input num" id="ky" inputmode="numeric" value="${T.kademe_kwh_ay || ''}" placeholder="yok"></div>
       <div class="field"><div><label for="k2">Kademe üstü fiyat</label></div><input class="input num" id="k2" inputmode="decimal" value="${f(T.kademe2_tl || '')}" placeholder="–"></div>
+      <div class="field"><div><label>Üç zamanlı (₺/kWh)</label><small>Karşılaştırma için: gece · gündüz · puant</small></div>
+        <div style="display:flex;gap:6px"><input class="input num" id="ug" inputmode="decimal" value="${f(T.uc_gece || '')}" placeholder="${f(3.23)}" style="width:62px" aria-label="Gece">
+        <input class="input num" id="ud" inputmode="decimal" value="${f(T.uc_gunduz || '')}" placeholder="${f(4.82)}" style="width:62px" aria-label="Gündüz">
+        <input class="input num" id="up" inputmode="decimal" value="${f(T.uc_puant || '')}" placeholder="${f(6.79)}" style="width:62px" aria-label="Puant"></div></div>
       ${yr === M.y ? `<div class="field"><div><label for="py">${M.y - 1} toplam tüketimi (kWh)</label><small>Bu yılın limitini aştıysa bütün yıl son kaynak fiyatı uygulanır. e-Devlet / fatura.</small></div><input class="input num" id="py" inputmode="numeric" value="${T.onceki_yil_kwh ?? ''}" placeholder="kWh"></div>` : ''}
       ${yr === M.y ? `<div class="field"><div><label for="bs">Abonelik başlangıcı</label><small>Bu yıl taşındıysan ilk okuma tarihi (yıllık hız bundan hesaplanır).</small></div><input class="input" type="date" id="bs" value="${esc(T.baslangic || '')}"></div>
       <div class="field"><div><label for="so">Son fatura okuması</label><small>Ev şalteri bağlanana kadar ölçüm bu tarihte biter, sonrası tahmin edilir.</small></div><input class="input" type="date" id="so" value="${esc(T.son_okuma || '')}"></div>` : ''}
@@ -58,7 +62,12 @@ export function renderAyarlar(el, M, app) {
 
     <div class="card">
       <h2>Bildirimler</h2>
-      <p class="hint">Pi, limit eşiklerinde, şarj başlayıp bitince ve uzun süre yüksek akımda <b>ntfy</b> ile telefona bildirim gönderir.</p>
+      <p class="hint">Pi, limit eşiklerinde, şarj başlayıp bitince, cihazlar işini bitirince ve uzun süre yüksek akımda <b>ntfy</b> ile telefona bildirim gönderir.</p>
+      ${M.plugs.length ? `<div class="notif-list">${M.plugs.map((d) => `
+        <div class="field"><div><label>${esc(d.name)}</label><small>${d.type === 'ev_sarj'
+          ? 'Şarj bitince; araç dolduysa "Araç Doldu".'
+          : 'İşini bitirince (en az 1 dk çalışıp 5 dk beklemeye geçince).'}</small></div>
+          <button class="switch ${d.bitti_bildirim !== false ? 'on' : ''}" data-nt="${esc(d.id)}" aria-label="${esc(d.name)} bildirimi"></button></div>`).join('')}</div>` : ''}
       <div class="field"><div><label for="es">Limit eşikleri (%)</label></div><input class="input" id="es" value="${esc(esik)}" style="width:130px;text-align:right"></div>
       ${M.raw.status?.ntfy ? `<div class="field"><div><label>ntfy konusu</label><small>ntfy uygulamasında bu konuya abone ol.</small></div><a class="btn ghost sm" href="https://ntfy.sh/${encodeURIComponent(M.raw.status.ntfy)}" target="_blank" rel="noopener">${esc(M.raw.status.ntfy)}</a></div>` : ''}
       <button class="btn ghost" id="saveA" style="margin-top:12px">${icon('check')}Kaydet</button>
@@ -88,7 +97,8 @@ export function renderAyarlar(el, M, app) {
 
   $('#ys').onclick = (e) => { const b = e.target.closest('[data-y]'); if (b) { yearSel = +b.dataset.y; app.refresh(); } };
   $('#saveT').onclick = () => {
-    const v = { limit_kwh: n($('#lim').value), normal_tl: n($('#nt').value), sktt_tl: n($('#st').value), kademe_kwh_ay: n($('#ky').value), kademe2_tl: n($('#k2').value) };
+    const v = { limit_kwh: n($('#lim').value), normal_tl: n($('#nt').value), sktt_tl: n($('#st').value), kademe_kwh_ay: n($('#ky').value), kademe2_tl: n($('#k2').value),
+      uc_gece: n($('#ug').value), uc_gunduz: n($('#ud').value), uc_puant: n($('#up').value) };
     if ($('#py')) v.onceki_yil_kwh = n($('#py').value);
     if ($('#bs')?.value) v.baslangic = $('#bs').value;
     if ($('#so')?.value) v.son_okuma = $('#so').value;
@@ -109,6 +119,13 @@ export function renderAyarlar(el, M, app) {
     const arr = $('#es').value.split(/[,\s]+/).map(Number).filter((x) => x > 0 && x < 100).sort((a, b) => a - b);
     save('settings/alerts', { esikler: arr.length ? arr : [70, 85, 95] });
   };
+  // Cihaz bildirimleri: dokununca hemen kaydedilir (Pi en geç 1 dk içinde görür)
+  el.querySelectorAll('[data-nt]').forEach((b) => b.addEventListener('click', async () => {
+    const on = !b.classList.contains('on');
+    b.classList.toggle('on', on);
+    try { await st.patch('devices', { [`${b.dataset.nt}/bitti_bildirim`]: on }); toast(on ? 'Bildirim açık' : 'Bildirim kapalı'); }
+    catch { b.classList.toggle('on', !on); toast('Kaydedilemedi'); }
+  }));
   $('#saveK').onclick = () => { const k = $('#key').value.trim(); if (!k) return toast('Anahtar boş'); st.setKey(k); toast('Anahtar bu telefona kaydedildi'); app.refresh(); };
   $('#th').onclick = (e) => { const b = e.target.closest('[data-t]'); if (b) app.setTheme(b.dataset.t); };
   $('#demo').onclick = () => st.setForcedDemo(!st.forcedDemo);

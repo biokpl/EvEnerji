@@ -1,5 +1,5 @@
 // Ham veriden ekranların kullandığı özetleri çıkarır.
-import { ayMaliyeti, birimFiyat, gunlukButce, kalanGun, tarife, yilDurumu } from './tariff.js';
+import { UC_ZAMAN, ayMaliyeti, birimFiyat, dilim, gunlukButce, kalanGun, tarife, ucZamanKiyas, yilDurumu } from './tariff.js';
 import { iso } from './ui.js';
 
 const z12 = () => Array(12).fill(0);
@@ -197,6 +197,29 @@ export function build(raw) {
     if (per100) s.km = ((s.kwh || 0) / per100) * 100;   // bu şarjla eklenen menzil
   }
 
+  // Üç zamanlı tarife karşılaştırması (son 30 gün saatlik ölçüm)
+  const ucFiyat = { ...UC_ZAMAN, ...Object.fromEntries(Object.entries({ gunduz: TY.uc_gunduz, puant: TY.uc_puant, gece: TY.uc_gece }).filter(([, v]) => v > 0)) };
+  const ucKaynak = home ? [home] : enabled.filter((d) => d.type === 'priz' || d.type === 'ev_sarj');
+  const olculen = { gunduz: 0, puant: 0, gece: 0 }, toggSaat = { gunduz: 0, puant: 0, gece: 0 };
+  const ucGunler = new Set();
+  for (const d of ucKaynak) {
+    for (const [dk, arr] of Object.entries(raw.hours?.[d.id] || {})) {
+      if (!Array.isArray(arr) || dk > today) continue;
+      ucGunler.add(dk);
+      arr.forEach((v, h) => { const x = Number(v) || 0; olculen[dilim(h)] += x; if (d.type === 'ev_sarj') toggSaat[dilim(h)] += x; });
+    }
+  }
+  const ucN = ucGunler.size;
+  let ucz = null;
+  if (ucN) {
+    const gunler = [...ucGunler];
+    const toplam = home ? olculen.gunduz + olculen.puant + olculen.gece : Math.max(rate * ucN, 0);
+    const togg = sum(gunler.map((k) => evs.reduce((a, d) => a + Number(days(d.id)[k] || 0), 0) + Number(hist[k] || 0)));
+    const toggOlc = toggSaat.gunduz + toggSaat.puant + toggSaat.gece;
+    ucz = { ...ucZamanKiyas(t, ucFiyat, olculen, toplam, ucN, togg), n: ucN, fiyat: ucFiyat, varsayim: !home,
+      toggGece: toggOlc > 0.5 ? toggSaat.gece / toggOlc : null, toggAy: togg * 30 / ucN };
+  }
+
   const activeSession = evs.map((d) => d.live?.session && (d.live?.w || 0) > 50 ? { dev: d, ...d.live.session } : null).find(Boolean) || null;
   if (activeSession) {
     const a = activeSession, v = socIn[a.id] || {};
@@ -223,7 +246,7 @@ export function build(raw) {
     evW: evs.reduce((a, d) => a + (d.live?.w || 0), 0),
     todayHome: home ? Math.max(Number(days(home.id)[today] || 0), Number(home.live?.today || 0)) : 0,
     todayEv: evs.reduce((a, d) => a + Math.max(Number(days(d.id)[today] || 0), Number(d.live?.today || 0)), 0),
-    lastN, days, histMonth, histTotal, history: S.ev_history || null,
+    ucz, lastN, days, histMonth, histTotal, history: S.ev_history || null,
     evDay: (k) => evs.reduce((a, d) => a + Number(days(d.id)[k] || 0), 0) + Number(hist[k] || 0),
     car,
     winder: raw.winder?.state || null,

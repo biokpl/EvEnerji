@@ -116,6 +116,55 @@ class SessionTracker:
         return None, a
 
 
+# Priz "iş" algılama (çamaşır, kurutma, yazıcı...): güç bir süre yüksek kalıp beklemeye düşünce "bitti"
+JOB_RUN_W = 50        # bunun üstü: çalışıyor
+JOB_RUN_S = 60        # en az bu kadar süre (kısa sıçramalar iş sayılmaz)
+JOB_END_W = 50        # bunun altı: beklemede
+JOB_END_S = 300       # bu kadar süre beklemede kalırsa iş bitti (program içi kısa duraklamalar sayılmaz)
+JOB_MIN_S = 300       # bundan kısa işler bildirilmez
+JOB_MIN_KWH = 0.02
+
+
+class JobTracker:
+    """Prizdeki cihazın bir işi (yıkama, baskı, pişirme) bitirdiğini güç eğrisinden anlar."""
+
+    def __init__(self, state: dict):
+        self.st = state
+        self.st.setdefault("hi_since", None)
+        self.st.setdefault("job", None)
+        self.st.setdefault("low_since", None)
+
+    def update(self, ts: float, w: float | None, kwh_added: float) -> dict | None:
+        """Biten işi ({start, end, kwh, peak_w}) döndürür; yoksa None."""
+        st = self.st
+        job = st["job"]
+        if w is None:                       # okunamadı: durumu koru, enerjiyi say
+            if job:
+                job["kwh"] += kwh_added
+            return None
+        if job is None:
+            if w >= JOB_RUN_W:
+                st["hi_since"] = st["hi_since"] or ts
+                if ts - st["hi_since"] >= JOB_RUN_S:
+                    st["job"] = {"start": st["hi_since"], "kwh": kwh_added, "peak_w": w}
+                    st["hi_since"], st["low_since"] = None, None
+            else:
+                st["hi_since"] = None
+            return None
+        job["kwh"] += kwh_added
+        job["peak_w"] = max(job["peak_w"], w)
+        if w < JOB_END_W:
+            st["low_since"] = st["low_since"] or ts
+            if ts - st["low_since"] >= JOB_END_S:
+                done = {**job, "end": st["low_since"]}
+                st["job"], st["low_since"] = None, None
+                if done["end"] - done["start"] >= JOB_MIN_S and done["kwh"] >= JOB_MIN_KWH:
+                    return done
+        else:
+            st["low_since"] = None
+        return None
+
+
 def merge_months(bills: dict | None, meter: dict | None) -> list[float]:
     """Yılın 12 ayı: fatura (elle girilen) ile sayaç ölçümünden büyük olanı.
     Sayaç ay ortasında başladıysa o ayın faturası eksik kısmı tamamlar."""

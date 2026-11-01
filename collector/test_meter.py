@@ -112,3 +112,34 @@ def test_oturum_doldu_isareti():
     cekildi = _oturum([2200] * 10 + [0] * 110)
     assert cekildi and cekildi["full"] is False
     assert "tail_w" not in cekildi
+
+
+def _is(guc, adim=3):
+    from meter import JobTracker
+    j, t, biten = JobTracker({}), 0, []
+    for w in guc:
+        r = j.update(t, w, w * adim / 3_600_000)
+        if r:
+            biten.append(r)
+        t += adim
+    return biten
+
+
+def test_is_biter_ve_bildirilir():
+    # 20 dk çalışma (2 dk duraklama dahil), sonra 8 dk beklemede -> tek iş
+    guc = [2000] * 200 + [5] * 40 + [400] * 160 + [3] * 160
+    biten = _is(guc)
+    assert len(biten) == 1
+    b = biten[0]
+    assert 19 * 60 <= b["end"] - b["start"] <= 21 * 60
+    assert b["kwh"] > 0.1 and b["peak_w"] == 2000
+
+
+def test_kisa_sicrama_is_degil():
+    assert _is([5] * 50 + [900] * 10 + [5] * 200) == []      # 30 sn sıçrama
+    assert _is([300] * 30 + [5] * 200) == []                  # 90 sn: iş başlar ama 5 dk'dan kısa
+
+
+def test_bekleme_gucu_esigin_altinda_kalir():
+    # yazıcı beklemede 26-40 W: hiç iş başlamaz
+    assert _is([26, 40, 33] * 300) == []

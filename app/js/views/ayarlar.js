@@ -66,8 +66,10 @@ export function renderAyarlar(el, M, app) {
       ${M.plugs.length ? `<div class="notif-list">${M.plugs.map((d) => `
         <div class="field"><div><label>${esc(d.name)}</label><small>${d.type === 'ev_sarj'
           ? 'Şarj bitince; araç dolduysa "Araç Doldu".'
-          : 'İşini bitirince (en az 1 dk çalışıp 5 dk beklemeye geçince).'}</small></div>
-          <button class="switch ${d.bitti_bildirim !== false ? 'on' : ''}" data-nt="${esc(d.id)}" aria-label="${esc(d.name)} bildirimi"></button></div>`).join('')}</div>` : ''}
+          : `İşini bitirip beklemeye geçince.${d.bitti_dk_oto ? ' Bekleme erken bildirimden sonra otomatik ayarlandı.' : ''}`}</small></div>
+          <div style="display:flex;align-items:center;gap:8px">${d.type === 'priz' ? `<select class="input" data-wt="${esc(d.id)}" aria-label="${esc(d.name)} bekleme süresi" style="width:76px">${[1, 2, 3, 5, 10, 15].map((v) => `<option value="${v}" ${Number(d.bitti_dk || 3) === v ? 'selected' : ''}>${v} dk</option>`).join('')}</select>` : ''}
+          <button class="switch ${d.bitti_bildirim !== false ? 'on' : ''}" data-nt="${esc(d.id)}" aria-label="${esc(d.name)} bildirimi"></button></div></div>`).join('')}
+        <p class="chart-note" style="margin:2px 0 8px">Süre: cihaz bu kadar beklemede kalınca "bitti" sayılır. Erken bildirim olursa (cihaz işe devam ederse) süre kendiliğinden uzatılır.</p></div>` : ''}
       <div class="field"><div><label for="es">Limit eşikleri (%)</label></div><input class="input" id="es" value="${esc(esik)}" style="width:130px;text-align:right"></div>
       ${M.raw.status?.ntfy ? `<div class="field"><div><label>ntfy konusu</label><small>ntfy uygulamasında bu konuya abone ol.</small></div><a class="btn ghost sm" href="https://ntfy.sh/${encodeURIComponent(M.raw.status.ntfy)}" target="_blank" rel="noopener">${esc(M.raw.status.ntfy)}</a></div>` : ''}
       <button class="btn ghost" id="saveA" style="margin-top:12px">${icon('check')}Kaydet</button>
@@ -125,6 +127,10 @@ export function renderAyarlar(el, M, app) {
     b.classList.toggle('on', on);
     try { await st.patch('devices', { [`${b.dataset.nt}/bitti_bildirim`]: on }); toast(on ? 'Bildirim açık' : 'Bildirim kapalı'); }
     catch { b.classList.toggle('on', !on); toast('Kaydedilemedi'); }
+  }));
+  el.querySelectorAll('[data-wt]').forEach((sel) => sel.addEventListener('change', async () => {
+    try { await st.patch('devices', { [`${sel.dataset.wt}/bitti_dk`]: Number(sel.value), [`${sel.dataset.wt}/bitti_dk_oto`]: null }); toast(`Bekleme ${sel.value} dk`); }
+    catch { toast('Kaydedilemedi'); }
   }));
   $('#saveK').onclick = () => { const k = $('#key').value.trim(); if (!k) return toast('Anahtar boş'); st.setKey(k); toast('Anahtar bu telefona kaydedildi'); app.refresh(); };
   $('#th').onclick = (e) => { const b = e.target.closest('[data-t]'); if (b) app.setTheme(b.dataset.t); };

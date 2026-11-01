@@ -34,7 +34,7 @@ from datetime import date, datetime, timedelta
 from pathlib import Path
 
 from fb import FB
-from meter import DeviceMeter, JobTracker, SessionTracker, day_key, merge_months
+from meter import JOB_END_S, DeviceMeter, JobTracker, SessionTracker, day_key, merge_months, next_wait
 from notify import Notifier
 from providers import Reading, make_provider
 from tariff import Tarife, birim_fiyat, gunluk_butce, yil_durumu, yil_sonu_tahmini
@@ -212,9 +212,12 @@ class Collector:
                 elif ev == "bitti":
                     self.on_session_end(did, m, sess)
             if did in self.jobs:
-                job = self.jobs[did].update(now, w, added)
-                if job:
-                    self.on_job_end(did, m, job)
+                end_s = float(m.get("bitti_dk") or JOB_END_S / 60) * 60
+                ev, data = self.jobs[did].update(now, w, added, end_s)
+                if ev == "bitti":
+                    self.on_job_end(did, m, data)
+                elif ev == "devam":
+                    self.on_job_resume(did, m, data["gap"], end_s)
             self.check_safety(did, m, r, now)
         if live_out:
             self.fb.safe(self.fb.patch, "live", live_out)
@@ -244,6 +247,19 @@ class Collector:
             title = f"{m.get('name', 'Araç')}: Araç Doldu" if s.get("full") else f"{m.get('name', 'Araç')} şarjı bitti"
             self.ntfy.send(title, msg, tags="white_check_mark", open_tab="togg")
 
+    def on_job_resume(self, did, m, gap, end_s):
+        """Bildirilen iş sürdü: bekleme kısa kalmış. Duraklamayı kapsayan kademeye çıkar ve kaydet."""
+        new_s = next_wait(gap)
+        log.info("Erken bitti: %s %.0f sn duraklama, bekleme %.0f -> %d sn", did, gap, end_s, new_s)
+        if new_s <= end_s:
+            return
+        a, b = end_s / 60, new_s / 60
+        m["bitti_dk"] = b
+        self.fb.safe(self.fb.patch, f"devices/{did}", {"bitti_dk": b, "bitti_dk_oto": True})
+        job = self.jobs[did].st.get("job")
+        if job is not None:   # gerçek bitişte bildirime not düşülsün (ilk düzeltmenin eski değeri korunur)
+            job["duzeltme"] = [job.get("duzeltme", [a])[0], b]
+
     def on_job_end(self, did, m, job):
         mins = (job["end"] - job["start"]) / 60
         log.info("İş bitti: %s %.0f dk %.3f kWh", did, mins, job["kwh"])
@@ -254,6 +270,9 @@ class Collector:
         sure = f"{h} sa {mi} dk" if h else f"{mi} dk"
         kwh = f"{job['kwh']:.2f}".replace(".", ",") + " kWh"
         msg = f"{sure} · {kwh} · {fmt_tl(job['kwh'] * price)}"
+        if job.get("duzeltme"):
+            a, b = job["duzeltme"]
+            msg += f"\nErken bildirim yüzünden bekleme {a:g} → {b:g} dk yapıldı."
         # bildirim ağı beklerken ölçüm döngüsü durmasın
         self.pool.submit(self.ntfy.send, f"{m.get('name', did)} bitti", msg,
                          tags="white_check_mark", open_tab="cihazlar")

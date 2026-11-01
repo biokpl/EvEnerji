@@ -187,3 +187,35 @@ def test_priz_is_bitti_bildirimi():
 
 def test_priz_bildirimi_kapaliysa_gonderilmez():
     assert _priz_calistir(False) == []
+
+
+def test_erken_bitti_bekleme_otomatik_artar():
+    c, _ = make()
+    plug = FakePlug()
+    c.meta = {"camasir": {"name": "Çamaşır", "type": "priz", "enabled": True, "bitti_dk": 1}}
+    c.fb.data["devices"] = {"camasir": dict(c.meta["camasir"])}
+    c.providers = {"camasir": plug}
+    c.meters = {"camasir": C.DeviceMeter("camasir", c.state["meters"], 3)}
+    c.sessions = {}
+    c.jobs = {"camasir": C.JobTracker({})}
+    t, real = time.time(), time.time
+    try:
+        def step(w, n):
+            nonlocal t
+            for _ in range(n):
+                plug.w = w
+                C.time.time = lambda: t
+                c.poll_once()
+                t += 3
+        step(1800.0, 200)   # 10 dk yıkama
+        step(3.0, 50)       # 2,5 dk su alma (1 dk bekleme ile erken "bitti")
+        step(1800.0, 200)   # devam
+        step(3.0, 100)      # gerçekten bitti (artık 3 dk bekleme)
+    finally:
+        C.time.time = real
+    c.pool.shutdown(wait=True)
+    sent = c.ntfy.sent
+    assert len(sent) == 2, sent                                  # erken + gerçek
+    assert c.fb.data["devices"]["camasir"]["bitti_dk"] == 3
+    assert c.fb.data["devices"]["camasir"]["bitti_dk_oto"] is True
+    assert "1 → 3 dk" in sent[1][1], sent[1]

@@ -1,5 +1,5 @@
 // Çevrimdışı önbellek (yalnız uygulama dosyaları; Firebase verisi önbelleğe alınmaz).
-const CACHE = 'evenerji-v41';
+const CACHE = 'evenerji-v42';
 const ASSETS = [
   './', './index.html', './manifest.json', './css/app.css', './vendor/echarts.min.js',
   './js/app.js', './js/data.js', './js/demo.js', './js/model.js', './js/tariff.js', './js/ui.js', './js/charts.js',

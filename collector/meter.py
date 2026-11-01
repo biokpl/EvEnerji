@@ -120,49 +120,70 @@ class SessionTracker:
 JOB_RUN_W = 50        # bunun üstü: çalışıyor
 JOB_RUN_S = 60        # en az bu kadar süre (kısa sıçramalar iş sayılmaz)
 JOB_END_W = 50        # bunun altı: beklemede
-JOB_END_S = 300       # bu kadar süre beklemede kalırsa iş bitti (program içi kısa duraklamalar sayılmaz)
+JOB_END_S = 180       # varsayılan bekleme: bu kadar süre beklemede kalırsa iş bitti (cihaz başına ayarlanır)
 JOB_MIN_S = 300       # bundan kısa işler bildirilmez
 JOB_MIN_KWH = 0.02
+JOB_RESUME_S = 600    # "bitti"den sonra bu süre içinde yeniden çalışırsa aynı iş sayılır (erken bildirim)
+JOB_WAIT_STEPS = (60, 120, 180, 300, 600, 900)   # bekleme kademeleri (sn)
+
+
+def next_wait(gap_s: float) -> int:
+    """Ölçülen duraklamayı (30 sn payla) kapsayan ilk bekleme kademesi."""
+    return next((s for s in JOB_WAIT_STEPS if s >= gap_s + 30), JOB_WAIT_STEPS[-1])
 
 
 class JobTracker:
-    """Prizdeki cihazın bir işi (yıkama, baskı, pişirme) bitirdiğini güç eğrisinden anlar."""
+    """Prizdeki cihazın bir işi (yıkama, baskı, pişirme) bitirdiğini güç eğrisinden anlar.
+
+    update() olay döndürür: ("bitti", iş) | ("devam", {"gap": sn}) | (None, None).
+    "devam": bildirimi yapılmış iş, JOB_RESUME_S içinde sürdü; bekleme süresi kısa kalmış demektir.
+    """
 
     def __init__(self, state: dict):
         self.st = state
-        self.st.setdefault("hi_since", None)
-        self.st.setdefault("job", None)
-        self.st.setdefault("low_since", None)
+        for k in ("hi_since", "job", "low_since", "last"):
+            self.st.setdefault(k, None)
 
-    def update(self, ts: float, w: float | None, kwh_added: float) -> dict | None:
-        """Biten işi ({start, end, kwh, peak_w}) döndürür; yoksa None."""
+    def update(self, ts: float, w: float | None, kwh_added: float,
+               end_s: float = JOB_END_S) -> tuple[str | None, dict | None]:
         st = self.st
         job = st["job"]
         if w is None:                       # okunamadı: durumu koru, enerjiyi say
             if job:
                 job["kwh"] += kwh_added
-            return None
+            return None, None
         if job is None:
+            last = st["last"]
+            if last and ts - last["end"] > JOB_RESUME_S:
+                st["last"] = last = None
             if w >= JOB_RUN_W:
                 st["hi_since"] = st["hi_since"] or ts
                 if ts - st["hi_since"] >= JOB_RUN_S:
+                    if last and st["hi_since"] - last["end"] <= JOB_RESUME_S:
+                        # erken "bitti": aynı iş sürüyor; işi kaldığı yerden devam ettir
+                        gap = st["hi_since"] - last["end"]
+                        st["job"] = {"start": last["start"], "kwh": last["kwh"] + kwh_added,
+                                     "peak_w": max(last["peak_w"], w)}
+                        st["hi_since"], st["low_since"], st["last"] = None, None, None
+                        return "devam", {"gap": gap}
                     st["job"] = {"start": st["hi_since"], "kwh": kwh_added, "peak_w": w}
                     st["hi_since"], st["low_since"] = None, None
             else:
                 st["hi_since"] = None
-            return None
+            return None, None
         job["kwh"] += kwh_added
         job["peak_w"] = max(job["peak_w"], w)
         if w < JOB_END_W:
             st["low_since"] = st["low_since"] or ts
-            if ts - st["low_since"] >= JOB_END_S:
+            if ts - st["low_since"] >= end_s:
                 done = {**job, "end": st["low_since"]}
                 st["job"], st["low_since"] = None, None
                 if done["end"] - done["start"] >= JOB_MIN_S and done["kwh"] >= JOB_MIN_KWH:
-                    return done
+                    st["last"] = {k: done[k] for k in ("start", "end", "kwh", "peak_w")}
+                    return "bitti", done
         else:
             st["low_since"] = None
-        return None
+        return None, None
 
 
 def merge_months(bills: dict | None, meter: dict | None) -> list[float]:

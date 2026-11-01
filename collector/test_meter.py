@@ -114,13 +114,15 @@ def test_oturum_doldu_isareti():
     assert "tail_w" not in cekildi
 
 
-def _is(guc, adim=3):
+def _is(guc, adim=3, end_s=300, olaylar=None):
     from meter import JobTracker
     j, t, biten = JobTracker({}), 0, []
     for w in guc:
-        r = j.update(t, w, w * adim / 3_600_000)
-        if r:
+        ev, r = j.update(t, w, w * adim / 3_600_000, end_s)
+        if ev == "bitti":
             biten.append(r)
+        if ev and olaylar is not None:
+            olaylar.append((ev, r))
         t += adim
     return biten
 
@@ -143,3 +145,30 @@ def test_kisa_sicrama_is_degil():
 def test_bekleme_gucu_esigin_altinda_kalir():
     # yazıcı beklemede 26-40 W: hiç iş başlamaz
     assert _is([26, 40, 33] * 300) == []
+
+
+def test_erken_bitti_sonra_devam_algilanir():
+    from meter import next_wait
+    # 10 dk çalış, 2,5 dk dur (1 dk bekleme ile "bitti" der), 10 dk daha çalış, sonra gerçekten bit
+    olay = []
+    guc = [1500] * 200 + [4] * 50 + [1500] * 200 + [4] * 60
+    biten = _is(guc, end_s=60, olaylar=olay)
+    turler = [e for e, _ in olay]
+    assert turler == ["bitti", "devam", "bitti"], turler
+    gap = olay[1][1]["gap"]
+    assert 140 <= gap <= 160, gap
+    assert next_wait(gap) == 180          # 2,5 dk duraklama -> 3 dk kademe (30 sn payla)
+    son = biten[-1]
+    assert son["end"] - son["start"] > 20 * 60   # süre işin tamamını kapsar
+
+
+def test_uzun_aradan_sonra_yeni_is_sayilir():
+    olay = []
+    _is([1500] * 200 + [4] * 300 + [1500] * 200 + [4] * 60, end_s=60, olaylar=olay)   # 15 dk ara
+    assert [e for e, _ in olay] == ["bitti", "bitti"]
+
+
+def test_bekleme_kademeleri():
+    from meter import next_wait
+    assert next_wait(20) == 60 and next_wait(100) == 180 and next_wait(200) == 300
+    assert next_wait(2000) == 900

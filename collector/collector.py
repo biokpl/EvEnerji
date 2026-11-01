@@ -1,6 +1,6 @@
 """Ev Enerji toplayıcı servisi (Raspberry Pi, systemd: ev-enerji).
 
-Döngü (poll_seconds, varsayılan 10 sn):
+Döngü (poll_seconds, varsayılan 3 sn; prizler aynı anda okunur):
   - kayıtlı her cihazı okur, enerjiyi biriktirir, araç şarj oturumlarını ayırır
   - canlı değerleri Firebase'e yazar; dakikada bir saat/gün/ay toplamlarını yazar
   - uygulamadan gelen imzalı komutları uygular (priz aç/kapa, kablo sarıcı)
@@ -29,6 +29,7 @@ import os
 import signal
 import sys
 import time
+from concurrent.futures import ThreadPoolExecutor
 from datetime import date, datetime, timedelta
 from pathlib import Path
 
@@ -80,7 +81,8 @@ class Collector:
         self.fb = FB(self.cfg["firebase_url"], self.cfg.get("base_path", ""),
                      self.cfg.get("firebase_secret", ""))
         self.ntfy = Notifier(self.cfg.get("ntfy_topic", ""), self.cfg.get("app_url", ""))
-        self.poll = float(self.cfg.get("poll_seconds", 10))
+        self.poll = float(self.cfg.get("poll_seconds", 3))
+        self.pool = ThreadPoolExecutor(max_workers=8, thread_name_prefix="oku")
         self.flush_every = float(self.cfg.get("flush_seconds", 60))
         self.secret = (self.cfg.get("control_secret") or "").encode()
         self.state = load_json(STATE_FILE, {})
@@ -176,8 +178,10 @@ class Collector:
     def poll_once(self):
         now = time.time()
         live_out = {}
-        for did, prov in list(self.providers.items()):
-            r: Reading = prov.read()
+        # prizler aynı anda okunur: priz sayısı artınca tur süresi uzamasın
+        provs = list(self.providers.items())
+        readings = list(self.pool.map(lambda p: p[1].read(), provs))
+        for (did, prov), r in zip(provs, readings):
             m = self.meta.get(did, {})
             w = r.w if r.ok else None
             # okunamazsa 60 sn'ye kadar son değeri sürdür

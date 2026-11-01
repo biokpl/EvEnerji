@@ -82,3 +82,12 @@ if __name__ == "__main__":
                 fails += 1; print("HATA", name, e)
     print("TUM TESTLER GECTI" if not fails else f"{fails} test başarısız")
     sys.exit(1 if fails else 0)
+
+
+def test_oturum_sik_olcumde_erken_baslamaz():
+    # 3 sn'de bir ölçümde de oturum en az 10 sn yüksek güçten sonra başlar
+    s = SessionTracker({})
+    ev = [s.update(1000 + i * 3, 2200, 0.0)[0] for i in range(5)]   # 0, 3, 6, 9, 12 sn
+    assert ev[:4] == [None] * 4
+    assert ev[4] == "basladi"
+    assert s.active["start"] == 1000

@@ -5,7 +5,7 @@ import { closeSheet, hydrateIcons, icon, sheetOpen, toast } from './ui.js';
 import { renderPano, updatePano } from './views/pano.js';
 import { renderTogg, updateTogg } from './views/togg.js';
 import { renderEv } from './views/ev.js';
-import { renderCihazlar } from './views/cihazlar.js';
+import { renderCihazlar, updateCihazlar } from './views/cihazlar.js';
 import { renderSarici } from './views/sarici.js';
 import { renderAyarlar } from './views/ayarlar.js';
 
@@ -14,7 +14,7 @@ const VIEWS = {
   pano: { title: 'Pano', render: renderPano, update: updatePano },
   togg: { title: 'Togg T10X', render: renderTogg, update: updateTogg },
   ev: { title: 'Ev', render: renderEv },
-  cihazlar: { title: 'Cihazlar', render: renderCihazlar, live: 'render' },
+  cihazlar: { title: 'Cihazlar', render: renderCihazlar, update: updateCihazlar, live: 'render' },
   sarici: { title: 'Kablo Sarıcı', render: renderSarici, live: 'render' },
   ayarlar: { title: 'Ayarlar', render: renderAyarlar },
 };
@@ -122,8 +122,9 @@ function onLive() {
   const v = VIEWS[current];
   const wrap = viewEl.querySelector('.view');
   if (!wrap) return;
-  if (v.update) v.update(wrap, M);
-  else if (v.live === 'render' && Date.now() - lastLiveRender > 10e3 && !sheetOpen() && !document.activeElement?.matches('input,select')) {
+  // update false dönerse (diziliş değişti) yeniden çizime düşer
+  if (v.update && v.update(wrap, M) !== false) return;
+  if (v.live === 'render' && (v.update || Date.now() - lastLiveRender > 10e3) && !sheetOpen() && !document.activeElement?.matches('input,select')) {
     lastLiveRender = Date.now();
     const y = window.scrollY;
     wrap.innerHTML = '';

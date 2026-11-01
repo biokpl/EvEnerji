@@ -4,7 +4,7 @@ import { store } from '../data.js';
 import { axisStyle, colors, mount } from '../charts.js';
 import { AYLAR, DEVICE_ICONS, GUN_K, closeSheet, esc, icon, kwh, num, openSheet, tl, toast, watt, ago } from '../ui.js';
 
-// Uygulama açıkken gelen canlı güç ölçümleri (cihaz başına son ~2 saat): detay ekranındaki canlı grafik
+// Uygulama açıkken gelen canlı güç ölçümleri (cihaz başına son ~2 saat, 3 sn aralıkla): detay ekranındaki canlı grafik
 const trace = new Map();
 store.subscribe((kind) => {
   if (kind !== 'live') return;
@@ -16,7 +16,7 @@ store.subscribe((kind) => {
     while (i > 0 && arr[i - 1][0] > ts) i--;
     if (i > 0 && arr[i - 1][0] === ts) continue;
     arr.splice(i, 0, [ts, L.w]);
-    if (arr.length > 720) arr.shift();
+    if (arr.length > 2400) arr.shift();   // 3 sn aralıkla ~2 saat
     trace.set(id, arr);
   }
 });
@@ -31,12 +31,12 @@ const COLORS = [
 const busy = new Set();
 let sorting = false;   // "Sırala" modu: kartlarda yukarı/aşağı okları
 
-function devCard(M, d) {
+// Kartın canlı veriyle değişen kısmı (ilk çizimde ve anlık güncellemede ortak)
+function devState(M, d) {
   const L = d.live || {};
   const stale = !L.ts || Date.now() / 1000 - L.ts > 120;
   const offline = d.type !== 'kablo_sarici' && (stale || L.ok === false);
   const on = d.type === 'ana_sayac' ? true : L.on !== false && !offline;
-  const canSwitch = d.provider === 'tuya' && d.type !== 'ana_sayac';
   let sub;
   if (d.type === 'kablo_sarici') {
     const w = M.winder;
@@ -46,18 +46,28 @@ function devCard(M, d) {
   } else {
     sub = `<b>${watt(L.w)}</b>${L.v ? ` · ${num(L.v)} V` : ''}${L.a != null ? ` · ${num(L.a, 2)} A` : ''} · bugün ${kwh(L.today || 0)}`;
   }
+  return { offline, on, sub };
+}
+
+// Kart dizilişini değiştiren her şey; değişirse kartlar baştan çizilir
+const layoutKey = (M) => JSON.stringify([sorting, M.discovered.map(([id]) => id),
+  M.devices.map((d) => [d.id, d.name, d.icon, d.color, d.enabled, d.room, d.type, d.provider])]);
+
+function devCard(M, d) {
+  const { offline, on, sub } = devState(M, d);
+  const canSwitch = d.provider === 'tuya' && d.type !== 'ana_sayac';
   const right = sorting
     ? `<div class="sort-btns"><button data-mv="-1" data-id="${esc(d.id)}" aria-label="${esc(d.name)} yukarı">${icon('up')}</button><button data-mv="1" data-id="${esc(d.id)}" aria-label="${esc(d.name)} aşağı">${icon('downArrow')}</button></div>`
     : canSwitch
     ? `<button class="switch ${on ? 'on' : ''} ${busy.has(d.id) ? 'busy' : ''}" data-sw="${esc(d.id)}" aria-label="${esc(d.name)} ${on ? 'kapat' : 'aç'}" ${offline ? 'disabled' : ''}></button>`
     : d.type === 'ana_sayac' ? `<span class="lock">${icon('lock')}Yalnız ölçüm</span>` : '';
   return `
-  <div class="dev ${on && !offline ? 'on' : ''} ${offline ? 'offline' : ''} ${sorting ? 'sorting' : ''}" style="--dc:${esc(d.color || '#3b82f6')}">
+  <div class="dev ${on && !offline ? 'on' : ''} ${offline ? 'offline' : ''} ${sorting ? 'sorting' : ''}" data-dev="${esc(d.id)}" style="--dc:${esc(d.color || '#3b82f6')}">
     <div class="d-ic" data-edit="${esc(d.id)}" role="button" aria-label="${esc(d.name)} düzenle">${icon(d.icon || 'plug')}</div>
     <div data-edit="${esc(d.id)}" role="button" style="min-width:0;cursor:pointer">
       <div class="d-name">${esc(d.name)}${d.enabled ? '' : ' <span class="muted">(kapalı)</span>'}</div>
       <div class="d-sub">${esc(TYPES[d.type] || d.type)}${d.room ? ' · ' + esc(d.room) : ''}</div>
-      <div class="d-sub">${sub}</div>
+      <div class="d-sub" data-live>${sub}</div>
     </div>
     ${right}
   </div>`;
@@ -306,8 +316,31 @@ function detailSheet(M, id, app) {
   }, 340);
 }
 
+// Canlı veri gelince kartları baştan çizmeden yalnız değişen değerleri günceller.
+// Kart dizilişi değiştiyse (ad, renk, sıra, yeni priz…) false döner: uygulama baştan çizer.
+export function updateCihazlar(el, M) {
+  if (el.dataset.layout !== layoutKey(M)) return false;
+  for (const d of M.devices) {
+    const card = el.querySelector(`[data-dev="${CSS.escape(d.id)}"]`);
+    if (!card) return false;
+    const { offline, on, sub } = devState(M, d);
+    card.classList.toggle('on', on && !offline);
+    card.classList.toggle('offline', offline);
+    const s = card.querySelector('[data-live]');
+    if (s && s.innerHTML !== sub) s.innerHTML = sub;
+    const sw = card.querySelector('[data-sw]');
+    if (sw && !busy.has(d.id)) {
+      sw.classList.toggle('on', on);
+      sw.disabled = offline;
+      sw.setAttribute('aria-label', `${d.name} ${on ? 'kapat' : 'aç'}`);
+    }
+  }
+  return true;
+}
+
 export function renderCihazlar(el, M, app) {
   const list = M.devices;
+  el.dataset.layout = layoutKey(M);
   el.innerHTML = `
     ${M.discovered.length ? `<div class="card found"><h2>${icon('wifi', 'style="width:16px;height:16px;vertical-align:-3px;margin-right:6px;color:var(--accent)"')}Yeni priz bulundu</h2>
       <p class="hint">Smart Life hesabında henüz eklenmemiş prizler.</p>

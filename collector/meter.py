@@ -11,7 +11,8 @@ GAP_MAX_S = 600
 
 # Şarj oturumu eşikleri (Mennekes 10 A ≈ 2,2 kW)
 SESSION_START_W = 300
-SESSION_START_N = 2          # art arda kaç ölçüm
+SESSION_START_N = 2          # art arda en az kaç ölçüm
+SESSION_START_S = 10         # ve en az kaç saniye (ölçüm sıklığından bağımsız olsun)
 SESSION_END_W = 50
 SESSION_END_S = 300          # bu kadar süre düşük güç -> bitti
 SESSION_MIN_KWH = 0.05       # bundan küçükse oturum sayılmaz
@@ -80,7 +81,7 @@ class SessionTracker:
             if w >= SESSION_START_W:
                 st["hi_n"] += 1
                 st["hi_first"] = st["hi_first"] or ts
-                if st["hi_n"] >= SESSION_START_N:
+                if st["hi_n"] >= SESSION_START_N and ts - st["hi_first"] >= SESSION_START_S:
                     start = st["hi_first"]
                     st["active"] = {
                         "id": datetime.fromtimestamp(start).strftime("%Y%m%d-%H%M"),

@@ -83,9 +83,9 @@ export function chargeCard(M) {
   const known = s.socNow != null;
   // Yüzde biliniyorsa: tahmini şarj durumu ve hedefe kalan süre; bilinmiyorsa girme düğmesi
   const socLine = known
-    ? `<div class="soc-line"><b>≈ %${num(s.socNow)}</b>${s.socNow >= s.target - 0.5 ? ` · hedef %${num(s.target)} doldu` : s.etaMin != null ? ` · hedef %${num(s.target)} · ≈ ${dur(s.etaMin)} kaldı` : ` · hedef %${num(s.target)}`}
+    ? `<div class="soc-line"><b>≈ %${num(s.socNow)}</b>${s.socNow >= s.target - 0.5 ? ` · Hedef %${num(s.target)} · Araç Doldu` : s.etaMin != null ? ` · Hedef %${num(s.target)} · ≈ ${dur(s.etaMin)} Kaldı` : ` · Hedef %${num(s.target)}`}
         <button class="soc-edit" data-soc aria-label="Şarj yüzdesini düzelt">${icon('edit')}</button></div>`
-    : `<button class="soc-ask" data-soc>${icon('plus')}Araçta şu an kaç %? Gir, kalan süreyi hesaplayayım</button>`;
+    : `<button class="soc-ask" data-soc>${icon('plus')}Araçta Şu An Kaç %? Gir, Kalan Süreyi Hesaplayayım</button>`;
   const bar = known
     ? `<div class="progress soc"><i class="base" style="width:${Math.min(100, s.socStart)}%"></i><i style="width:${Math.max(0, Math.min(100, s.socNow) - Math.min(100, s.socStart))}%"></i>
         <span class="tgt" style="left:${Math.min(100, s.target)}%"></span></div>`
@@ -95,9 +95,9 @@ export function chargeCard(M) {
     <div class="charge">
       <div class="car-wrap"><img class="car-img" src="img/t10x.webp" alt="Togg T10X" width="120" height="63"><span class="plug-dot"></span></div>
       <div>
-        <div class="t"><span class="pulse" style="display:inline-block;margin-right:6px"></span>Şarj ediliyor · ${esc(s.dev.name)}</div>
+        <div class="t"><span class="pulse" style="display:inline-block;margin-right:6px"></span>Şarj Ediliyor · ${esc(s.dev.name)}</div>
         <div class="v">${kwh(s.kwh, 2)} · ${tl(s.kwh * M.priceNow)}</div>
-        <div class="s">${watt(M.evW)} · ${dur(min)} · bataryaya ≈ +${pct(s.added)}${km}</div>
+        <div class="s">${watt(M.evW)} · ${dur(min)} · Bataryaya ≈ +${pct(s.added)}${km}</div>
       </div>
     </div>
     ${socLine}

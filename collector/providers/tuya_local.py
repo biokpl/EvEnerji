@@ -32,7 +32,10 @@ class TuyaPlug:
         t = self.t
         d = tinytuya.OutletDevice(t["dev_id"], t.get("ip") or "Auto", t["local_key"],
                                   version=float(t.get("version", 3.3)))
-        d.set_socketPersistent(True)
+        # Kalıcı soket kullanılmaz: Smart Life telefondan yerel bağlanınca ya da priz
+        # kendiliğinden veri itince kalıcı oturum bozuluyor ("Unexpected Payload").
+        # Her okumada kısa bir bağlantı açıp kapatmak daha sağlam.
+        d.set_socketPersistent(False)
         d.set_socketTimeout(4)
         d.set_socketRetryLimit(1)
         return d

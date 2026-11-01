@@ -22,15 +22,20 @@ class TuyaPlug:
     can_switch = True
 
     def __init__(self, dev_id: str, local: dict):
-        t = local["tuya"]
-        self.dps = {**DEFAULT_DPS, **t.get("dps", {})}
-        self.scale = {**DEFAULT_SCALE, **t.get("scale", {})}
-        self.d = tinytuya.OutletDevice(t["dev_id"], t.get("ip") or "Auto", t["local_key"],
-                                       version=float(t.get("version", 3.3)))
-        self.d.set_socketPersistent(True)
-        self.d.set_socketTimeout(4)
-        self.d.set_socketRetryLimit(1)
+        self.t = local["tuya"]
+        self.dps = {**DEFAULT_DPS, **self.t.get("dps", {})}
+        self.scale = {**DEFAULT_SCALE, **self.t.get("scale", {})}
+        self.d = self._connect()
         self.fails = 0
+
+    def _connect(self):
+        t = self.t
+        d = tinytuya.OutletDevice(t["dev_id"], t.get("ip") or "Auto", t["local_key"],
+                                  version=float(t.get("version", 3.3)))
+        d.set_socketPersistent(True)
+        d.set_socketTimeout(4)
+        d.set_socketRetryLimit(1)
+        return d
 
     def _num(self, dps: dict, key: str):
         v = dps.get(self.dps[key])
@@ -52,11 +57,15 @@ class TuyaPlug:
             return r
         except Exception as e:
             self.fails += 1
-            if self.fails >= 3:  # bağlantıyı tazele
+            if self.fails % 3 == 0:
+                # Ağ kesintisinden sonra v3.4 şifreli oturum bozuk kalabiliyor; yalnız
+                # close() yetmedi (saatlerce "Check device key"). Bağlantıyı sıfırdan kur.
+                log.warning("%s yeniden bağlanıyor (%d hata): %s", self.t["dev_id"], self.fails, e)
                 try:
                     self.d.close()
                 except Exception:
                     pass
+                self.d = self._connect()
             return Reading(ok=False, err=str(e))
 
     def set_switch(self, on: bool) -> None:

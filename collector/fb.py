@@ -44,5 +44,11 @@ class FB:
         try:
             return fn(*a, **kw)
         except Exception as e:  # ağ kesintisi servisi durdurmasın
-            log.warning("Firebase hatası: %s", e)
+            log.warning("Firebase hatası: %s", self.redact(e))
             return None
+
+    def redact(self, e) -> str:
+        """Hata metnindeki adreste geçen gizli anahtarı günlüğe yazmamak için gizler."""
+        s = str(e)
+        sec = self.auth.get("auth")
+        return s.replace(sec, "***") if sec else s

@@ -1,0 +1,6 @@
+[Unit]
+Description=Ag bekcisi: modeme ulasilamazsa Wi-Fi'i ya da Pi'yi yeniden baslatir
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/bin/ag-bekcisi.sh

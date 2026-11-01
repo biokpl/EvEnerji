@@ -1,0 +1,9 @@
+[Unit]
+Description=Ag bekcisi (2 dk'da bir)
+
+[Timer]
+OnBootSec=3min
+OnUnitActiveSec=2min
+
+[Install]
+WantedBy=timers.target

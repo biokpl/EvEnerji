@@ -63,3 +63,18 @@ Komutlar telefonda HMAC ile imzalanır; Pi imzası tutmayan veya 2 dakikadan esk
 ```bash
 cd collector && python test_tariff.py && python test_meter.py && python test_collector.py
 ```
+
+## Kendini kurtarma (Pi'de, 2026-11-01)
+
+Dosyalar `collector/sistem/` altında; kurulu yerleri:
+
+| Katman | Dosya | Ne yapar |
+|---|---|---|
+| Donanım bekçisi | `/etc/systemd/system.conf.d/watchdog.conf` | Pi donarsa 14 sn içinde kendini yeniden başlatır |
+| Servis bekçisi | `/etc/systemd/system/ev-enerji.service` (`WatchdogSec=180`) | Toplayıcı döngüsü 3 dk takılırsa servis yeniden başlar |
+| Ağ bekçisi | `/usr/local/bin/ag-bekcisi.sh` + `ag-bekcisi.timer` (2 dk) | Modeme ~6 dk ulaşamazsa Wi-Fi'ı yeniler, ~12 dk olursa Pi'yi yeniden başlatır (saatte en fazla 1, açılıştan sonra 20 dk yok) |
+| Wi-Fi güç tasarrufu kapalı | `/etc/NetworkManager/conf.d/wifi-powersave.conf` | Bir sonraki açılışta geçerli |
+| Priz bekçisi | `collector.py` `watchdog()` | Ağdaki priz 10 dk bozuk yanıt verirse servis kendini yeniden başlatır (saatte 1) |
+
+Kayıtlar: `journalctl -t ag-bekcisi`, `journalctl -u ev-enerji | grep -i watchdog`.
+Geri almak: dosyaları sil, `sudo systemctl disable --now ag-bekcisi.timer && sudo systemctl daemon-reexec`; eski servis dosyası `ev-enerji.service.yedek`.

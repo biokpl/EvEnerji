@@ -74,6 +74,22 @@ def fmt_kwh(x: float) -> str:
     return f"{x:.1f}".replace(".", ",") + " kWh"
 
 
+def sd_notify(msg: str) -> None:
+    """systemd'ye durum bildirir (WatchdogSec): döngü takılırsa systemd servisi yeniden başlatır."""
+    addr = os.environ.get("NOTIFY_SOCKET")
+    if not addr:
+        return
+    if addr.startswith("@"):
+        addr = chr(0) + addr[1:]
+    try:
+        import socket
+        with socket.socket(socket.AF_UNIX, socket.SOCK_DGRAM) as sk:
+            sk.connect(addr)
+            sk.sendall(msg.encode())
+    except OSError as e:
+        log.warning("systemd bildirimi gönderilemedi: %s", e)
+
+
 class Collector:
     def __init__(self):
         self.cfg = load_json(CFG_FILE, None)
@@ -434,6 +450,7 @@ class Collector:
     def run(self):
         signal.signal(signal.SIGTERM, lambda *_: setattr(self, "running", False))
         log.info("Ev Enerji toplayıcı başladı")
+        sd_notify("READY=1\nWATCHDOG=1")
         self.refresh_devices()          # önce kayıtlı cihazlar: keşif bunları "yeni" saymasın
         self.t_meta = time.time()
         self.discover()
@@ -445,6 +462,7 @@ class Collector:
                 self.t_meta = t0
             self.poll_once()
             self.watchdog()
+            sd_notify("WATCHDOG=1")      # canlıyım: döngü 2 dk dönmezse systemd yeniden başlatır
             if t0 - self.t_flush >= self.flush_every:
                 self.flush()
                 self.t_flush = t0

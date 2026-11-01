@@ -1,0 +1,17 @@
+[Unit]
+Description=Ev Enerji toplayici (Togg sarj + ev tuketimi)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+User=grid
+WorkingDirectory=/home/grid/evenerji/collector
+ExecStart=/home/grid/evenerji/venv/bin/python collector.py
+Restart=always
+RestartSec=15
+# Servis bekçisi: döngü 3 dk boyunca "canlıyım" (WATCHDOG=1) demezse systemd yeniden başlatır
+WatchdogSec=180
+NotifyAccess=main
+
+[Install]
+WantedBy=multi-user.target

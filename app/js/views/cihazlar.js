@@ -10,8 +10,12 @@ store.subscribe((kind) => {
   if (kind !== 'live') return;
   for (const [id, L] of Object.entries(store.raw?.live || {})) {
     if (!L?.ts || L.w == null) continue;
-    const arr = trace.get(id) || [];
-    if (!arr.length || arr[arr.length - 1][0] !== L.ts * 1000) arr.push([L.ts * 1000, L.w]);
+    const arr = trace.get(id) || [], ts = L.ts * 1000;
+    // zamana göre sıralı tut: geç gelen eski ölçüm araya girer, aynı an iki kez eklenmez
+    let i = arr.length;
+    while (i > 0 && arr[i - 1][0] > ts) i--;
+    if (i > 0 && arr[i - 1][0] === ts) continue;
+    arr.splice(i, 0, [ts, L.w]);
     if (arr.length > 720) arr.shift();
     trace.set(id, arr);
   }
@@ -207,6 +211,23 @@ function detailSheet(M, id, app) {
   const dim = col + 'a8';   // geçmiş çubuklar biraz soluk, güncel olan tam renk
   let ch = null;
 
+  // Canlı grafiğin saat ekseni: veri süresine göre sabit bir pencere (2 dk … 2 sa) ve o pencereye
+  // özgü sabit etiket aralığı. Böylece etiketler her ölçümde yeniden dizilmez, eşit aralıkla kayar.
+  const WINS = [[2, 30], [5, 60], [10, 120], [15, 180], [30, 300], [60, 600], [120, 1200]];  // [dk, adım sn]
+  const liveX = (t) => {
+    const last = t.length ? t[t.length - 1][0] : Date.now();
+    const span = t.length ? last - t[0][0] : 0;
+    const [mins, step] = WINS.find(([m]) => m * 60e3 >= span) || WINS[WINS.length - 1];
+    const min = last - mins * 60e3, ms = step * 1000, ticks = [];
+    for (let v = Math.ceil(min / ms) * ms; v <= last; v += ms) ticks.push(v);   // tam saat değerleri
+    const pad = mins * 60e3 * 0.07;   // kenara çok yakın etiket yarım kesilmesin
+    const labels = ticks.filter((v) => v - min > pad && last - v > pad);
+    return { type: 'time', ...ax, min, max: last, splitLine: { show: false },
+      axisTick: { ...(ax.axisTick || {}), customValues: ticks },
+      axisLabel: { ...ax.axisLabel, customValues: labels, hideOverlap: true,
+        formatter: step < 60 ? '{HH}:{mm}:{ss}' : '{HH}:{mm}' } };
+  };
+
   const views = {
     canli: () => {
       const t = trace.get(id) || [];
@@ -215,8 +236,7 @@ function detailSheet(M, id, app) {
         empty: t.length < 2 ? 'Ölçümler toplanıyor… Ekran açık kaldıkça çizgi oluşacak.' : '',
         opt: {
           grid, tooltip: { trigger: 'axis', axisPointer: { type: 'line', lineStyle: { color: c.faint } }, valueFormatter: (v) => watt(v) },
-          xAxis: { type: 'time', ...ax, splitNumber: 4, splitLine: { show: false },
-            axisLabel: { ...ax.axisLabel, hideOverlap: true, formatter: t.length > 1 && t[t.length - 1][0] - t[0][0] < 15 * 60e3 ? '{HH}:{mm}:{ss}' : '{HH}:{mm}' } },
+          xAxis: liveX(t),
           yAxis: { ...yAx((v) => (v >= 1000 ? `${num(v / 1000, 1)} kW` : `${v} W`)), max: (v) => Math.max(10, Math.ceil(v.max * 1.25)) },
           series: [{ type: 'line', data: t, showSymbol: false, smooth: 0.3, lineStyle: { color: col, width: 2 },
             areaStyle: { color: grad('55', '05') }, emphasis: { disabled: true } }],
@@ -279,7 +299,7 @@ function detailSheet(M, id, app) {
       sh.querySelector('#dh').innerHTML = heroHtml();
       if (dtTab === 'canli') {
         const t = trace.get(id) || [];
-        if (ch && t.length >= 2) ch.setOption({ series: [{ data: t }] });
+        if (ch && t.length >= 2) ch.setOption({ xAxis: liveX(t), series: [{ data: t }] });
         else if (!ch && t.length >= 2) draw();
       }
     });

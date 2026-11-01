@@ -109,7 +109,12 @@ class Collector:
 
     # ------------------------------------------------------------ cihazlar
     def refresh_devices(self):
-        meta = self.fb.safe(self.fb.get, "devices") or {}
+        meta = self.fb.safe(self.fb.get, "devices")
+        if meta is None:
+            # Okunamadı (ağ takıldı) ya da liste boş: cihazları silinmiş sayma, eldekiyle devam et
+            if self.meta:
+                return
+            meta = {}
         local = load_json(LOCAL_FILE, {})
         # devices_local'da olup Firebase'de metası olmayanları varsayılanla yayınla
         for did, loc in local.items():

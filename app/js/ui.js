@@ -58,6 +58,8 @@ export const num = (x, d = 0) => (x == null || Number.isNaN(x) ? '–' : (NF[d] 
 export const kwh = (x, d) => `${num(x, d ?? (Math.abs(x) < 10 ? 2 : Math.abs(x) < 100 ? 1 : 0))} kWh`;
 export const tl = (x, d) => `${num(x, d ?? (Math.abs(x) < 100 ? 2 : 0))} ₺`;
 export const watt = (w) => (w == null ? '–' : w >= 1000 ? `${num(w / 1000, 2)} kW` : `${num(w)} W`);
+// Togg şarj gücü: kW için 4 ondalık (priz 0,1 W hassasiyetle ölçer; ör. 1,9548 kW)
+export const wattFine = (w) => (w == null ? "–" : w >= 1000 ? `${num(w / 1000, 4)} kW` : `${num(w, 1)} W`);
 export const pct = (x, d = 0) => `%${num(x, d)}`;
 export const AYLAR = ['Ocak', 'Şubat', 'Mart', 'Nisan', 'Mayıs', 'Haziran', 'Temmuz', 'Ağustos', 'Eylül', 'Ekim', 'Kasım', 'Aralık'];
 // Ay adlarına doğru Türkçe ek: Ekim'de / Ekim'den, Kasım'da / Kasım'dan, Mart'ta / Mart'tan

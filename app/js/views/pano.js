@@ -1,6 +1,6 @@
 // Ana pano: yıllık limit halkası, canlı güç, şarj durumu, uyarılar, 30 gün, gelecek yıl senaryosu
 import { colors, mount, stackedBars } from '../charts.js';
-import { AYLAR, alertBox, ayDa, ayDan, dur, esc, icon, kwh, num, pct, tl, watt } from '../ui.js';
+import { AYLAR, alertBox, ayDa, ayDan, dur, esc, icon, kwh, num, pct, tl, watt, wattFine } from '../ui.js';
 
 const R = 96, C = 2 * Math.PI * R, ARC = 0.75 * C;
 
@@ -41,8 +41,9 @@ function heroText(M) {
   const parts = [`Günde ≈ ${kwh(M.rate, 1)} hızla yıl sonu <b>≈ ${kwh(M.proj, 0)}</b>.`];
   if (M.ytdEst) {
     const tr = (d) => d.toLocaleDateString('tr-TR');
+    // Faturası henüz girilmemiş dönem: son okuma → şalterin ölçmeye başladığı gün (tarihlerle, ay adıyla karışmasın)
     parts.push(M.home && M.holeEnd <= new Date()
-      ? `(Son okuma ${tr(M.holeStart)} ile şalterin ölçmeye başladığı ${tr(M.holeEnd)} arası ≈ ${kwh(M.estTotal, 0)} tahmin; o ayın faturasını girince düzelir.)`
+      ? `<br><span class="muted">Dönem tahmini <b class="est-val">≈ ${kwh(M.estTotal, 0)}</b></span><span class="est-note">Bu dönemin faturası gelince düzelecek.</span>`
       : `(Son okuma ${tr(M.holeStart)}; sonrası tahmin.)`);
   }
   if (M.exceedDate === 'gecti') parts.push('Yıllık limit <b>aşıldı</b>.');
@@ -53,18 +54,94 @@ function heroText(M) {
   return parts.join(' ');
 }
 
+// Canlı enerji akışı: Şebeke → Ev (ana şalter) → Togg / Prizler. Yalnız ana şalter varsa.
+function flowVals(M) {
+  const prizW = M.enabled.filter((d) => d.type === 'priz' && d.live?.ok !== false && d.live?.on !== false)
+    .reduce((a, d) => a + (Number(d.live?.w) || 0), 0);
+  return { v: M.home?.live?.v, home: M.homeW, togg: M.evW, priz: prizW };
+}
+
+// Güç değerini sayı + birim olarak ayırır (birim ayrı, küçük yazılır)
+const wParts = (w) => (w == null ? ['–', ''] : w >= 1000 ? [num(w / 1000, 2), 'kW'] : [num(w), 'W']);
+// Kart değeri: sayı büyük, birim küçük (Togg şarj gücü 4 ondalık: 1,9548 kW)
+const wHtml = (w, fine = false) => {
+  if (w == null) return '–';
+  const n = w >= 1000 ? num(w / 1000, fine ? 4 : 2) : num(w, fine ? 1 : 0);
+  return `${n}<small> ${w >= 1000 ? 'kW' : 'W'}</small>`;
+};
+// Akan parlak noktalar (SMIL); "hareketi azalt" açıksa hiç çizilmez
+const motionOK = () => /[?&]hareket=1/.test(location.search) || !matchMedia('(prefers-reduced-motion: reduce)').matches;
+const dots = (id, dur) => (motionOK() ? [0, dur / 2].map((b) =>
+  `<circle r="2.6"><animateMotion dur="${dur}s" begin="${b}s" repeatCount="indefinite"><mpath href="#${id}"/></animateMotion></circle>`).join('') : '');
+
+function flow(M) {
+  if (!M.home) return '';
+  const f = flowVals(M);
+  const [hn, hu] = wParts(f.home), [tn, tu] = wParts(f.togg), [pn, pu] = wParts(f.priz);
+  const chg = f.togg > 50;
+  const on = (w) => (w > 5 ? ' on' : '');
+  return `
+  <div class="flow-strip" data-flow>
+    <div class="fs-head">ŞU AN..<span><span class="pulse"></span>Canlı</span></div>
+    <svg viewBox="0 0 340 124" aria-label="Canlı enerji akışı">
+      <defs>
+        <linearGradient id="tgShade" x1="0" y1="0" x2="0" y2="1"><stop offset=".45" stop-color="#000" stop-opacity="0"/><stop offset="1" stop-color="#000" stop-opacity=".86"/></linearGradient>
+        <radialGradient id="tgSpot" cx=".5" cy=".4" r=".62"><stop offset="0" stop-color="#22d3d6" stop-opacity=".16"/><stop offset="1" stop-color="#22d3d6" stop-opacity="0"/></radialGradient>
+        <clipPath id="tgClip"><rect x="244" y="4" width="92" height="54" rx="12"/></clipPath>
+        <filter id="flGlow" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="1.6"/></filter>
+      </defs>
+      <path id="flH" class="cn h${on(f.home)}" data-fl="h" d="M88 62 H114"/>
+      <path id="flT" class="cn t${on(f.togg)}" data-fl="t" d="M218 50 C231 50,231 31,244 31"/>
+      <path id="flP" class="cn p${on(f.priz)}" data-fl="p" d="M218 74 C231 74,231 93,244 93"/>
+      <g class="pt h${on(f.home)}" data-pt="h" filter="url(#flGlow)">${dots('flH', 1.3)}</g>
+      <g class="pt t${on(f.togg)}" data-pt="t" filter="url(#flGlow)">${dots('flT', 1.2)}</g>
+      <g class="pt p${on(f.priz)}" data-pt="p" filter="url(#flGlow)">${dots('flP', 1.3)}</g>
+
+      <rect class="nd" x="4" y="34" width="84" height="56" rx="12"/>
+      <rect class="tile grid" x="12" y="49" width="26" height="26" rx="8"/>
+      <path class="ico grid" d="M26.5 54 19.5 63h5.5l-1 7.5 7-9h-5.5z"/>
+      <text class="lb" x="45" y="58">Şebeke</text>
+      <text class="vl" x="45" y="75" data-fv="v">${f.v ? num(f.v) + ' V' : '–'}</text>
+
+      <rect class="nd home" x="114" y="22" width="104" height="80" rx="14"/>
+      <rect class="tile home" x="124" y="32" width="26" height="26" rx="8"/>
+      <path class="ico home" d="M129.5 45.5 137 39l7.5 6.5V53h-4.5v-5h-6v5h-4.5z"/>
+      <text class="lb" x="157" y="49">Ev Toplam</text>
+      <text class="big" x="166" y="88" text-anchor="middle"><tspan data-fv="hn">${hn}</tspan><tspan class="bu" dx="5" data-fv="hu">${hu}</tspan></text>
+
+      <g class="tg${chg ? ' chg' : ''}" data-tg>
+        <rect class="tg-glow" x="242" y="2" width="96" height="58" rx="14" filter="url(#flGlow)"/>
+        <rect class="tg-bg" x="244" y="4" width="92" height="54" rx="12"/>
+        <rect x="244" y="4" width="92" height="54" rx="12" fill="url(#tgSpot)"/>
+        <image class="tg-img" href="img/t10x.webp" x="248" y="5" width="84" height="44" preserveAspectRatio="xMidYMid meet" clip-path="url(#tgClip)"/>
+        <rect x="244" y="4" width="92" height="54" rx="12" fill="url(#tgShade)"/>
+        <rect class="tg-frame" x="244" y="4" width="92" height="54" rx="12"/>
+        <text class="tg-k" x="252" y="41">Togg</text>
+        <text class="tg-m" x="252" y="53">T10X</text>
+        <text class="tg-v" x="329" y="53" text-anchor="end"><tspan data-fv="tn">${tn}</tspan><tspan class="su" dx="2.5" data-fv="tu">${tu}</tspan></text>
+      </g>
+
+      <rect class="nd" x="244" y="66" width="92" height="54" rx="12"/>
+      <rect class="tile" x="252" y="80" width="26" height="26" rx="8"/>
+      <path class="ico" d="M262 84.5v4.5M268 84.5v4.5M259 89h12v3.2a6 6 0 0 1-12 0zM265 98.2v3.6"/>
+      <text class="lb" x="285" y="89">Prizler</text>
+      <text class="vl" x="285" y="106"><tspan data-fv="pn">${pn}</tspan><tspan class="su" dx="2.5" data-fv="pu">${pu}</tspan></text>
+    </svg>
+  </div>`;
+}
+
 function kpis(M) {
   const charging = M.evW > 50;
   return `
   <div class="kpis kpis-c">
     <div class="kpi" data-go="ev">
       <div class="k-label">${icon('home')}Ev şu an</div>
-      <div class="k-val" data-live="homeW">${M.home ? (M.homeW == null ? '–' : watt(M.homeW)) : '–'}</div>
+      <div class="k-val" data-live="homeW">${M.home ? wHtml(M.homeW) : '–'}</div>
       <div class="k-sub">${M.home ? `Bugün <span data-live="todayHome">${kwh(M.todayHome)}</span>` : 'Şalter bağlanınca canlı'}</div>
     </div>
     <div class="kpi ${charging ? 'charging' : ''}" data-go="togg" data-live-cls="evKpi">
       <div class="k-label">${charging ? '<span class="pulse"></span>' : icon('car')}Togg</div>
-      <div class="k-val" data-live="evW">${charging ? watt(M.evW) : 'Boşta'}</div>
+      <div class="k-val" data-live="evW">${charging ? wHtml(M.evW, true) : 'Boşta'}</div>
       <div class="k-sub">Bugün <span data-live="todayEv">${kwh(M.todayEv)}</span></div>
     </div>
     <div class="kpi" data-go="ev">
@@ -103,11 +180,11 @@ export function chargeCard(M) {
   return `
   <div class="card no-anim">
     <div class="charge">
-      <div class="car-wrap"><img class="car-img" src="img/t10x.webp" alt="Togg T10X" width="120" height="63"><span class="plug-dot"></span></div>
+      <div class="car-wrap"><img class="car-img" src="img/t10x.webp" alt="Togg T10X" width="120" height="63"></div>
       <div>
         <div class="t"><span class="pulse" style="display:inline-block;margin-right:6px"></span>Şarj Ediliyor · ${esc(s.dev.name)}</div>
         <div class="v">${kwh(s.kwh, 2)} · ${tl(s.kwh * M.priceNow)}</div>
-        <div class="s">${watt(M.evW)} · ${dur(min)} · Bataryaya ≈ +${pct(s.added)}${km}</div>
+        <div class="s">${wattFine(M.evW)} · ${dur(min)} · Bu şarjda +${pct(s.added)}${km}</div>
       </div>
     </div>
     ${socLine}
@@ -183,6 +260,8 @@ export function renderPano(el, M, app) {
         <span class="badge ${M.level}">${icon(M.level === 'good' ? 'shield' : 'alert')}${M.levelText}</span>
         <p>${heroText(M)}</p>
       </div>
+      ${flow(M)}
+      ${M.home ? '<div class="hero-sep"></div>' : ''}
       <div class="trio">
         <div><b>${num(Math.max(0, M.t.limit_kwh - M.ytd))}<small> kWh</small></b><span>Limitten Kalan</span></div>
         <div><b>${num(M.butce, 1)}<small> kWh</small></b><span>Günlük Bütçe<br>≈ ${tl(M.butce * M.priceNow, 0)} karşılığı</span></div>
@@ -218,12 +297,26 @@ export function renderPano(el, M, app) {
 // Canlı güncelleme: grafiklere dokunmadan yalnız sayılar
 export function updatePano(el, M) {
   const set = (k, v) => { const n = el.querySelector(`[data-live="${k}"]`); if (n) n.textContent = v; };
-  set('homeW', M.homeW == null ? '–' : watt(M.homeW));
-  set('evW', M.evW > 50 ? watt(M.evW) : 'Boşta');
+  const setH = (k, v) => { const n = el.querySelector(`[data-live="${k}"]`); if (n && n.innerHTML !== v) n.innerHTML = v; };
+  setH('homeW', wHtml(M.homeW));
+  setH('evW', M.evW > 50 ? wHtml(M.evW, true) : 'Boşta');
   set('todayHome', kwh(M.todayHome));
   set('todayHome2', num(M.todayHome, 1));
   set('todayEv', kwh(M.todayEv));
   el.querySelector('[data-live-cls="evKpi"]')?.classList.toggle('charging', M.evW > 50);
   const slot = el.querySelector('[data-slot="charge"]');
   if (slot) slot.innerHTML = chargeCard(M);
+  // akış şeması: yalnız sayılar, bağlantı renkleri ve Togg kartının durumu
+  const fl = el.querySelector('[data-flow]');
+  if (fl) {
+    const f = flowVals(M);
+    const fv = (k, v) => { const n = fl.querySelector(`[data-fv="${k}"]`); if (n && n.textContent !== v) n.textContent = v; };
+    const [hn, hu] = wParts(f.home), [tn, tu] = wParts(f.togg), [pn, pu] = wParts(f.priz);
+    fv('v', f.v ? `${num(f.v)} V` : '–'); fv('hn', hn); fv('hu', hu); fv('tn', tn); fv('tu', tu); fv('pn', pn); fv('pu', pu);
+    for (const [k, w] of [['h', f.home], ['t', f.togg], ['p', f.priz]]) {
+      fl.querySelector(`[data-fl="${k}"]`)?.classList.toggle('on', w > 5);
+      fl.querySelector(`[data-pt="${k}"]`)?.classList.toggle('on', w > 5);
+    }
+    fl.querySelector('[data-tg]')?.classList.toggle('chg', f.togg > 50);
+  }
 }

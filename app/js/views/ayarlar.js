@@ -32,10 +32,10 @@ export function renderAyarlar(el, M, app) {
       <div class="field"><div><label for="ky">Aylık kademe (kWh)</label><small>Aylık kademe uygulanıyorsa sınır; yoksa boş bırak.</small></div><input class="input num" id="ky" inputmode="numeric" value="${T.kademe_kwh_ay || ''}" placeholder="yok"></div>
       <div class="field"><div><label for="k2">Kademe üstü fiyat</label></div><input class="input num" id="k2" inputmode="decimal" value="${f(T.kademe2_tl || '')}" placeholder="–"></div>
       <div class="field"><div><label>Üç zamanlı (₺/kWh)</label><small>Karşılaştırma için: gece · gündüz · puant</small></div>
-        <div style="display:flex;gap:6px"><input class="input num" id="ug" inputmode="decimal" value="${f(T.uc_gece || '')}" placeholder="${f(3.23)}" style="width:62px" aria-label="Gece">
-        <input class="input num" id="ud" inputmode="decimal" value="${f(T.uc_gunduz || '')}" placeholder="${f(4.82)}" style="width:62px" aria-label="Gündüz">
-        <input class="input num" id="up" inputmode="decimal" value="${f(T.uc_puant || '')}" placeholder="${f(6.79)}" style="width:62px" aria-label="Puant"></div></div>
-      ${yr === M.y ? `<div class="field"><div><label for="py">${M.y - 1} toplam tüketimi (kWh)</label><small>Bu yılın limitini aştıysa bütün yıl son kaynak fiyatı uygulanır. e-Devlet / fatura.</small></div><input class="input num" id="py" inputmode="numeric" value="${T.onceki_yil_kwh ?? ''}" placeholder="kWh"></div>` : ''}
+        <div style="display:flex;gap:6px"><input class="input num" id="ug" inputmode="decimal" value="${f(T.uc_gece || '')}" placeholder="${f(3.261)}" style="width:62px" aria-label="Gece">
+        <input class="input num" id="ud" inputmode="decimal" value="${f(T.uc_gunduz || '')}" placeholder="${f(4.92)}" style="width:62px" aria-label="Gündüz">
+        <input class="input num" id="up" inputmode="decimal" value="${f(T.uc_puant || '')}" placeholder="${f(6.996)}" style="width:62px" aria-label="Puant"></div></div>
+      ${yr === M.y ? `<div class="field"><div><label for="py">${M.y - 1} toplam tüketimi (kWh)</label><small>Bu yılın limitini aştıysa bütün yıl son kaynak fiyatı uygulanır. ${M.prevTotal > 0 ? `Boş bırakırsan uygulama kendi verisinden hesaplar: <b>${num(M.prevTotal)} kWh</b>.` : 'e-Devlet / fatura.'}</small></div><input class="input num" id="py" inputmode="numeric" value="${T.onceki_yil_kwh ?? ''}" placeholder="${M.prevTotal > 0 ? 'otomatik' : 'kWh'}"></div>` : ''}
       ${yr === M.y ? `<div class="field"><div><label for="bs">Abonelik başlangıcı</label><small>Bu yıl taşındıysan ilk okuma tarihi (yıllık hız bundan hesaplanır).</small></div><input class="input" type="date" id="bs" value="${esc(T.baslangic || '')}"></div>
       <div class="field"><div><label for="so">Son fatura okuması</label><small>Ev şalteri bağlanana kadar ölçüm bu tarihte biter, sonrası tahmin edilir.</small></div><input class="input" type="date" id="so" value="${esc(T.son_okuma || '')}"></div>` : ''}
       <button class="btn primary" id="saveT" style="margin-top:12px">${icon('check')}Tarifeyi kaydet</button>
@@ -43,7 +43,7 @@ export function renderAyarlar(el, M, app) {
 
     <div class="card">
       <h2>${yr} faturaları (kWh)</h2>
-      <p class="hint">Şalter takılmadan önceki aylar için faturadaki tüketimi gir. Her ay için fatura ile ölçümden büyük olan kullanılır.</p>
+      <p class="hint">Şalter takılmadan önceki aylar için faturadaki tüketimi gir. Her ay için fatura ile ölçümden büyük olan kullanılır. Faturayı tüketimin yapıldığı aya yaz: ör. Ekim başında gelen (2 Eyl – 2 Eki) fatura → <b>Eyl</b>. <b>Son fatura okuması</b> tarihi kendiliğinden bir ay ilerler.</p>
       <div class="bills">${AY_K.map((a, i) => { const k = String(i + 1).padStart(2, '0'); return `<label>${a}<input class="input" data-m="${k}" inputmode="numeric" value="${bills[k] ?? ''}" placeholder="–"></label>`; }).join('')}</div>
       <button class="btn ghost" id="saveB" style="margin-top:12px">${icon('check')}Faturaları kaydet</button>
     </div>
@@ -111,6 +111,20 @@ export function renderAyarlar(el, M, app) {
     const b = {};
     el.querySelectorAll('[data-m]').forEach((i) => { const x = n(i.value); if (x != null) b[i.dataset.m] = x; });
     save(`settings/bills/${yr}`, Object.keys(b).length ? b : null, 'Faturalar kaydedildi');
+    // Son okuma tarihini kendiliğinden ilerlet: m. ayın faturası (m+1). ayın okuma gününde biter.
+    // Okuma günü önceki son okumadan alınır (her ay aynı gün okunur); daha ileriye hiç geri almaz.
+    const son = Math.max(0, ...Object.keys(b).map(Number));
+    if (son) {
+      const cur = T.son_okuma || '';
+      const gun = cur ? Number(cur.slice(8, 10)) : 2;
+      const d = new Date(yr, son, gun);
+      const iso = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+      if (iso > cur) {
+        st.put(`settings/tariff/${yr}/son_okuma`, iso)
+          .then(() => toast(`Son okuma ${d.toLocaleDateString('tr-TR')} olarak güncellendi`))
+          .catch(() => {});
+      }
+    }
   };
   $('#saveC').onclick = () => save('settings/car', {
     ...(M.S.car || {}),   // batarya kimyası gibi formda olmayan alanlar korunur

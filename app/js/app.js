@@ -162,6 +162,8 @@ store.subscribe((kind) => {
 });
 
 applyTheme();
+// Test seçeneği: adres ?hareket=1 ile açılırsa "hareketi azalt" ayarı yok sayılır (önizlemede animasyonları görmek için)
+if (/[?&]hareket=1/.test(location.search)) document.documentElement.dataset.motion = 'force';
 // Araç resmini açılışta bir kez çözüp bellekte tut: Pano/Togg sekmesinde beklemeden görünsün
 const carImg = new Image();
 carImg.src = 'img/t10x.webp';

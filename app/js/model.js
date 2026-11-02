@@ -52,7 +52,14 @@ export function build(raw) {
   for (let i = 0; i < 12; i++) evMonths[i] += histMonth(`${y}-${String(i + 1).padStart(2, '0')}`);
   const histTotal = sum(Object.values(hist).map((v) => Number(v) || 0));
 
-  const TY = S.tariff?.[y] || {};
+  // Önceki yılın toplamı (yeni yılın tarifesini belirler): elle girilmediyse kendi verisinden
+  // (her ay için ana sayaç ölçümü ile faturadan büyük olan).
+  const prevBills = S.bills?.[y - 1] || {};
+  const prevMeter = home ? monthsOf(raw, home.id, y - 1) : z12();
+  const prevTotal = sum(prevMeter.map((v, i) => Math.max(v, Number(prevBills[String(i + 1).padStart(2, '0')] || 0))));
+  const TY0 = S.tariff?.[y] || {};
+  const oncekiOto = TY0.onceki_yil_kwh == null && prevTotal > 0;
+  const TY = oncekiOto ? { ...TY0, onceki_yil_kwh: Math.round(prevTotal) } : TY0;
   const t = tarife(y, TY);
   // gelecek yılın limiti bu yıldan devralınmaz: ayarda yoksa yasal limit (2027+: 3.000)
   const tNext = tarife(y + 1, { ...TY, limit_kwh: null, onceki_yil_kwh: null, ...S.tariff?.[y + 1] });
@@ -255,7 +262,7 @@ export function build(raw) {
     todayEv: evs.reduce((a, d) => a + Math.max(Number(days(d.id)[today] || 0), Number(d.live?.today || 0)), 0),
     ucz, lastN, days, histMonth, histTotal, history: S.ev_history || null,
     evDay: (k) => evs.reduce((a, d) => a + Number(days(d.id)[k] || 0), 0) + Number(hist[k] || 0),
-    car,
+    car, oncekiOto, prevTotal,
     winder: raw.winder?.state || null,
     discovered: Object.entries(raw.discovered || {}).filter(([id]) => !raw.devices?.[id]),
   };

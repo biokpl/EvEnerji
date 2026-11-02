@@ -87,7 +87,7 @@ export const kalanGun = (bugun) => gunYil(bugun.getFullYear()) - yilinGunu(bugun
 
 // ---------------------------------------------------------------- üç zamanlı tarife
 // Saat dilimleri (EPDK): gündüz 06–17, puant 17–22, gece 22–06. Üç zamanlıda kademe yok.
-export const UC_ZAMAN = { gunduz: 4.82, puant: 6.79, gece: 3.23 };   // ₺/kWh vergiler dahil (Nisan 2026)
+export const UC_ZAMAN = { gunduz: 4.92, puant: 6.996, gece: 3.261 };   // ₺/kWh vergiler dahil — EPDK 4 Nisan 2026 tablosu (Pi her sabah EPDK'dan günceller)
 export const dilim = (h) => (h >= 6 && h < 17 ? 'gunduz' : h >= 17 && h < 22 ? 'puant' : 'gece');
 // Saatlik ölçümü olmayan ev tüketimi için varsayılan dağılım (ana şalter gelince gerçeği kullanılır)
 export const EV_PROFIL = { gunduz: 0.45, puant: 0.35, gece: 0.2 };

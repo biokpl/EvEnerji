@@ -75,31 +75,36 @@ export function build(raw) {
   const today0 = d0(today);
   const start = TY.baslangic && d0(TY.baslangic) > new Date(y, 0, 1) ? d0(TY.baslangic) : new Date(y, 0, 1);
   const meterDays = home ? Object.keys(days(home.id)).filter((k) => k.startsWith(String(y)) && days(home.id)[k] > 0).sort() : [];
-  let covEnd = today0;
-  if (!meterDays.length && TY.son_okuma) covEnd = d0(TY.son_okuma);
-  else if (meterDays.length) covEnd = new Date(today0.getTime() + DAY); // bugün dahil ölçülüyor
-  const covDays = Math.max(1, Math.round((covEnd - start) / DAY));
+  // Boşluk: son fatura okumasından ana sayacın ölçmeye başladığı güne kadar (sayaç yoksa bugüne dek).
+  // Bu günler tahminle doldurulur; faturası girilmiş aylar atlanır (iki kez sayılmasın).
+  const tomorrow0 = new Date(today0.getTime() + DAY);
+  const billEnd = TY.son_okuma && d0(TY.son_okuma) > start ? d0(TY.son_okuma) : start;
+  const holeStart = billEnd;
+  const holeEnd = meterDays.length ? d0(meterDays[0]) : tomorrow0;
+  const covEnd = billEnd;   // geriye uyum: faturayla kapsanan son gün
+  const measuredDays = Math.max(1, Math.round((billEnd - start) / DAY) + meterDays.length);
   const measured = sum(homeMonths);
   // Günlük hız: sayaçtan son 30 gün, yoksa son faturanın günlük ortalaması; dönem ortalamasıyla harmanlanır
-  const avgAll = measured / covDays;
+  const avgAll = measured / measuredDays;
   const lastBillMi = [...homeMonths.keys()].filter((i) => Number(bills[String(i + 1).padStart(2, '0')] || 0) > 0).pop();
   const recent = son30 > 0 ? son30 / 30 : lastBillMi != null ? homeMonths[lastBillMi] / new Date(y, lastBillMi + 1, 0).getDate() : avgAll;
   const rate = measured > 0 ? 0.6 * recent + 0.4 * avgAll : 0;
-  const gapDays = Math.max(0, Math.round((today0 - covEnd) / DAY) + 1);
-  const ytdEst = gapDays > 0 && !meterDays.length;
-  const ytd = measured + (ytdEst ? rate * gapDays : 0);
+  // Ay ay tahmin: boşluk (geçmiş) ve yarından yıl sonuna (gelecek)
+  const daysIn = (i, a, b) => {   // i. ayın [a, b) aralığına düşen gün sayısı
+    const from = Math.max(new Date(y, i, 1).getTime(), a.getTime());
+    const to = Math.min(new Date(y, i + 1, 1).getTime(), b.getTime());
+    return Math.max(0, Math.round((to - from) / DAY));
+  };
+  const estMonths = homeMonths.map((_, i) => (bills[String(i + 1).padStart(2, '0')] ? 0 : rate * daysIn(i, holeStart, holeEnd)));
+  const estTotal = sum(estMonths);
+  const ytdEst = estTotal > 0.5;
+  const ytd = measured + estTotal;
   const remain = kalanGun(now) - 1;
   const proj = ytd + rate * remain;
   const butce = gunlukButce(t.limit_kwh, ytd, now);
 
-  // Ay ay tahmini tam yıl (geçmiş: ölçüm, boşluk ve gelecek: hız x gün)
-  const projMonths = [...homeMonths];
-  for (let i = 0; i < 12; i++) {
-    const mStart = new Date(y, i, 1), mEnd = new Date(y, i + 1, 1);
-    const from = Math.max(mStart.getTime(), Math.max(covEnd.getTime(), start.getTime()));
-    const n = Math.max(0, Math.round((mEnd.getTime() - from) / DAY));
-    projMonths[i] += rate * n;
-  }
+  const yearEnd = new Date(y + 1, 0, 1);
+  const projMonths = homeMonths.map((v, i) => v + estMonths[i] + rate * daysIn(i, tomorrow0, yearEnd));
   const durum = yilDurumu(t, homeMonths);
   const projDurum = yilDurumu(t, projMonths);
 
@@ -239,7 +244,7 @@ export function build(raw) {
   return {
     raw, now, y, mi, today, S, t, tNext, durum, projDurum, devices, enabled, home, evs, plugs, winderDev,
     homeMonths, projMonths, evMonths, evTlByMonth, ytd, ytdEst, rate, son30, proj, butce, evYtd, evShare, evProj, evTl, evAvgTl, noEvProj,
-    exceedDate, level, levelText, scenarios, nextYear, kademeAylari, sessions, per100, activeSession, covEnd, start,
+    exceedDate, level, levelText, scenarios, nextYear, kademeAylari, sessions, per100, activeSession, covEnd, start, holeStart, holeEnd, estTotal, estMonths,
     priceNow: birimFiyat(t, projDurum, mi + 1),
     monthTl: projDurum.aylikTl[mi], monthKwh: projMonths[mi],
     homeW: home?.live?.w ?? null,

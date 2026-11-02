@@ -45,7 +45,7 @@ def _parse(params: dict, keys: dict, scale: dict) -> Reading:
 
 # ---------------------------------------------------------------- LAN
 class _LanListener:
-    """Tek zeroconf dinleyicisi; tüm eWeLink cihazlarının son parametrelerini tutar."""
+    """Tek zeroconf dinleyicisi; eWeLink cihazlarının son yayınını ve IP adresini tutar."""
     _inst = None
     _lock = threading.Lock()
 
@@ -59,6 +59,7 @@ class _LanListener:
     def __init__(self):
         from zeroconf import ServiceBrowser, Zeroconf
         self.raw: dict[str, tuple[float, dict]] = {}
+        self.ip: dict[str, tuple[str, int]] = {}
         self.zc = Zeroconf()
         self.browser = ServiceBrowser(self.zc, "_ewelink._tcp.local.", handlers=[self._on])
 
@@ -71,6 +72,9 @@ class _LanListener:
         did = props.get("id")
         if did:
             self.raw[did] = (time.time(), props)
+            if info.addresses:
+                import socket
+                self.ip[did] = (socket.inet_ntoa(info.addresses[0]), info.port or 8081)
 
     @staticmethod
     def decrypt(props: dict, devicekey: str) -> dict:
@@ -86,6 +90,11 @@ class _LanListener:
 
 
 class EwelinkLan:
+    """Yerel ağ: güç/gerilim/akım şalterden doğrudan istenir (/zeroconf/statistics, yalnız okuma).
+
+    Şalter gücü kendiliğinden sık yayınlamıyor ve yayınları yalnız DEĞİŞEN alanları taşıyor;
+    bu yüzden ölçüm her okumada sorulur, açık/kapalı durumu yayınlardan birleştirilerek tutulur.
+    """
     can_switch = False
 
     def __init__(self, dev_id: str, local: dict):
@@ -93,19 +102,52 @@ class EwelinkLan:
         self.did, self.key = e["device_id"], e["devicekey"]
         self.keys = {**DEFAULT_KEYS, **e.get("keys", {})}
         self.scale = {**DEFAULT_SCALE, **e.get("scale", {})}
+        self.ip_cfg = e.get("ip")                 # yayın gelmezse yedek adres
         self.lst = _LanListener.get()
+        self.params: dict = {}                    # yayınlardan birleştirilmiş son değerler
+        self.seen_ts = 0.0
+        self.s = requests.Session()
+
+    def _merge_broadcast(self):
+        item = self.lst.raw.get(self.did)
+        if item and item[0] != self.seen_ts:
+            self.seen_ts = item[0]
+            try:
+                self.params.update(self.lst.decrypt(item[1], self.key))
+            except Exception as e:
+                log.debug("yayın çözülemedi: %s", e)
+
+    def _post(self, ip: str, port: int, path: str) -> dict:
+        from Cryptodome.Cipher import AES
+        import os
+        key = hashlib.md5(self.key.encode()).digest()
+        iv = os.urandom(16)
+        raw = b"{}"
+        pad = 16 - len(raw) % 16
+        ct = AES.new(key, AES.MODE_CBC, iv).encrypt(raw + bytes([pad]) * pad)
+        body = {"sequence": str(int(time.time() * 1000)), "deviceid": self.did, "selfApikey": "123",
+                "iv": base64.b64encode(iv).decode(), "encrypt": True, "data": base64.b64encode(ct).decode()}
+        j = self.s.post(f"http://{ip}:{port}/zeroconf/{path}", json=body, timeout=2.5).json()
+        if j.get("encrypt") and j.get("data"):
+            p = AES.new(key, AES.MODE_CBC, base64.b64decode(j["iv"])).decrypt(base64.b64decode(j["data"]))
+            return json.loads(p[:-p[-1]].decode())
+        return j
 
     def read(self) -> Reading:
-        item = self.lst.raw.get(self.did)
-        if not item:
-            return Reading(ok=False, err="LAN yayını yok")
-        ts, props = item
-        if time.time() - ts > 120:
-            return Reading(ok=False, err="LAN verisi eski")
+        self._merge_broadcast()
+        ip, port = self.lst.ip.get(self.did) or ((self.ip_cfg, 8081) if self.ip_cfg else (None, None))
+        if not ip:
+            return Reading(ok=False, err="şalterin adresi henüz bilinmiyor (LAN yayını bekleniyor)")
         try:
-            return _parse(self.lst.decrypt(props, self.key), self.keys, self.scale)
+            st = self._post(ip, port, "statistics")
+            if st.get("error") not in (None, 0):
+                raise RuntimeError(f"hata {st.get('error')}")
+            r = _parse({**self.params, **st}, self.keys, self.scale)
+            if r.w is None:
+                raise RuntimeError("yanıtta güç yok")
+            return r
         except Exception as e:
-            return Reading(ok=False, err=f"çözme hatası: {e}")
+            return Reading(ok=False, err=f"LAN: {e.__class__.__name__}: {e}"[:160])
 
 
 # ---------------------------------------------------------------- Bulut

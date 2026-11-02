@@ -1,6 +1,6 @@
 // Ev ekranı: dönem grafikleri, kümülatif limit, saat ısı haritası, cihaz kırılımı
 import { axisStyle, colors, mount, stackedBars } from '../charts.js';
-import { AYLAR, AY_K, GUN_K, esc, icon, iso, kwh, num, pct, tl } from '../ui.js';
+import { AYLAR, AY_K, GUN_K, esc, icon, iso, kwh, num, pct, tl, watt } from '../ui.js';
 
 let period = 'gun30';
 
@@ -51,7 +51,7 @@ export function renderEv(el, M, app) {
   }
   el.innerHTML = `
     <div class="kpis">
-      <div class="kpi"><div class="k-label">${icon('bolt')}Bugün</div><div class="k-val">${num(M.todayHome, 1)}<small>kWh</small></div><div class="k-sub">${tl(M.todayHome * M.priceNow)}</div></div>
+      <div class="kpi"><div class="k-label"><span class="pulse" style="display:inline-block;margin-right:6px"></span>Şu An</div><div class="k-val" data-ev="w">${watt(M.homeW)}</div><div class="k-sub" data-ev="bugun">Bugün ${kwh(M.todayHome, 1)} · ${tl(M.todayHome * M.priceNow)}</div></div>
       <div class="kpi"><div class="k-label">${icon('calc')}Günlük hız</div><div class="k-val">${num(M.rate, 1)}<small>kWh</small></div><div class="k-sub">bütçe ${kwh(M.butce, 1)}/gün</div></div>
     </div>
     <div class="card">
@@ -67,7 +67,7 @@ export function renderEv(el, M, app) {
       <div class="chart short" id="cc"></div>
       <details class="tbl"><summary>Aylık tablo (₺)</summary>
         <table class="table"><thead><tr><th>Ay</th><th>kWh</th><th>Togg</th><th>₺</th></tr></thead><tbody>
-        ${M.homeMonths.map((k, i) => (i <= M.mi ? `<tr class="${M.durum.aylikSktt[i] ? 'sktt' : ''}"><td>${AYLAR[i]}</td><td>${num(k)}</td><td>${num(M.evMonths[i])}</td><td>${num(M.durum.aylikTl[i])}</td></tr>` : '')).join('')}
+        ${M.homeMonths.map((k, i) => (i <= M.mi ? `<tr class="${M.durum.aylikSktt[i] ? 'sktt' : ''}"><td>${AYLAR[i]}</td><td>${M.estMonths[i] > 0.5 ? '≈ ' : ''}${num(k + M.estMonths[i])}</td><td>${num(M.evMonths[i])}</td><td>${num(M.durum.aylikTl[i])}</td></tr>` : '')).join('')}
         <tr><td><b>Toplam</b></td><td><b>${num(M.ytd)}</b></td><td><b>${num(M.evYtd)}</b></td><td><b>${num(M.durum.toplamTl)}</b></td></tr>
         </tbody></table></details>
     </div>
@@ -96,7 +96,7 @@ export function renderEv(el, M, app) {
 
   // Kümülatif
   const cum = []; let acc = 0;
-  M.homeMonths.forEach((v, i) => { acc += v; cum.push(i <= M.mi ? +acc.toFixed(0) : null); });
+  M.homeMonths.forEach((v, i) => { acc += v + M.estMonths[i]; cum.push(i <= M.mi ? +acc.toFixed(0) : null); });   // tahmini boşluk dahil
   const pcum = []; let pa = 0;
   M.projDurum.aylik.forEach((v, i) => { pa += v; pcum.push(i >= M.mi ? +pa.toFixed(0) : null); });
   mount(el.querySelector('#cc'), {
@@ -130,4 +130,14 @@ export function renderEv(el, M, app) {
     visualMap: { show: false, min: 0, max: max || 1, inRange: { color: [c.hi, c.home + '88', c.home] } },
     series: [{ type: 'heatmap', data, itemStyle: { borderColor: c.card, borderWidth: 2, borderRadius: 3 }, emphasis: { itemStyle: { borderColor: c.text } } }],
   });
+}
+
+// Canlı veri: yalnız anlık güç ve bugünkü tüketim yerinde güncellenir (grafikler yeniden çizilmez)
+export function updateEv(el, M) {
+  if (!M.home) return false;
+  const w = el.querySelector('[data-ev="w"]'), b = el.querySelector('[data-ev="bugun"]');
+  if (!w || !b) return false;
+  w.textContent = watt(M.homeW);
+  b.textContent = `Bugün ${kwh(M.todayHome, 1)} · ${tl(M.todayHome * M.priceNow)}`;
+  return true;
 }

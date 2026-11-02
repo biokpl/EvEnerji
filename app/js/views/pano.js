@@ -39,7 +39,12 @@ function ring(M) {
 function heroText(M) {
   const L = M.t.limit_kwh;
   const parts = [`Günde ≈ ${kwh(M.rate, 1)} hızla yıl sonu <b>≈ ${kwh(M.proj, 0)}</b>.`];
-  if (M.ytdEst) parts.push(`(Son okuma ${M.covEnd.toLocaleDateString('tr-TR')}; sonrası tahmin.)`);
+  if (M.ytdEst) {
+    const tr = (d) => d.toLocaleDateString('tr-TR');
+    parts.push(M.home && M.holeEnd <= new Date()
+      ? `(Son okuma ${tr(M.holeStart)} ile şalterin ölçmeye başladığı ${tr(M.holeEnd)} arası ≈ ${kwh(M.estTotal, 0)} tahmin; o ayın faturasını girince düzelir.)`
+      : `(Son okuma ${tr(M.holeStart)}; sonrası tahmin.)`);
+  }
   if (M.exceedDate === 'gecti') parts.push('Yıllık limit <b>aşıldı</b>.');
   else if (M.exceedDate) parts.push(`Limit <b>${M.exceedDate.getDate()} ${AYLAR[M.exceedDate.getMonth()]}</b> civarı aşılabilir.`);
   const sb = M.projDurum.skttBas;

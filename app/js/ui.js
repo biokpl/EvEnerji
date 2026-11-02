@@ -53,8 +53,8 @@ export const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&a
 
 // ---------- Türkçe sayı biçimleri
 const nf = (d) => new Intl.NumberFormat('tr-TR', { minimumFractionDigits: d, maximumFractionDigits: d });
-const NF = [nf(0), nf(1), nf(2)];
-export const num = (x, d = 0) => (x == null || Number.isNaN(x) ? '–' : NF[d].format(x));
+const NF = {};   // ondalık sayısına göre biçimleyiciler (gerektikçe oluşturulur)
+export const num = (x, d = 0) => (x == null || Number.isNaN(x) ? '–' : (NF[d] ||= nf(d)).format(x));
 export const kwh = (x, d) => `${num(x, d ?? (Math.abs(x) < 10 ? 2 : Math.abs(x) < 100 ? 1 : 0))} kWh`;
 export const tl = (x, d) => `${num(x, d ?? (Math.abs(x) < 100 ? 2 : 0))} ₺`;
 export const watt = (w) => (w == null ? '–' : w >= 1000 ? `${num(w / 1000, 2)} kW` : `${num(w)} W`);

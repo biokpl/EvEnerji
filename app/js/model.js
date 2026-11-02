@@ -106,6 +106,8 @@ export function build(raw) {
   const yearEnd = new Date(y + 1, 0, 1);
   const projMonths = homeMonths.map((v, i) => v + estMonths[i] + rate * daysIn(i, tomorrow0, yearEnd));
   const durum = yilDurumu(t, homeMonths);
+  // Bugüne kadar: ölçüm + fatura + tahmini boşluk (tablolarda ₺ için)
+  const nowDurum = yilDurumu(t, homeMonths.map((v, i) => v + estMonths[i]));
   const projDurum = yilDurumu(t, projMonths);
 
   // Togg'un gerçek maliyeti = faturası Togg'la - Togg olmadan (kademe/SKTT farkı dahil)
@@ -244,7 +246,7 @@ export function build(raw) {
   return {
     raw, now, y, mi, today, S, t, tNext, durum, projDurum, devices, enabled, home, evs, plugs, winderDev,
     homeMonths, projMonths, evMonths, evTlByMonth, ytd, ytdEst, rate, son30, proj, butce, evYtd, evShare, evProj, evTl, evAvgTl, noEvProj,
-    exceedDate, level, levelText, scenarios, nextYear, kademeAylari, sessions, per100, activeSession, covEnd, start, holeStart, holeEnd, estTotal, estMonths,
+    exceedDate, level, levelText, scenarios, nextYear, kademeAylari, sessions, per100, activeSession, covEnd, start, holeStart, holeEnd, estTotal, estMonths, nowDurum,
     priceNow: birimFiyat(t, projDurum, mi + 1),
     monthTl: projDurum.aylikTl[mi], monthKwh: projMonths[mi],
     homeW: home?.live?.w ?? null,

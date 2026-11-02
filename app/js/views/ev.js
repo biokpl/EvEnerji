@@ -67,8 +67,8 @@ export function renderEv(el, M, app) {
       <div class="chart short" id="cc"></div>
       <details class="tbl"><summary>Aylık tablo (₺)</summary>
         <table class="table"><thead><tr><th>Ay</th><th>kWh</th><th>Togg</th><th>₺</th></tr></thead><tbody>
-        ${M.homeMonths.map((k, i) => (i <= M.mi ? `<tr class="${M.durum.aylikSktt[i] ? 'sktt' : ''}"><td>${AYLAR[i]}</td><td>${M.estMonths[i] > 0.5 ? '≈ ' : ''}${num(k + M.estMonths[i])}</td><td>${num(M.evMonths[i])}</td><td>${num(M.durum.aylikTl[i])}</td></tr>` : '')).join('')}
-        <tr><td><b>Toplam</b></td><td><b>${num(M.ytd)}</b></td><td><b>${num(M.evYtd)}</b></td><td><b>${num(M.durum.toplamTl)}</b></td></tr>
+        ${M.homeMonths.map((k, i) => (i <= M.mi ? `<tr class="${M.durum.aylikSktt[i] ? 'sktt' : ''}"><td>${AYLAR[i]}</td><td>${M.estMonths[i] > 0.5 ? '≈ ' : ''}${num(k + M.estMonths[i])}</td><td>${num(M.evMonths[i])}</td><td>${num(M.nowDurum.aylikTl[i])}</td></tr>` : '')).join('')}
+        <tr><td><b>Toplam</b></td><td><b>${num(M.ytd)}</b></td><td><b>${num(M.evYtd)}</b></td><td><b>${num(M.nowDurum.toplamTl)}</b></td></tr>
         </tbody></table></details>
     </div>
     <div class="card">

@@ -18,7 +18,7 @@
   --glow1: rgba(34, 211, 214, 0.16);
   --glow2: rgba(155, 140, 255, 0.13);
   --radius: 22px;
-  --nav-h: 66px;
+  --nav-h: 56px;
   color-scheme: dark;
 }
 :root[data-theme="light"] {
@@ -396,14 +396,14 @@ select.input { padding-right: 6px; }
 
 /* Alt sekme çubuğu */
 .nav {
-  position: fixed; left: 50%; transform: translateX(-50%); bottom: calc(12px + env(safe-area-inset-bottom)); z-index: 30;
+  position: fixed; left: 50%; transform: translateX(-50%); bottom: calc(4px + env(safe-area-inset-bottom)); z-index: 30;
   width: min(528px, calc(100% - 20px)); height: var(--nav-h); display: grid; grid-template-columns: repeat(6, 1fr);
   background: transparent; border: 0; border-radius: 24px; padding: 5px;
 }
 /* Üst şeridin aynası: ekranın iki kenarına ve en alta uzanan buzlu cam; altta koyu, yukarı doğru renksiz */
 .nav::before {
   content: ''; position: absolute; z-index: -1; pointer-events: none;
-  top: -22px; bottom: calc(-12px - env(safe-area-inset-bottom)); left: 50%; width: 100vw; transform: translateX(-50%);
+  top: -8px; bottom: calc(-4px - env(safe-area-inset-bottom)); left: 50%; width: 100vw; transform: translateX(-50%);
   background: linear-gradient(to top,
     var(--bg) 0%,
     color-mix(in srgb, var(--bg) 94%, transparent) 3%,

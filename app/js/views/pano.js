@@ -287,7 +287,11 @@ export function renderPano(el, M, app) {
     const other = homeD.map(([, v], i) => Math.max(0, v - evD[i]));
     const cats = homeD.map(([k]) => `${+k.slice(8)}.${+k.slice(5, 7)}`);
     const opt = stackedBars(c, cats, evD.map((v) => +v.toFixed(2)), other.map((v) => +v.toFixed(2)), {
-      tip: (p) => `<b>${p[0].axisValue}</b><br>${p.map((x) => `${x.marker}${x.seriesName}: ${num(x.value, 1)} kWh`).join('<br>')}<br>Toplam: <b>${num(p.reduce((a, x) => a + x.value, 0), 1)} kWh</b>`,
+      tip: (p) => {
+        const top = p.reduce((a, x) => a + x.value, 0);
+        return `<b>${p[0].axisValue}</b><br>${p.map((x) => `${x.marker}${x.seriesName}: ${num(x.value, 1)} kWh · ${tl(x.value * M.priceNow)}`).join('<br>')}`
+          + `<br>Toplam: <b>${num(top, 1)} kWh · ${tl(top * M.priceNow)}</b>`;
+      },
     });
     opt.series[1].markLine = { symbol: 'none', silent: true, lineStyle: { color: c.mid, type: 'dashed', width: 1.5 }, label: { show: false }, data: [{ yAxis: +M.butce.toFixed(2) }] };
     mount(el.querySelector('#c30'), opt);

@@ -91,7 +91,14 @@ export function renderEv(el, M, app) {
   const ax = axisStyle(c);
   const s = seriesFor(M);
   mount(el.querySelector('#cp'), stackedBars(c, s.cats, s.ev.map((v) => +v.toFixed(3)), s.other.map((v) => +v.toFixed(3)), {
-    tip: (p) => `<b>${s.label(p[0].axisValue, p[0].dataIndex)}</b><br>${p.map((x) => `${x.marker}${x.seriesName}: ${num(x.value, period === 'yil' ? 0 : 2)} kWh`).join('<br>')}<br>Toplam: <b>${num(p.reduce((a, x) => a + x.value, 0), period === 'yil' ? 0 : 2)} kWh</b>`,
+    tip: (p) => {
+      const i = p[0].dataIndex, d = period === 'yil' ? 0 : 2;
+      const ayKwh = period === 'yil' ? M.homeMonths[i] + M.estMonths[i] : 0;
+      const fiyat = period === 'yil' && ayKwh > 0 ? M.nowDurum.aylikTl[i] / ayKwh : M.priceNow;   // ₺/kWh
+      const top = p.reduce((a, x) => a + x.value, 0);
+      return `<b>${s.label(p[0].axisValue, i)}</b><br>${p.map((x) => `${x.marker}${x.seriesName}: ${num(x.value, d)} kWh · ${tl(x.value * fiyat)}`).join('<br>')}`
+        + `<br>Toplam: <b>${num(top, d)} kWh · ${tl(top * fiyat)}</b>`;
+    },
   }));
 
   // Kümülatif

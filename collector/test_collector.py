@@ -300,3 +300,12 @@ def test_kesif_bulamadigi_surumu_ezmez():
     f.write_text(json.dumps({"priz": {"provider": "tuya", "tuya": {"dev_id": "t1", "local_key": "k", "ip": "1.2.3.4", "version": 3.4}}}))
     D.sync({"api_key": "a", "api_secret": "b"}, f, {"priz"})
     assert json.loads(f.read_text())["priz"]["tuya"]["version"] == 3.4
+
+
+def test_onceki_yil_kendiliginden_hesaplanir():
+    c, _ = make()
+    c.settings = {"bills": {"2025": {"10": 500.0, "11": 600.0}}, "tariff": {"2026": {"normal_tl": 3.0}}}
+    assert c.tariff(2026).onceki_yil_kwh == 1100            # elle girilmedi: faturalardan
+    c.settings["tariff"]["2026"]["onceki_yil_kwh"] = 4200
+    assert c.tariff(2026).onceki_yil_kwh == 4200            # elle girilen öncelikli
+    assert c.tariff(2025).onceki_yil_kwh is None            # 2024 verisi yok

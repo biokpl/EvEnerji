@@ -1,0 +1,10 @@
+[Unit]
+Description=Ev Enerji: elektrik tarifesi ve SKTT otomatik kontrol
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=grid
+WorkingDirectory=/home/grid/evenerji/collector
+ExecStart=/home/grid/evenerji/venv/bin/python tarife_kontrol.py

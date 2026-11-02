@@ -78,3 +78,11 @@ Dosyalar `collector/sistem/` altında; kurulu yerleri:
 
 Kayıtlar: `journalctl -t ag-bekcisi`, `journalctl -u ev-enerji | grep -i watchdog`.
 Geri almak: dosyaları sil, `sudo systemctl disable --now ag-bekcisi.timer && sudo systemctl daemon-reexec`; eski servis dosyası `ev-enerji.service.yedek`.
+
+## Otomatik tarife ve SKTT kontrolü (2026-11-03)
+
+`collector/tarife_kontrol.py`, `tarife-kontrol.timer` ile her sabah ~09:30 çalışır.
+- Normal tarife: verinokta.com (mesken enerji kademe 1/2 + dağıtım, vergisiz) — hakedis.org'daki bu ayın dağıtım bedeliyle çapraz kontrol. Fiyat = (enerji + dağıtım + enerji×%5 BTV) × 1,10 (faturayla doğrulandı: 3,238 / 4,857).
+- SKTT: EPİAŞ verisinin herkese açık aynası (jsDelivr: 06maslan27/fatura-dedektifi-veri) — geçen ayın ortalama PTF + YEKDEM, × 1,05.
+- Değişince `settings/tariff/{yıl}` güncellenir ve ntfy bildirimi gider ("Elektrik Tarifesine Zam Geldi..!!"). Okunamaz ya da kaynaklar çelişirse hiçbir şey değişmez, haftada en fazla bir "Tarife değişmiş olabilir, Kontrol et..!!" bildirimi.
+- Durum: Firebase `settings/tarife_oto`. Elle deneme: `python tarife_kontrol.py --kuru`. Kayıt: `journalctl -u tarife-kontrol`.

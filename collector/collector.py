@@ -187,7 +187,12 @@ class Collector:
         return merge_months(bills, meter)
 
     def tariff(self, year: int) -> Tarife:
-        return Tarife.from_dict(year, (self.settings.get("tariff") or {}).get(str(year)))
+        t = Tarife.from_dict(year, (self.settings.get("tariff") or {}).get(str(year)))
+        if t.onceki_yil_kwh is None:   # elle girilmediyse önceki yılın toplamı kendi verisinden
+            onceki = sum(self.year_months(year - 1))
+            if onceki > 0:
+                t.onceki_yil_kwh = round(onceki)
+        return t
 
     def price_now(self) -> tuple[float, float]:
         today = date.today()

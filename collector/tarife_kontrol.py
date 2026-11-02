@@ -2,14 +2,15 @@
 
 Her sabah çalışır (systemd: tarife-kontrol.timer); yalnız bir şey değişince bildirim gönderir.
 
-Normal tarife (mesken, tek zamanlı, kademeli):
-  verinokta.com tablosundan vergisiz birim bedeller (kr/kWh): düşük/yüksek kademe enerji + dağıtım.
-  Çapraz kontrol: hakedis.org'daki bu ayın mesken dağıtım bedeli aynı olmalı. Çelişki ya da
-  okunamama → hiçbir şey değiştirilmez, "Tarife değişmiş olabilir, Kontrol et..!!" bildirimi.
+Normal ve üç zamanlı tarife — DOĞRUDAN EPDK'dan (resmi kaynak):
+  epdk.gov.tr "Elektrik Faturalarına Esas Tarife Tabloları" listesi (sitenin kendi veri adresi
+  /Detay/GetFastAccessList) → en yeni kurul kararının Excel tablosu (/Detay/DownloadDocument).
+  "Mesken (8 kWh/gün ve altı / üstü)" satırları: tek zamanlı enerji, gündüz/puant/gece, dağıtım.
+  Karar başlığındaki geçerlilik tarihi gelmeden uygulanmaz. Okunamazsa hiçbir şey değişmez,
+  "Tarife değişmiş olabilir, Kontrol et..!!" bildirimi (haftada en fazla bir).
 
 SKTT (aylık):
-  EPİAŞ verisinin herkese açık aynasından (jsDelivr) geçen ayın ortalama PTF'si + o ayın YEKDEM'i.
-  enerji = (PTF + YEKDEM) × 1,05 (EPDK katsayısı)
+  Geçen ayın ortalama PTF'si + o ayın YEKDEM'i (EPİAŞ verisi), enerji = (PTF + YEKDEM) × 1,05.
 
 Faturaya esas fiyat (kullanıcının faturasıyla doğrulandı: 3,238 / 4,857 ₺):
   fiyat = (enerji + dağıtım + enerji × %5 BTV) × 1,10 (KDV)
@@ -19,7 +20,7 @@ Faturaya esas fiyat (kullanıcının faturasıyla doğrulandı: 3,238 / 4,857 �
 """
 from __future__ import annotations
 
-import html
+import io
 import json
 import re
 import statistics
@@ -33,14 +34,13 @@ import requests
 HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
 
-VERINOKTA = "https://verinokta.com/fiyatlar/elektrik-tarifeleri/"
-HAKEDIS = "https://www.hakedis.org/endeksler/epdk-elektrik-farturasi-vergi-ve-tarifeler"
+EPDK = "https://www.epdk.gov.tr"
+EPDK_SAYFA = EPDK + "/Detay/Icerik/3-1327/elektrik-faturalarina-esas-tarife-tablolari"
+EPDK_LISTE_ID = "1327"      # "Elektrik Faturalarına Esas Tarife Tabloları" hızlı erişim kaydı
 PIYASA = "https://cdn.jsdelivr.net/gh/06maslan27/fatura-dedektifi-veri@main/data/piyasa/ptf-yekdem.json"
 UA = {"User-Agent": "Mozilla/5.0 (EvEnerji tarife kontrol)"}
 
 BTV, KDV, SKTT_KATSAYI = 0.05, 0.10, 1.05
-AYLAR = ["OCAK", "ŞUBAT", "MART", "NİSAN", "MAYIS", "HAZİRAN",
-         "TEMMUZ", "AĞUSTOS", "EYLÜL", "EKİM", "KASIM", "ARALIK"]
 UYARI_ARALIGI = 7 * 86400     # "kontrol et" bildirimi en fazla haftada bir
 
 
@@ -49,44 +49,48 @@ def fiyat(enerji_tl: float, dagitim_tl: float) -> float:
     return round((enerji_tl + dagitim_tl + enerji_tl * BTV) * (1 + KDV), 3)
 
 
-def _sayi(s: str) -> float:
-    return float(s.replace(".", "").replace(",", "."))
+def epdk_son_karar(oturum: requests.Session) -> dict:
+    """EPDK tarife tabloları listesinden en yeni kararı ve Excel dosyasının kimliğini döndürür."""
+    r = oturum.post(EPDK + "/Detay/GetFastAccessList", json={"fId": EPDK_LISTE_ID}, timeout=30,
+                    headers={**UA, "X-Requested-With": "XMLHttpRequest", "Referer": EPDK_SAYFA})
+    r.raise_for_status()
+    kayitlar = []
+    for k in r.json().get("model") or []:
+        excel = [f for f in k.get("FastAccessDetail") or [] if f.get("ContentType") == 9 and f.get("IsFileType") == 2]
+        m = re.search(r"(\d{1,2})/(\d{1,2})/(\d{4})", k.get("Title", ""))
+        if excel and m:
+            gecerli = date(int(m.group(3)), int(m.group(2)), int(m.group(1)))
+            kayitlar.append({"gecerli": gecerli, "karar": k.get("Number"), "baslik": k.get("Title"),
+                             "dosya": excel[0]["ContentId"]})
+    if not kayitlar:
+        raise ValueError("EPDK listesinde Excel tarife tablosu bulunamadı")
+    return max(kayitlar, key=lambda x: x["gecerli"])
 
 
-def _hucreler(satir: str) -> list[str]:
-    return [" ".join(html.unescape(re.sub(r"<[^>]+>", " ", c)).split())
-            for c in re.findall(r"<t[hd][^>]*>(.*?)</t[hd]>", satir, re.S)]
-
-
-def oku_verinokta(sayfa: str) -> dict:
-    """Mesken satırı: düşük enerji, yüksek enerji, dağıtım (kr/kWh)."""
-    for satir in re.findall(r"<tr.*?</tr>", sayfa, re.S):
-        h = _hucreler(satir)
-        if len(h) >= 4 and h[0] == "Mesken":
-            e1, e2, d = (_sayi(x) for x in h[1:4])
-            if not (0 < e1 < e2 < 2000 and 50 < d < 2000):
-                raise ValueError(f"verinokta değerleri olağan dışı: {h}")
-            return {"e1": e1, "e2": e2, "d": d}
-    raise ValueError("verinokta: Mesken satırı bulunamadı")
-
-
-def oku_hakedis_dagitim(sayfa: str, gun: date) -> float:
-    """Bu ayın mesken (AG, tek terim) dağıtım bedeli, kr/kWh."""
-    ay = AYLAR[gun.month - 1]
-    for tablo in re.findall(r"<table.*?</table>", sayfa, re.S):
-        satirlar = re.findall(r"<tr.*?</tr>", tablo, re.S)
-        if not satirlar:
-            continue
-        basliklar = _hucreler(satirlar[0])
-        aylar = [b.upper() for b in basliklar if b]
-        if ay not in aylar:
-            continue
-        sira = aylar.index(ay)          # her ay iki sütun: dağıtım, reaktif
-        for satir in satirlar[2:]:
-            h = _hucreler(satir)
-            if len(h) > 2 and h[0] == "Mesken" and h[1] == "Tek":
-                return _sayi(h[2 + 2 * sira])     # ilk "Mesken Tek" = alçak gerilim
-    raise ValueError(f"hakedis: {ay} için mesken dağıtım bedeli bulunamadı")
+def oku_epdk_excel(icerik: bytes) -> dict:
+    """Resmi tablodan mesken (alçak gerilim, tek terim) bedelleri, kr/kWh."""
+    import openpyxl
+    wb = openpyxl.load_workbook(io.BytesIO(icerik), data_only=True, read_only=True)
+    satirlar = {}
+    for ws in wb.worksheets:
+        for r in ws.iter_rows(values_only=True):
+            etiket = next((str(c).strip() for c in r if isinstance(c, str) and c.strip()), "")
+            sayilar = [float(c) for c in r if isinstance(c, (int, float))]
+            if etiket.startswith("Mesken (8 kWh/gün ve altı)"):
+                satirlar["alti"] = sayilar
+            elif etiket.startswith("Mesken (8 kWh/gün üstü)"):
+                satirlar["ustu"] = sayilar
+    if "alti" not in satirlar or "ustu" not in satirlar:
+        raise ValueError("EPDK tablosunda mesken kademe satırları bulunamadı")
+    a, u = satirlar["alti"], satirlar["ustu"]
+    if len(a) < 5 or len(u) < 5:
+        raise ValueError(f"mesken satırı eksik: {a} / {u}")
+    # sıra: tek zamanlı enerji | gündüz | puant | gece | dağıtım
+    v = {"e1": a[0], "e2": u[0], "gunduz": a[1], "puant": a[2], "gece": a[3], "d": a[4]}
+    if not (0 < v["e1"] < v["e2"] < 2000 and 0 < v["gece"] < v["gunduz"] < v["puant"] < 2000
+            and 50 < v["d"] < 2000 and abs(u[4] - a[4]) < 1e-6):
+        raise ValueError(f"EPDK değerleri olağan dışı: {v}")
+    return v
 
 
 def sktt_hesapla(piyasa: dict, yil: int, ay: int, dagitim_tl: float) -> dict:
@@ -144,29 +148,41 @@ class Kontrol:
         bugun = date.today()
         y = str(bugun.year)
         tarife = (self.fb.get(f"settings/tariff/{y}") or {})
-        # 1) Normal tarife
+        # 1) Normal ve üç zamanlı tarife: doğrudan EPDK
         dagitim_tl = None
         try:
-            v = oku_verinokta(requests.get(VERINOKTA, headers=UA, timeout=25).text)
-            d_hk = oku_hakedis_dagitim(requests.get(HAKEDIS, headers=UA, timeout=25).text, bugun)
-            if abs(d_hk - v["d"]) > 0.01:
-                raise ValueError(f"kaynaklar çelişiyor: dağıtım {v['d']} ≠ {d_hk} kr/kWh")
-            dagitim_tl = v["d"] / 100
-            yeni1, yeni2 = fiyat(v["e1"] / 100, dagitim_tl), fiyat(v["e2"] / 100, dagitim_tl)
-            eski1, eski2 = float(tarife.get("normal_tl") or 0), float(tarife.get("kademe2_tl") or 0)
-            print(f"Normal tarife: {eski1} / {eski2} → {yeni1} / {yeni2}")
-            if eski1 and not (0.6 < yeni1 / eski1 < 1.8):
-                raise ValueError(f"değişim olağan dışı büyük: {eski1} → {yeni1}")
-            if abs(yeni1 - eski1) > 0.002 or abs(yeni2 - eski2) > 0.002:
-                self.yaz(f"settings/tariff/{y}", {"normal_tl": yeni1, "kademe2_tl": yeni2})
-                zam = yeni1 > eski1
-                self.bildir("Elektrik Tarifesine Zam Geldi..!!" if zam else "Elektrik Tarifesi Düştü..!!",
-                            f"Yeni tarife: {tl(eski1)} → {tl(yeni1)} ₺/kWh, uygulandı\n"
-                            f"Kademe üstü: {tl(eski2)} → {tl(yeni2)} ₺/kWh",
-                            tags="chart_with_upwards_trend" if zam else "chart_with_downwards_trend", priority=4)
-            self.durum["tarife"] = {"e1": v["e1"], "e2": v["e2"], "d": v["d"], "kontrol": bugun.isoformat()}
+            oturum = requests.Session()
+            karar = epdk_son_karar(oturum)
+            if karar["gecerli"] > bugun:
+                print(f"EPDK kararı {karar['karar']} {karar['gecerli']} tarihinde geçerli olacak; bekleniyor")
+                karar = None
+            if karar:
+                xlsx = oturum.get(EPDK + "/Detay/DownloadDocument", params={"id": karar["dosya"]},
+                                  headers={**UA, "Referer": EPDK_SAYFA}, timeout=60).content
+                v = oku_epdk_excel(xlsx)
+                dagitim_tl = v["d"] / 100
+                yeni = {"normal_tl": fiyat(v["e1"] / 100, dagitim_tl), "kademe2_tl": fiyat(v["e2"] / 100, dagitim_tl),
+                        "uc_gunduz": fiyat(v["gunduz"] / 100, dagitim_tl), "uc_puant": fiyat(v["puant"] / 100, dagitim_tl),
+                        "uc_gece": fiyat(v["gece"] / 100, dagitim_tl)}
+                eski = {k: float(tarife.get(k) or 0) for k in yeni}
+                print(f"EPDK kararı {karar['karar']} ({karar['gecerli']}): {eski} → {yeni}")
+                if eski["normal_tl"] and not (0.6 < yeni["normal_tl"] / eski["normal_tl"] < 1.8):
+                    raise ValueError(f"değişim olağan dışı büyük: {eski['normal_tl']} → {yeni['normal_tl']}")
+                degisen = {k: x for k, x in yeni.items() if abs(x - eski[k]) > 0.002}
+                if degisen:
+                    self.yaz(f"settings/tariff/{y}", degisen)
+                if "normal_tl" in degisen or "kademe2_tl" in degisen:
+                    e1, y1 = eski["normal_tl"], yeni["normal_tl"]
+                    zam = y1 > e1
+                    self.bildir("Elektrik Tarifesine Zam Geldi..!!" if zam else "Elektrik Tarifesi Düştü..!!",
+                                f"Yeni tarife: {tl(e1)} → {tl(y1)} ₺/kWh, uygulandı\n"
+                                f"Kademe üstü: {tl(eski['kademe2_tl'])} → {tl(yeni['kademe2_tl'])} ₺/kWh\n"
+                                f"EPDK kararı {karar['karar']}, {karar['gecerli'].strftime('%d.%m.%Y')}'ten itibaren",
+                                tags="chart_with_upwards_trend" if zam else "chart_with_downwards_trend", priority=4)
+                self.durum["tarife"] = {**v, "karar": karar["karar"], "gecerli": karar["gecerli"].isoformat(),
+                                        "kontrol": bugun.isoformat()}
         except Exception as e:
-            self.uyar(f"normal tarife: {e}")
+            self.uyar(f"EPDK tarife tablosu: {e}")
         # 2) SKTT: geçen ayın piyasa verisiyle, ayda bir
         gecen = (bugun.year - (bugun.month == 1), 12 if bugun.month == 1 else bugun.month - 1)
         gecen_ym = f"{gecen[0]}-{gecen[1]:02d}"

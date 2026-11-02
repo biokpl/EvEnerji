@@ -1,17 +1,39 @@
-"""tarife_kontrol.py testleri (ağ yok, sahte sayfa/veriyle):  python test_tarife_kontrol.py"""
+"""tarife_kontrol.py testleri (ağ yok, sahte EPDK listesi/Excel ve piyasa verisiyle):  python test_tarife_kontrol.py"""
+import io
 from datetime import date
 
 import tarife_kontrol as T
 
-VERINOKTA = """<table><tr><th>AG tek zamanlı grup</th><th>Düşük enerji kr/kWh</th><th>Yüksek enerji kr/kWh</th><th>Dağıtım kr/kWh</th></tr>
-<tr><td>Mesken</td><td>49,4065</td><td>189,5808</td><td>242,4900</td></tr>
-<tr><td>Kamu/Özel hizmetler ve diğer</td><td>287,3087</td><td>345,4688</td><td>247,9368</td></tr></table>"""
 
-HAKEDIS = """<table><tr><th></th><th></th><th>TEMMUZ</th><th>AĞUSTOS</th><th>EYLÜL</th><th>EKİM</th><th>KASIM</th><th>ARALIK</th></tr>
-<tr><td>Abone Grubu</td><td>Tarife Türü</td><td>Dağıtım Bedeli</td><td>Reaktif Bedeli</td><td>Dağıtım Bedeli</td><td>Reaktif Bedeli</td><td>Dağıtım Bedeli</td><td>Reaktif Bedeli</td><td>Dağıtım Bedeli</td><td>Reaktif Bedeli</td><td>Dağıtım Bedeli</td><td>Reaktif Bedeli</td><td>Dağıtım Bedeli</td><td>Reaktif Bedeli</td></tr>
-<tr><td>Aydınlatma</td><td>Tek</td><td>237,469</td><td></td><td>237,469</td><td></td><td>237,469</td><td></td><td>237,469</td><td></td><td>237,469</td><td></td><td>237,469</td><td></td></tr>
-<tr><td>Mesken</td><td>Tek</td><td>242,49</td><td></td><td>242,49</td><td></td><td>242,49</td><td></td><td>242,49</td><td></td><td>250,10</td><td></td><td>250,10</td><td></td></tr>
-<tr><td>Mesken</td><td>Tek</td><td>204,0402</td><td></td><td>204,0402</td><td></td><td>204,0402</td><td></td><td>204,0402</td><td></td><td>204,0402</td><td></td><td>204,0402</td><td></td></tr></table>"""
+def _excel(alti=(49.4065, 195.064, 374.7551, 51.3656, 242.49), ustu=(189.5808, 195.064, 374.7551, 51.3656, 242.49)):
+    import openpyxl
+    wb = openpyxl.Workbook()
+    ws = wb.active
+    ws.append([None, "4 Nisan 2026 Tarihinden İtibaren Geçerli Vergiler Hariç Elektrik Tarifeleri"])
+    ws.append(["Mesken", 203.6685, 209.1502, 388.8424, 65.454, 204.0402])        # OG satırı: karışmamalı
+    ws.append([None, "Mesken (8 kWh/gün ve altı)", *alti])
+    ws.append([None, "Mesken (8 kWh/gün üstü)", *ustu])
+    b = io.BytesIO()
+    wb.save(b)
+    return b.getvalue()
+
+
+class _Yanit:
+    def __init__(self, veri): self.veri = veri
+    def raise_for_status(self): pass
+    def json(self): return self.veri
+
+
+class _Oturum:
+    def __init__(self, model): self.model = model
+    def post(self, *a, **k): return _Yanit({"model": self.model})
+
+
+def _kayit(baslik, karar, excel=True):
+    dosyalar = [{"ContentId": "word", "ContentType": 11, "IsFileType": 1}]
+    if excel:
+        dosyalar.append({"ContentId": f"x{karar}", "ContentType": 9, "IsFileType": 2})
+    return {"Title": baslik, "Number": karar, "FastAccessDetail": dosyalar}
 
 
 def test_formul_faturayla_ayni():
@@ -20,28 +42,30 @@ def test_formul_faturayla_ayni():
     assert T.fiyat(1.895808, 2.4249) == 4.857
 
 
-def test_verinokta_okunur():
-    v = T.oku_verinokta(VERINOKTA)
-    assert v == {"e1": 49.4065, "e2": 189.5808, "d": 242.49}
+def test_epdk_excel_okunur():
+    v = T.oku_epdk_excel(_excel())
+    assert v == {"e1": 49.4065, "e2": 189.5808, "gunduz": 195.064, "puant": 374.7551, "gece": 51.3656, "d": 242.49}
+    assert (T.fiyat(v["gunduz"] / 100, 2.4249), T.fiyat(v["puant"] / 100, 2.4249), T.fiyat(v["gece"] / 100, 2.4249)) \
+        == (4.92, 6.996, 3.261)
 
 
-def test_verinokta_bozuksa_hata():
-    for bozuk in ("<table></table>", VERINOKTA.replace("189,5808", "12,0")):
+def test_epdk_excel_bozuksa_hata():
+    for bozuk in (_excel(alti=(49.4, 195.0)),                                  # eksik sütun
+                  _excel(ustu=(12.0, 195.064, 374.7551, 51.3656, 242.49)),     # kademe üstü düşük
+                  _excel(ustu=(189.5808, 195.064, 374.7551, 51.3656, 250.0))):  # dağıtım farklı
         try:
-            T.oku_verinokta(bozuk)
+            T.oku_epdk_excel(bozuk)
             assert False, "hata bekleniyordu"
         except ValueError:
             pass
 
 
-def test_hakedis_ay_sutunu():
-    assert T.oku_hakedis_dagitim(HAKEDIS, date(2026, 10, 5)) == 242.49
-    assert T.oku_hakedis_dagitim(HAKEDIS, date(2026, 11, 5)) == 250.10   # Kasım farklı: çelişki yakalanır
-    try:
-        T.oku_hakedis_dagitim(HAKEDIS, date(2026, 3, 1))                  # bu tabloda Mart yok
-        assert False
-    except ValueError:
-        pass
+def test_epdk_en_yeni_karar_secilir():
+    o = _Oturum([_kayit("5/4/2025'ten itibaren geçerli olacak elektrik tarifeleri tabloları", "13426"),
+                 _kayit("4/4/2026' dan itibaren geçerli olacak elektrik tarifeleri tabloları", "14461"),
+                 _kayit("1/1/2027'den itibaren geçerli ...", "15000", excel=False)])   # Excel'i yok: atlanır
+    k = T.epdk_son_karar(o)
+    assert k["karar"] == "14461" and k["gecerli"] == date(2026, 4, 4) and k["dosya"] == "x14461"
 
 
 def test_sktt_hesabi():
@@ -50,8 +74,7 @@ def test_sktt_hesabi():
                                   {"year": 2026, "month": 10, "unitCostPerMwh": "526.39"}]}   # revize: sonraki geçerli
     s = T.sktt_hesapla(piyasa, 2026, 10, 2.4249)
     assert s["ptf"] == 3.0 and s["yekdem"] == 0.5264
-    enerji = (3.0 + 0.52639) * 1.05
-    assert s["sktt_tl"] == T.fiyat(enerji, 2.4249)
+    assert s["sktt_tl"] == T.fiyat((3.0 + 0.52639) * 1.05, 2.4249)
     try:
         T.sktt_hesapla(piyasa, 2026, 9, 2.4249)      # eylül verisi yok
         assert False

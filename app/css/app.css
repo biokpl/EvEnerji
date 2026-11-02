@@ -44,6 +44,9 @@
 }
 
 * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+/* Dokununca Chrome "Dokunarak Ara" (Google) paneli açılmasın: yazı seçimi kapalı, form alanlarında açık */
+body { -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
+input, textarea, select, [contenteditable] { -webkit-user-select: text; user-select: text; -webkit-touch-callout: default; }
 html, body { margin: 0; padding: 0; }
 body {
   font-family: 'Manrope', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
@@ -485,8 +488,9 @@ select.input { padding-right: 6px; }
 .flow-strip .tg.chg .tg-glow { opacity: .35; }
 .flow-strip .tg.chg .tg-frame { stroke: var(--ev); }
 .flow-strip .tg.chg .tg-v { fill: color-mix(in srgb, var(--ev) 60%, #fff); }
-.hero-sep { height: 1px; margin: 16px 10px 2px; position: relative; z-index: 1;
+.hero-sep { height: 1px; margin: 9px 10px 0; position: relative; z-index: 1;
   background: linear-gradient(90deg, transparent, color-mix(in srgb, var(--text) 14%, transparent) 20%, color-mix(in srgb, var(--text) 14%, transparent) 80%, transparent); }
+.hero-sep + .trio { margin-top: 9px; }
 /* Tahmin notunun ikinci yarısı: küçük, silik, italik */
 .est-note { display: block; margin-top: -2px; line-height: 1.15; font-size: 11px; font-style: italic; color: var(--faint); font-weight: 600; }
 .hero-meta p b.est-val, .est-val { color: color-mix(in srgb, var(--home) 60%, var(--muted)); font-weight: 800; }   /* tahmini dönem: ev rengi */

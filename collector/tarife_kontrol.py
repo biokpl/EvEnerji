@@ -9,8 +9,12 @@ Normal ve üç zamanlı tarife — DOĞRUDAN EPDK'dan (resmi kaynak):
   Karar başlığındaki geçerlilik tarihi gelmeden uygulanmaz. Okunamazsa hiçbir şey değişmez,
   "Tarife değişmiş olabilir, Kontrol et..!!" bildirimi (haftada en fazla bir).
 
-SKTT (aylık):
-  Geçen ayın ortalama PTF'si + o ayın YEKDEM'i (EPİAŞ verisi), enerji = (PTF + YEKDEM) × 1,05.
+SKTT (aylık) — kayıt gerektirmez:
+  PTF: EPİAŞ şeffaflık verisinin herkese açık aynası (jsDelivr). EPİAŞ'ın kendisi hesapsız
+       otomatik erişimi engelliyor (API 401, ana sayfa "Erişim Talebiniz Engellendi").
+  YEKDEM: EPDK Kurul kararıyla Resmî Gazete'de yayımlanan aylık öngörü (settings/yekdem/{yyyy-mm});
+       tabloda olmayan ay için aynadaki değer (EPDK karar numarasıyla) alınır ve bildirilir.
+  enerji = (PTF + YEKDEM) × 1,05
 
 Faturaya esas fiyat (kullanıcının faturasıyla doğrulandı: 3,238 / 4,857 ₺):
   fiyat = (enerji + dağıtım + enerji × %5 BTV) × 1,10 (KDV)
@@ -93,21 +97,22 @@ def oku_epdk_excel(icerik: bytes) -> dict:
     return v
 
 
-def sktt_hesapla(piyasa: dict, yil: int, ay: int, dagitim_tl: float) -> dict:
-    """Verilen ayın ortalama PTF'si ve YEKDEM'inden SKTT (vergiler dahil, ₺/kWh)."""
-    ym = f"{yil}-{ay:02d}"
-    ptf = [float(p["price"]) for s in piyasa.get("priceSeries", []) for p in s.get("points", [])
-           if str(p.get("date", "")).startswith(ym)]
-    yk = [float(x["unitCostPerMwh"]) for x in piyasa.get("yekdemUnitCosts", [])
-          if int(x.get("year", 0)) == yil and int(x.get("month", 0)) == ay]
-    if len(ptf) < 20 or not yk:
-        raise ValueError(f"{ym} için piyasa verisi eksik (PTF {len(ptf)} gün, YEKDEM {len(yk)})")
-    ptf_ort = statistics.mean(ptf)
-    if not (0.3 < ptf_ort < 20):
-        raise ValueError(f"PTF olağan dışı: {ptf_ort}")
-    enerji = (ptf_ort + yk[-1] / 1000) * SKTT_KATSAYI    # aynı ay revize edildiyse sonraki geçerli
-    return {"ay": ym, "ptf": round(ptf_ort, 4), "yekdem": round(yk[-1] / 1000, 4),
-            "sktt_tl": fiyat(enerji, dagitim_tl)}
+def ayna_ptf(piyasa: dict, ym: str) -> dict[str, float]:
+    """Aynadaki (EPİAŞ kopyası) günlük PTF'ler: {'YYYY-AA-GG': ₺/kWh}."""
+    return {p["date"]: float(p["price"]) for s in piyasa.get("priceSeries", []) for p in s.get("points", [])
+            if str(p.get("date", "")).startswith(ym)}
+
+
+def sktt_hesapla(ptf_gun: dict[str, float], gun_sayisi: int, yekdem_tl_mwh: float, dagitim_tl: float, ym: str) -> dict:
+    """Bir ayın günlük PTF'leri ve YEKDEM öngörüsünden SKTT (vergiler dahil, ₺/kWh)."""
+    if len(ptf_gun) < min(20, gun_sayisi):
+        raise ValueError(f"{ym} için PTF eksik ({len(ptf_gun)}/{gun_sayisi} gün)")
+    ptf_ort = statistics.mean(ptf_gun.values())
+    if not (0.3 < ptf_ort < 20 and 0 <= yekdem_tl_mwh < 5000):
+        raise ValueError(f"olağan dışı: PTF {ptf_ort}, YEKDEM {yekdem_tl_mwh}")
+    enerji = (ptf_ort + yekdem_tl_mwh / 1000) * SKTT_KATSAYI
+    return {"ay": ym, "ptf": round(ptf_ort, 4), "yekdem": round(yekdem_tl_mwh / 1000, 4),
+            "gun": len(ptf_gun), "sktt_tl": fiyat(enerji, dagitim_tl)}
 
 
 def tl(x: float) -> str:
@@ -183,20 +188,34 @@ class Kontrol:
                                         "kontrol": bugun.isoformat()}
         except Exception as e:
             self.uyar(f"EPDK tarife tablosu: {e}")
-        # 2) SKTT: geçen ayın piyasa verisiyle, ayda bir
-        gecen = (bugun.year - (bugun.month == 1), 12 if bugun.month == 1 else bugun.month - 1)
-        gecen_ym = f"{gecen[0]}-{gecen[1]:02d}"
+        # 2) SKTT: geçen ay için, ayda bir
+        gy, ga = (bugun.year - 1, 12) if bugun.month == 1 else (bugun.year, bugun.month - 1)
+        gecen_ym = f"{gy}-{ga:02d}"
         if self.durum.get("sktt_ay") != gecen_ym:
             try:
+                import calendar
+                gun_sayisi = calendar.monthrange(gy, ga)[1]
                 if dagitim_tl is None:
                     dagitim_tl = (self.durum.get("tarife") or {}).get("d", 242.49) / 100
                 piyasa = requests.get(PIYASA, timeout=25).json()
-                uretim = datetime.fromisoformat(piyasa["generatedAt"].replace("Z", "+00:00")).timestamp()
-                if time.time() - uretim > 10 * 86400:
-                    raise ValueError("piyasa verisi 10 günden eski")
-                s = sktt_hesapla(piyasa, gecen[0], gecen[1], dagitim_tl)
+                gunler = ayna_ptf(piyasa, gecen_ym)
+                # YEKDEM: Resmî Gazete'deki EPDK öngörüsü; yoksa aynadan (karar numarasıyla) ekle
+                yk = (self.fb.get(f"settings/yekdem/{gecen_ym}") or {})
+                if not yk:
+                    adaylar = [x for x in piyasa.get("yekdemUnitCosts", [])
+                               if int(x.get("year", 0)) == gy and int(x.get("month", 0)) == ga]
+                    if not adaylar:
+                        raise ValueError(f"{gecen_ym} için YEKDEM öngörüsü bulunamadı")
+                    yk = {"tl_mwh": float(adaylar[-1]["unitCostPerMwh"]), "kaynak": adaylar[-1].get("source", "")}
+                    self.yaz(f"settings/yekdem/{gecen_ym}", yk)
+                    self.bildir("YEKDEM öngörüsü eklendi",
+                                f"{gecen_ym}: {yk['tl_mwh']:.2f} TL/MWh — {yk['kaynak'] or 'kaynak belirtilmemiş'}",
+                                tags="memo", priority=2)
+                s = sktt_hesapla(gunler, gun_sayisi, float(yk["tl_mwh"]), dagitim_tl, gecen_ym)
+                s["yekdem_kaynak"] = yk.get("kaynak", "")
                 eski = float(tarife.get("sktt_tl") or 0)
-                print(f"SKTT {s['ay']}: PTF {s['ptf']} + YEKDEM {s['yekdem']} → {s['sktt_tl']} (eski {eski})")
+                print(f"SKTT {gecen_ym}: PTF {s['ptf']} ({s['gun']} gün)"
+                      f" + YEKDEM {s['yekdem']} → {s['sktt_tl']} (eski {eski})")
                 if abs(s["sktt_tl"] - eski) > 0.005:
                     self.yaz(f"settings/tariff/{y}", {"sktt_tl": s["sktt_tl"]})
                     self.bildir("Son kaynak fiyatı güncellendi",

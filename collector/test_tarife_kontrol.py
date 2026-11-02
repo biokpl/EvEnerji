@@ -69,17 +69,22 @@ def test_epdk_en_yeni_karar_secilir():
 
 
 def test_sktt_hesabi():
-    piyasa = {"priceSeries": [{"points": [{"date": f"2026-10-{g:02d}", "price": "3.0"} for g in range(1, 32)]}],
-              "yekdemUnitCosts": [{"year": 2026, "month": 10, "unitCostPerMwh": "500"},
-                                  {"year": 2026, "month": 10, "unitCostPerMwh": "526.39"}]}   # revize: sonraki geçerli
-    s = T.sktt_hesapla(piyasa, 2026, 10, 2.4249)
-    assert s["ptf"] == 3.0 and s["yekdem"] == 0.5264
+    gunler = {f"2026-10-{g:02d}": 3.0 for g in range(1, 32)}
+    s = T.sktt_hesapla(gunler, 31, 526.39, 2.4249, "2026-10")
+    assert s["ptf"] == 3.0 and s["yekdem"] == 0.5264 and s["gun"] == 31
     assert s["sktt_tl"] == T.fiyat((3.0 + 0.52639) * 1.05, 2.4249)
     try:
-        T.sktt_hesapla(piyasa, 2026, 9, 2.4249)      # eylül verisi yok
+        T.sktt_hesapla({"2026-10-01": 3.0}, 31, 526.39, 2.4249, "2026-10")   # çok eksik gün
         assert False
     except ValueError:
         pass
+
+
+def test_ayna_ptf_ay_suzulur():
+    piyasa = {"priceSeries": [{"points": [{"date": "2026-09-30", "price": "9.0"}] +
+                               [{"date": f"2026-10-{g:02d}", "price": "2.0"} for g in range(1, 32)]}]}
+    g = T.ayna_ptf(piyasa, "2026-10")
+    assert len(g) == 31 and set(g.values()) == {2.0}
 
 
 if __name__ == "__main__":

@@ -83,6 +83,9 @@ Geri almak: dosyaları sil, `sudo systemctl disable --now ag-bekcisi.timer && su
 
 `collector/tarife_kontrol.py`, `tarife-kontrol.timer` ile her sabah ~09:30 çalışır.
 - Normal ve üç zamanlı tarife: DOĞRUDAN EPDK. Sitenin kendi veri adresi `POST /Detay/GetFastAccessList {fId:1327}` en yeni kurul kararını, `/Detay/DownloadDocument?id=…` resmi Excel tablosunu verir; "Mesken (8 kWh/gün ve altı/üstü)" satırları okunur. Kararın geçerlilik tarihi gelmeden uygulanmaz. Fiyat = (enerji + dağıtım + enerji×%5 BTV) × 1,10 (faturayla doğrulandı: 3,238 / 4,857; üç zamanlı 4,92 / 7,00 / 3,26).
-- SKTT: EPİAŞ verisinin herkese açık aynası (jsDelivr: 06maslan27/fatura-dedektifi-veri) — geçen ayın ortalama PTF + YEKDEM, × 1,05.
+- SKTT (ayda bir, kayıt gerektirmez): enerji = (geçen ayın ortalama PTF + YEKDEM) × 1,05.
+  - YEKDEM: resmi EPDK öngörüsü (Kurul Kararı 14718, RG 33300, 04.07.2026) Firebase `settings/yekdem/{yyyy-aa}` içinde; tabloda olmayan ay için aynadaki değer (karar numarasıyla) eklenir ve bildirim gelir. Yeni RG öngörüsü çıkınca bu tablo güncellenebilir.
+  - PTF: EPİAŞ şeffaflık verisinin herkese açık aynası (jsDelivr: 06maslan27/fatura-dedektifi-veri). EPİAŞ'ın kendi API'si hesap istiyor (401), ana sitesi otomatik erişimi engelliyor.
+- Pi'ye dosya yazılmaz: EPDK Excel'i bellekte okunur (openpyxl + BytesIO), diskte kalmaz.
 - Değişince `settings/tariff/{yıl}` güncellenir ve ntfy bildirimi gider ("Elektrik Tarifesine Zam Geldi..!!"). Okunamaz ya da değerler olağan dışıysa hiçbir şey değişmez, haftada en fazla bir "Tarife değişmiş olabilir, Kontrol et..!!" bildirimi.
 - Durum: Firebase `settings/tarife_oto`. Elle deneme: `python tarife_kontrol.py --kuru`. Kayıt: `journalctl -u tarife-kontrol`.

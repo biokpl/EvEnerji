@@ -204,6 +204,7 @@ button, input, select, textarea { font: inherit; color: inherit; }
 .batt svg { width: 38px; height: 38px; }
 .charge .t { font-size: 13px; color: var(--muted); font-weight: 700; }
 .charge .v { font-size: 22px; font-weight: 800; letter-spacing: -0.02em; margin: 2px 0; font-variant-numeric: tabular-nums; }
+.charge .s .nw { white-space: nowrap; }   /* "Bu şarjda +%7" gibi parçalar bölünmesin */
 .charge .s { font-size: 12px; color: var(--muted); font-weight: 600; font-variant-numeric: tabular-nums; }   /* rakamlar sabit genişlik: değer değişince satır kaymasın */
 .progress { height: 8px; border-radius: 9px; background: var(--card-hi); overflow: hidden; margin-top: 12px; }
 .progress i { display: block; height: 100%; border-radius: 9px; background: linear-gradient(90deg, var(--accent2), var(--ev)); transition: width .8s; }

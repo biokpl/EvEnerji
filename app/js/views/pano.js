@@ -164,7 +164,7 @@ export function chargeCard(M) {
   const s = M.activeSession;
   if (!s) return '';
   const min = (Date.now() / 1000 - s.start) / 60;
-  const km = s.km ? ` · +${num(s.km)} km` : '';
+  const km = s.km ? ` · <span class="nw">+${num(s.km)} km</span>` : '';
   const known = s.socNow != null;
   // Yüzde biliniyorsa: tahmini şarj durumu ve hedefe kalan süre; bilinmiyorsa girme düğmesi
   const socLine = known
@@ -185,7 +185,7 @@ export function chargeCard(M) {
       <div>
         <div class="t"><span class="pulse" style="display:inline-block;margin-right:6px"></span>Şarj Ediliyor · ${esc(s.dev.name)}</div>
         <div class="v">${kwh(s.kwh, 2)} · ${tl(s.kwh * M.priceNow)}</div>
-        <div class="s">${wattFine(M.evW)} · ${dur(min)} · Bu şarjda +${pct(s.added)}${km}</div>
+        <div class="s"><span class="nw">${wattFine(M.evW)}</span> · <span class="nw">${dur(min)}</span> · <span class="nw">Bu şarjda +${pct(s.added)}</span>${km}</div>
       </div>
     </div>
     ${socLine}

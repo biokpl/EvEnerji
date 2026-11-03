@@ -595,11 +595,10 @@ input.num, input[data-m] { caret-color: transparent; cursor: pointer; }
 .pi-btn { --c: var(--mid); background: color-mix(in srgb, var(--c) 12%, var(--card-hi)); border: 1px solid color-mix(in srgb, var(--c) 38%, transparent);
   color: color-mix(in srgb, var(--c) 80%, var(--text)); transition: background .2s, color .2s, box-shadow .2s; }
 .pi-btn.off { --c: var(--bad); }
-.pi-btn svg { width: 18px; height: 18px; }
+.pi-btn svg { width: 16px; height: 16px; flex: none; }
 .pi-btn.onay { background: var(--c); color: #fff; border-color: var(--c); box-shadow: 0 6px 18px color-mix(in srgb, var(--c) 40%, transparent); }
-.pi-btn { padding: 12px 10px; font-size: 13.5px; white-space: nowrap; }
+.pi-btn { padding: 0 8px; gap: 6px; font-size: 13px; white-space: nowrap; }
 .pi-btn span { line-height: 1.15; overflow: hidden; text-overflow: ellipsis; }
 .pi-card .btn-row { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
 .pi-btn { min-width: 0; }
-.pi-btn.onay { font-size: 12.5px; white-space: normal; }
-.pi-btn.onay span { text-align: left; }
+.pi-btn { height: 46px; }   /* onayda yazı değişse de boyut sabit */

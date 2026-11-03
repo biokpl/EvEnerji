@@ -174,7 +174,7 @@ export function renderAyarlar(el, M, app) {
       if (Date.now() - onay > 4000) {
         onay = Date.now();
         b.classList.add('onay');
-        b.innerHTML = `${icon(b.dataset.pi === 'kapat' ? 'power' : 'refresh')}<span>Emin misin? Tekrar dokun</span>`;
+        b.innerHTML = `${icon(b.dataset.pi === 'kapat' ? 'power' : 'refresh')}<span>Tekrar dokun</span>`;
         setTimeout(() => { if (b.isConnected && Date.now() - onay >= 4000) { b.innerHTML = ilk; b.classList.remove('onay'); } }, 4100);
         return;
       }

@@ -165,7 +165,7 @@ export function renderTogg(el, M, app) {
       <div class="trio">
         <div><b>${yak}${num(M.per100Duvar, 1)}</b><span>kWh/100 km</span><small class="tri-not">Çekilen Elektrik</small></div>
         <div><b>${yak}${num(tlPer100, 0)}</b><span>₺/100 km</span><small class="tri-not">Masraf · ${num(tlPer100 / 100, 2)} ₺/km</small></div>
-        <div><b>${num(M.evProj)}</b><span>Yıl Sonu kWh</span><small class="tri-not">Beklenen Toplam</small></div>
+        <div><b>≈ ${num(M.evProj)}</b><span>Yıl Sonu kWh</span><small class="tri-not">Beklenen Toplam</small></div>
       </div>
     </div>
     <div data-slot="charge">${chargeCard(M)}</div>

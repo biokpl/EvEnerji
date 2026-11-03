@@ -206,7 +206,10 @@ export function build(raw) {
   // Eklenen menzil: km girişlerinden öğrenilen duvar kWh/100 km varsa o; yoksa aracın menzil
   // Ayarlar'daki araç tüketimi (Trumore ortalaması; 2026-11: 3108 km'de 19 kWh/100 km)
   const bataryaTuketim = Number(car.tuketim_kwh_100) || 19;
-  const kmOf = (duvarKwh) => (per100 ? (duvarKwh / per100) * 100 : ((duvarKwh * car.eff) / bataryaTuketim) * 100);
+  // Prizden çekilen kWh/100 km: km girişlerinden öğrenilen; yoksa araç tüketimi ÷ şarj verimi (19 / 0,87 ≈ 21,8)
+  const per100Duvar = per100 ?? bataryaTuketim / car.eff;
+  const per100Tahmini = !per100;
+  const kmOf = (duvarKwh) => (duvarKwh / per100Duvar) * 100;
   const socAdd = (kwhWall) => (kwhWall * car.eff) / cap * 100;
   const hedef = Number(car.hedef_yuzde) || 100;
   for (const s of sessions) {
@@ -268,7 +271,7 @@ export function build(raw) {
   return {
     raw, now, y, mi, today, S, t, tNext, durum, projDurum, devices, enabled, home, evs, plugs, winderDev,
     homeMonths, projMonths, evMonths, evTlByMonth, ytd, ytdEst, rate, son30, proj, butce, evYtd, evShare, evProj, evTl, evAvgTl, noEvProj,
-    exceedDate, level, levelText, scenarios, nextYear, kademeAylari, sessions, per100, activeSession, covEnd, start, holeStart, holeEnd, estTotal, estMonths, nowDurum,
+    exceedDate, level, levelText, scenarios, nextYear, kademeAylari, sessions, per100, per100Duvar, per100Tahmini, activeSession, covEnd, start, holeStart, holeEnd, estTotal, estMonths, nowDurum,
     priceNow: birimFiyat(t, projDurum, mi + 1),
     monthTl: projDurum.aylikTl[mi], monthKwh: projMonths[mi],
     homeW: home?.live?.w ?? null,

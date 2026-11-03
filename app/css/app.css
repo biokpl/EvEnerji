@@ -169,6 +169,7 @@ button, input, select, textarea { font: inherit; color: inherit; }
 .trio b { display: block; font-size: 16.5px; font-weight: 800; font-variant-numeric: tabular-nums; }
 .trio span { display: block; margin-top: 1px; font-size: 11px; color: var(--muted); font-weight: 600; line-height: 1.15; }
 .trio b small { font-size: 11px; color: var(--muted); font-weight: 700; }
+.trio .tri-not { display: block; margin-top: 3px; font-size: 10px; line-height: 1.2; color: var(--faint); font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .trio b span { display: inline; margin: 0; font: inherit; color: inherit; line-height: inherit; }
 
 /* Canlı kutucuklar */

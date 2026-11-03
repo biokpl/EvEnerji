@@ -147,7 +147,8 @@ export function renderTogg(el, M, app) {
   const n = yearSess.length;
   const avg = n ? yearSess.reduce((a, s) => a + (s.kwh || 0), 0) / n : 0;
   const histNote = M.histTotal > 0 ? `<div class="muted" style="font-size:11.5px;font-weight:600;margin-top:2px">${num(M.histTotal, 1)} kWh ${esc(M.history.source || 'önceki')} geçmişi dahil</div>` : '';
-  const tlPer100 = M.per100 ? (M.per100 * M.priceNow) : null;
+  const tlPer100 = M.per100Duvar * M.priceNow;   // prizden çekilen enerjinin güncel birim fiyatla bedeli
+  const yak = M.per100Tahmini ? '≈ ' : '';
   const skttCost = M.evYtd * M.t.sktt_tl;
   const list = showAll ? M.sessions : M.sessions.slice(0, 8);
   el.innerHTML = `
@@ -162,9 +163,9 @@ export function renderTogg(el, M, app) {
         <i style="width:${M.evShare * 100}%;background:var(--ev)"></i><i style="flex:1;background:var(--home)"></i></div>
       <div class="legend" style="position:relative;z-index:1"><span><i style="background:var(--ev)"></i>Togg ${pct(M.evShare * 100)}</span><span><i style="background:var(--home)"></i>Evin geri kalanı</span></div>
       <div class="trio">
-        <div><b>${M.per100 ? num(M.per100, 1) : '–'}</b><span>kWh/100 km</span></div>
-        <div><b>${tlPer100 ? num(tlPer100, 2) : '–'}</b><span>₺/100 km</span></div>
-        <div><b>${num(M.evProj)}</b><span>yıl sonu kWh</span></div>
+        <div><b>${yak}${num(M.per100Duvar, 1)}</b><span>kWh/100 km</span><small class="tri-not">Çekilen Elektrik</small></div>
+        <div><b>${yak}${num(tlPer100, 0)}</b><span>₺/100 km</span><small class="tri-not">Masraf</small></div>
+        <div><b>${num(M.evProj)}</b><span>Yıl Sonu kWh</span><small class="tri-not">Beklenen Toplam</small></div>
       </div>
     </div>
     <div data-slot="charge">${chargeCard(M)}</div>

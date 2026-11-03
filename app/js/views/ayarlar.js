@@ -12,6 +12,11 @@ const n = (v) => {
 };
 const f = (v) => (v == null ? '' : String(v));
 
+const piSinyal = (ts) => {
+  const sn = Math.max(0, Date.now() / 1000 - ts);
+  return sn < 90 ? 'az önce (çalışıyor)' : sn < 3600 ? `${Math.round(sn / 60)} dk önce` : `${Math.round(sn / 3600)} saat önce`;
+};
+
 export function renderAyarlar(el, M, app) {
   const yr = yearSel ?? M.y;
   const T = M.S.tariff?.[yr] || {};
@@ -81,6 +86,15 @@ export function renderAyarlar(el, M, app) {
     </div>
 
     <div class="card">
+      <h2>Raspberry Pi</h2>
+      <p class="hint">Pi 3'te açma/kapama düğmesi yok. Fişini çekmeden önce buradan <b>güvenli kapat</b>: kayıtlar diske yazılır, SD kart korunur. Işığı sönünce fişi çekebilirsin; fişi geri takınca kendiliğinden açılır.${M.raw.status?.ts ? ` Son sinyal: <b>${piSinyal(M.raw.status.ts)}</b>.` : ''}</p>
+      <div class="btn-row" style="margin-top:10px">
+        <button class="btn ghost" data-pi="yeniden">${icon('refresh')}Yeniden başlat</button>
+        <button class="btn ghost" data-pi="kapat">${icon('power')}Güvenli kapat</button>
+      </div>
+    </div>
+
+    <div class="card">
       <h2>Uygulama</h2>
       <div class="field"><div><label>Tema</label></div><div class="seg" id="th">${[['dark', 'Koyu'], ['light', 'Açık']].map(([k, t]) => `<button data-t="${k}" class="${document.documentElement.dataset.theme === k ? 'on' : ''}">${t}</button>`).join('')}</div></div>
       <div class="field"><div><label>Demo veri</label><small>Gerçek veri yerine örnek veriyle göster.</small></div><button class="switch ${st.forcedDemo ? 'on' : ''}" id="demo"></button></div>
@@ -144,6 +158,26 @@ export function renderAyarlar(el, M, app) {
     try { await st.patch('devices', { [`${sel.dataset.wt}/bitti_dk`]: Number(sel.value), [`${sel.dataset.wt}/bitti_dk_oto`]: null }); toast(`Bekleme ${sel.value} dk`); }
     catch { toast('Kaydedilemedi'); }
   }));
+  // Pi komutları: yanlışlıkla basılmasın diye iki dokunuş (ilki onay ister)
+  el.querySelectorAll('[data-pi]').forEach((b) => {
+    const ilk = b.innerHTML;
+    let onay = 0;
+    b.addEventListener('click', async () => {
+      if (Date.now() - onay > 4000) {
+        onay = Date.now();
+        b.textContent = 'Emin misin? Tekrar dokun';
+        setTimeout(() => { if (b.isConnected && Date.now() - onay >= 4000) b.innerHTML = ilk; }, 4100);
+        return;
+      }
+      onay = 0; b.disabled = true; b.innerHTML = ilk;
+      try {
+        const r = await st.command('pi', b.dataset.pi);
+        toast(r.msg || (r.ok ? 'Gönderildi' : 'Başarısız'), 4500);
+        if (r.needKey) $('#key')?.focus();
+      } catch { toast('Komut gönderilemedi'); }
+      b.disabled = false;
+    });
+  });
   $('#saveK').onclick = () => { const k = $('#key').value.trim(); if (!k) return toast('Anahtar boş'); st.setKey(k); toast('Anahtar bu telefona kaydedildi'); app.refresh(); };
   $('#th').onclick = (e) => { const b = e.target.closest('[data-t]'); if (b) app.setTheme(b.dataset.t); };
   $('#demo').onclick = () => st.setForcedDemo(!st.forcedDemo);

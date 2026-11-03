@@ -27,7 +27,9 @@ import json
 import logging
 import os
 import signal
+import subprocess
 import sys
+import threading
 import time
 from concurrent.futures import ThreadPoolExecutor
 from datetime import date, datetime, timedelta
@@ -53,16 +55,34 @@ WINDER_BLOCKS_CHARGE = {"sarili", "sariyor", "aciliyor", "hata"}
 
 
 def load_json(p: Path, default):
-    try:
-        return json.loads(p.read_text(encoding="utf-8"))
-    except FileNotFoundError:
-        return default
+    """Dosya bozuksa (ör. elektrik kesilirken yazılıyordu) bir önceki sağlam kopyası (.bak) okunur."""
+    for q in (p, p.with_name(p.name + ".bak")):
+        try:
+            return json.loads(q.read_text(encoding="utf-8"))
+        except FileNotFoundError:
+            continue
+        except (ValueError, UnicodeDecodeError) as e:
+            logging.getLogger("collector").warning("%s bozuk (%s); yedeği deneniyor", q.name, e)
+    return default
 
 
 def save_json(p: Path, data) -> None:
+    """Elektrik kesintisine dayanıklı yazma: önce geçici dosya diske tam yazılır (fsync),
+    eski sağlam kopya .bak olarak saklanır, sonra yerine konur."""
     tmp = p.with_suffix(".tmp")
-    tmp.write_text(json.dumps(data, ensure_ascii=False), encoding="utf-8")
+    with open(tmp, "w", encoding="utf-8") as f:
+        f.write(json.dumps(data, ensure_ascii=False))
+        f.flush()
+        os.fsync(f.fileno())
+    if p.exists():
+        os.replace(p, p.with_name(p.name + ".bak"))
     os.replace(tmp, p)
+    if hasattr(os, "O_DIRECTORY"):
+        fd = os.open(p.parent, os.O_RDONLY | os.O_DIRECTORY)
+        try:
+            os.fsync(fd)
+        finally:
+            os.close(fd)
 
 
 def fmt_tl(x: float) -> str:
@@ -121,6 +141,18 @@ class Collector:
         self.t_flush = self.t_meta = self.t_cmd = self.t_disc = 0.0
         self.running = True
 
+    def restore_meter(self, did: str):
+        """Pi hafızasında (state.json) bu cihaz yoksa — yeni cihaz ya da hafıza kaybolmuş — bu ayın ve
+        geçen ayın günlük toplamlarını Firebase'den geri yükler. Yoksa ay toplamı sıfırdan hesaplanıp
+        Firebase'deki doğru değerin üstüne yazılırdı."""
+        eski = self.fb.get(f"days/{did}") or {}
+        bu = date.today()
+        aylar = {bu.strftime("%Y-%m"), (bu.replace(day=1) - timedelta(days=1)).strftime("%Y-%m")}
+        gunler = {k: float(v) for k, v in eski.items() if k[:7] in aylar and isinstance(v, (int, float))}
+        self.state["meters"][did] = {"last_ts": None, "last_w": None, "hours": {}, "days": gunler}
+        if gunler:
+            log.warning("%s: Pi hafızasında yoktu; %d günlük toplam Firebase'den geri yüklendi", did, len(gunler))
+
     def save_cfg(self):
         tmp = CFG_FILE.with_suffix(".tmp")
         tmp.write_text(json.dumps(self.cfg, ensure_ascii=False, indent=2), encoding="utf-8")
@@ -160,6 +192,8 @@ class Collector:
                 log.warning("%s için devices_local.json kaydı yok (discover.py çalıştır)", did)
                 continue
             try:
+                if did not in self.state["meters"]:
+                    self.restore_meter(did)       # ağ hatasında istisna: cihaz 1 dk sonra yeniden denenir
                 self.providers[did] = make_provider(did, local[did], self.cfg, self.shared)
                 self.meters[did] = DeviceMeter(did, self.state["meters"], self.poll)
                 if m.get("type") == "ev_sarj":
@@ -216,6 +250,11 @@ class Collector:
                 if prev and now - self.live_ts.get(did, 0) < 60:
                     w = prev.w
             added = self.meters[did].add(now, w)
+            g = self.meters[did].last_gap
+            if g:
+                self.meters[did].last_gap = None
+                log.info("%s: %d dk ölçüm yok (Pi/modem kesintisi); %s doldurma %.3f kWh", did,
+                         (g["bit"] - g["bas"]) / 60, g["tur"], g["kwh"])
             if r.ok:
                 self.live[did] = r
                 self.live_ts[did] = now
@@ -414,6 +453,16 @@ class Collector:
             self.fb.safe(self.fb.delete, f"commands/{key}")
 
     def execute(self, did: str, action: str) -> dict:
+        if did == "pi":
+            # Güvenli kapatma / yeniden başlatma (Pi 3'te düğme yok; fişi çekmek SD kartı bozabilir)
+            if action not in ("kapat", "yeniden"):
+                return {"msg": "Geçersiz Pi komutu"}
+            self.flush()
+            komut = ["sudo", "-n", "systemctl", "poweroff" if action == "kapat" else "reboot"]
+            threading.Timer(4, lambda: subprocess.run(komut, check=False)).start()   # önce yanıt yazılsın
+            log.warning("Pi %s komutu alındı", "kapatma" if action == "kapat" else "yeniden başlatma")
+            return {"ok": True, "msg": "Pi kapanıyor; ışığı sönünce fişi çekebilirsin" if action == "kapat"
+                    else "Pi yeniden başlıyor (~1 dk)"}
         if did == "sarici":
             if action not in ("sar", "ac", "dur", "kalibre"):
                 return {"msg": "Geçersiz sarıcı komutu"}

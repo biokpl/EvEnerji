@@ -22,12 +22,40 @@ def test_kisa_kopukluk_surekli_sayilir():
     assert abs(st["p"]["days"]["2026-10-30"] - 1000 * 300 / 3.6e6) < 1e-9
 
 
-def test_uzun_kopukluk_tek_aralik():
+def test_uzun_kopuklukta_sarj_ortalamayla_dolar():
     st = {}
     m = DeviceMeter("p", st, 10)
-    m.add(T0, 1000.0)
-    m.add(T0 + 3600, 1000.0)       # 1 saat veri yok -> yalnız 10 sn sayılır
-    assert abs(st["p"]["days"]["2026-10-30"] - 1000 * 10 / 3.6e6) < 1e-9
+    m.add(T0, 1850.0)
+    m.add(T0 + 1800, 1800.0)       # 30 dk veri yok, araç sabit çekiyor -> ortalama güç
+    assert abs(st["p"]["days"]["2026-10-30"] - 1825 * 1800 / 3.6e6) < 1e-9
+    assert st["p"]["est"] > 0 and m.last_gap["tur"] == "sabit"
+
+
+def test_uzun_kopuklukta_degisken_yuk_kucuk_gucle_dolar():
+    st = {}
+    m = DeviceMeter("p", st, 10)
+    m.add(T0, 80.0)
+    m.add(T0 + 3600, 2000.0)       # önce taban yük, sonra yüksek: yalnız küçük güç sayılır
+    assert abs(st["p"]["days"]["2026-10-30"] - 80 * 3600 / 3.6e6) < 1e-9
+    assert m.last_gap["tur"] == "taban"
+
+
+def test_cok_uzun_kopukluk_doldurulmaz():
+    st = {}
+    m = DeviceMeter("p", st, 10)
+    m.add(T0, 500.0)
+    m.add(T0 + 13 * 3600, 500.0)
+    assert st["p"]["days"].get("2026-10-30", 0) == 0 and st["p"]["days"].get("2026-10-31", 0) == 0
+
+
+def test_kopukluk_saatlere_dagitilir():
+    st = {}
+    m = DeviceMeter("p", st, 10)
+    t = datetime(2026, 10, 30, 19, 30, 0).timestamp()
+    m.add(t, 2000.0)
+    m.add(t + 3600, 2000.0)        # 19:30–20:30 -> yarısı 19'a, yarısı 20'ye
+    h = st["p"]["hours"]["2026-10-30"]
+    assert abs(h[19] - 1.0) < 1e-9 and abs(h[20] - 1.0) < 1e-9
 
 
 def test_saat_dizisi_ve_gun_gecisi():

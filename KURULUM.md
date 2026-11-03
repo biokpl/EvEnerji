@@ -89,3 +89,17 @@ Geri almak: dosyaları sil, `sudo systemctl disable --now ag-bekcisi.timer && su
 - Pi'ye dosya yazılmaz: EPDK Excel'i bellekte okunur (openpyxl + BytesIO), diskte kalmaz.
 - Değişince `settings/tariff/{yıl}` güncellenir ve ntfy bildirimi gider ("Elektrik Tarifesine Zam Geldi..!!"). Okunamaz ya da değerler olağan dışıysa hiçbir şey değişmez, haftada en fazla bir "Tarife değişmiş olabilir, Kontrol et..!!" bildirimi.
 - Durum: Firebase `settings/tarife_oto`. Elle deneme: `python tarife_kontrol.py --kuru`. Kayıt: `journalctl -u tarife-kontrol`.
+
+## Kesintiye dayanıklılık (2026-11-03)
+
+- Pi ya da modem kapanınca prizler çalışmaya devam eder, Pi ölçemez. Pi geri gelince boşluk doldurulur (meter.py):
+  10 dk'ya kadar ortalama güç; 10 dk–3 sa arası güç önce/sonra sabit ve yüksekse (araç şarjı) ortalama güç;
+  diğer durumlarda 12 saate kadar iki güçten küçüğü (temkinli). Doldurulan miktar günlükte ("doldurma") ve
+  state.json'da meters/<id>/est altında görünür. Şalterin ve prizlerin yerelde okunabilen toplam enerji sayacı
+  yok; prizin Tuya bulut kayıtları da modem kapalıyken eksik kalıyor, bu yüzden tahmin en iyi yol.
+- state.json elektrik kesintisine dayanıklı yazılır (fsync + state.json.bak); bozuksa yedekten açılır.
+  Pi hafızasında olmayan cihazın bu ve geçen ayki günleri Firebase'den geri yüklenir (ay toplamı ezilmez).
+- Güvenli kapatma: Uygulama > Ayarlar > Raspberry Pi (imzalı komut "pi/kapat|yeniden" → sudo systemctl
+  poweroff/reboot). Pi 3'te düğme yok; fişi çekmeden önce bunu kullan.
+- Güç: vcgencmd get_throttled 0x50000 gördü (düşük voltaj + yavaşlatma). Resmi 5,1 V 2,5 A adaptör önerilir;
+  modemin USB'si yetmez (0,5–1 A) ve modem her yeniden başladığında Pi'yi de ani kapatır.

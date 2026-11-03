@@ -1,13 +1,24 @@
 """Enerji biriktirme ve şarj oturumu algılama (saf mantık, test edilebilir).
 
-Enerji = güç x süre (iki ölçüm arasında yamuk kuralı). Kısa kopukluklarda
-(<10 dk) güç sürekli varsayılır; daha uzunsa yalnız bir ölçüm aralığı sayılır.
+Enerji = güç x süre (iki ölçüm arasında yamuk kuralı).
+
+Kopukluk (Pi kapalı, modem/Wi-Fi yok) — prizler bu sırada çalışmaya devam eder:
+  - 10 dk'ya kadar: öncesi ve sonrası güçlerin ortalaması sürmüş sayılır.
+  - 10 dk – 3 saat, güç önce ve sonra "sabit ve yüksek" ise (araç şarjı gibi: ikisi de
+    >= 300 W ve birbirine %25 yakın): ortalama güçle doldurulur.
+  - Diğer durumlarda 12 saate kadar: iki güçten KÜÇÜĞÜ sürmüş sayılır (temkinli alt sınır;
+    ör. ev taban yükü). Daha uzun boşluk doldurulmaz.
+  Doldurulan enerji kesintinin denk geldiği saatlere dağıtılır ve "est" altında toplanır.
 """
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import datetime, timedelta
 
-GAP_MAX_S = 600
+GAP_MAX_S = 600              # bu kadarına kadar ortalama güç (eski davranış)
+GAP_STEADY_MAX_S = 3 * 3600  # sabit yüksek güçte (şarj) ortalamayla doldurma sınırı
+GAP_BASE_MAX_S = 12 * 3600   # küçük güçle temkinli doldurma sınırı
+GAP_STEADY_W = 300
+GAP_STEADY_RATIO = 0.75
 
 # Şarj oturumu eşikleri (Mennekes 10 A ≈ 2,2 kW)
 SESSION_START_W = 300
@@ -29,21 +40,43 @@ class DeviceMeter:
         self.st = state.setdefault(dev_id, {"last_ts": None, "last_w": None,
                                             "hours": {}, "days": {}})
         self.poll_s = poll_s
+        self.last_gap: dict | None = None      # son doldurulan kesinti (günlüğe yazmak için)
 
     def add(self, ts: float, w: float | None) -> float:
         """Ölçüm ekler, bu aralıkta biriken kWh'yi döndürür."""
         st = self.st
         added = 0.0
         if w is not None and st["last_ts"] is not None and st["last_w"] is not None:
-            dt = ts - st["last_ts"]
-            if 0 < dt:
-                if dt > GAP_MAX_S:
-                    dt = self.poll_s
-                added = (st["last_w"] + w) / 2.0 * dt / 3_600_000.0
+            t0, w0 = st["last_ts"], st["last_w"]
+            dt = ts - t0
+            if 0 < dt <= GAP_MAX_S:
+                added = (w0 + w) / 2.0 * dt / 3_600_000.0
                 self._book(ts, added)
+            elif dt > GAP_MAX_S:
+                lo, hi = min(w0, w), max(w0, w)
+                if dt <= GAP_STEADY_MAX_S and lo >= GAP_STEADY_W and lo >= GAP_STEADY_RATIO * hi:
+                    p, tur = (w0 + w) / 2.0, "sabit"
+                elif dt <= GAP_BASE_MAX_S:
+                    p, tur = lo, "taban"
+                else:
+                    p, tur = 0.0, "yok"
+                added = p * dt / 3_600_000.0
+                if added > 0:
+                    self._book_span(t0, ts, added)
+                    st["est"] = round(st.get("est", 0.0) + added, 4)
+                self.last_gap = {"bas": t0, "bit": ts, "kwh": added, "tur": tur}
         if w is not None:
             st["last_ts"], st["last_w"] = ts, w
         return added
+
+    def _book_span(self, t0: float, t1: float, kwh: float) -> None:
+        """kWh'yi [t0, t1) aralığının saatlerine orantılı dağıtır."""
+        t = t0
+        while t < t1:
+            d = datetime.fromtimestamp(t).replace(minute=0, second=0, microsecond=0)
+            nxt = min(t1, (d + timedelta(hours=1)).timestamp())
+            self._book(t, kwh * (nxt - t) / (t1 - t0))
+            t = nxt
 
     def _book(self, ts: float, kwh: float) -> None:
         d = datetime.fromtimestamp(ts)

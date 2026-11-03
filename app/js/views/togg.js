@@ -148,7 +148,6 @@ export function renderTogg(el, M, app) {
   const n = yearSess.length + (M.histSarj || 0);
   const avg = n ? M.evYtd / n : 0;
   const nYak = M.histSarj ? '≈ ' : '';
-  const histNote = M.histTotal > 0 ? `<div class="muted" style="font-size:11.5px;font-weight:600;margin-top:2px">${num(M.histTotal, 1)} kWh ${esc(M.history.source || 'önceki')} geçmişi dahil</div>` : '';
   const tlPer100 = M.per100Duvar * M.priceNow;   // prizden çekilen enerjinin güncel birim fiyatla bedeli
   const yak = M.per100Tahmini ? '≈ ' : '';
   const skttCost = M.evYtd * M.t.sktt_tl;
@@ -158,7 +157,7 @@ export function renderTogg(el, M, app) {
       <div class="row-between" style="position:relative;z-index:1">
         <div><div class="muted" style="font-size:12px;font-weight:800;letter-spacing:.06em;text-transform:uppercase">${M.y} şarjı</div>
           <div style="font-size:34px;font-weight:800;letter-spacing:-.03em" class="num">${num(M.evYtd)} <small class="muted" style="font-size:15px">kWh</small></div>
-          <div class="muted" style="font-weight:700">${tl(M.evTl, 0)}${n ? ` · ${nYak}${n} şarj<br>ort. ${kwh(avg, 1)}` : ''}</div>${histNote}</div>
+          <div class="muted" style="font-weight:700">${tl(M.evTl, 0)}${n ? ` · ${nYak}${n} şarj<br>ort. ${kwh(avg, 1)}` : ''}</div></div>
         <div class="car-wrap"><img class="car-img" src="img/t10x.webp" alt="Togg T10X" width="160" height="83"></div>
       </div>
       <div class="share-bar" style="position:relative;z-index:1" aria-label="Togg payı ${pct(M.evShare * 100)}">

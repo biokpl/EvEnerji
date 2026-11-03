@@ -392,8 +392,9 @@ input.num, input[data-m] { caret-color: transparent; cursor: pointer; }
   background-position: calc(100% - 14px) 52%, calc(100% - 9px) 52%; background-size: 5px 5px; background-repeat: no-repeat; }
 .cam { position: fixed; left: 0; top: 0; z-index: 70; padding: 8px; border-radius: 22px; border: 0;
   /* arka plan büyük ölçüde görünür, hafif bulanık ve canlı; renk camın kendi rengi (beyaz) */
-  background: linear-gradient(135deg, rgba(255, 255, 255, .09), rgba(255, 255, 255, .01) 45%, rgba(255, 255, 255, .05));
-  backdrop-filter: blur(6px) saturate(2.4) brightness(1.18) contrast(1.05); -webkit-backdrop-filter: blur(6px) saturate(2.4) brightness(1.18) contrast(1.05);
+  /* cam: çok hafif mavimsi; doygunluk ölçülü (fazlası zeminin lacivertini koyu maviye çeviriyordu) */
+  background: linear-gradient(135deg, rgba(220, 232, 250, .13), rgba(220, 232, 250, .05) 45%, rgba(220, 232, 250, .09));
+  backdrop-filter: blur(6px) saturate(1.15) brightness(1.15) contrast(1.05); -webkit-backdrop-filter: blur(6px) saturate(1.15) brightness(1.15) contrast(1.05);
   box-shadow: 0 0 0 .35px rgba(255, 255, 255, .18), inset 0 0 18px rgba(255, 255, 255, .04), 0 8px 24px rgba(0, 0, 0, .14);
   opacity: 0; pointer-events: none; transition: opacity .16s ease; color: #fff; }
 .cam.on { opacity: 1; pointer-events: auto; }
@@ -405,14 +406,14 @@ input.num, input[data-m] { caret-color: transparent; cursor: pointer; }
 .cam button { position: relative; border: 0; border-radius: 13px; padding: 0; cursor: pointer;
   background: linear-gradient(160deg, rgba(255, 255, 255, .08), rgba(255, 255, 255, .01));
   box-shadow: 0 0 0 .35px rgba(255, 255, 255, .14);
-  color: rgba(255, 255, 255, .95); font: inherit; font-weight: 700; text-shadow: 0 1px 3px rgba(0, 0, 0, .6); }
+  color: color-mix(in srgb, var(--accent) 22%, #fff); font: inherit; font-weight: 700; text-shadow: 0 1px 3px rgba(0, 0, 0, .6); }
 .cam button::before { padding: .6px; opacity: .75; }
 .cam button:active { background: rgba(255, 255, 255, .30); }
 .cam button.on { background: linear-gradient(160deg, rgba(255, 255, 255, .34), rgba(255, 255, 255, .14)); }
 /* sayı tuş takımı */
 .kpop { display: grid; grid-template-columns: repeat(4, 40px); grid-auto-rows: 38px; gap: 6px; }
 .kpop button { font-size: 17px; }
-.kpop .fn { font-size: 15px; color: rgba(255, 255, 255, .8); }
+.kpop .fn { font-size: 15px; color: color-mix(in srgb, var(--accent) 22%, rgba(255, 255, 255, .8)); }
 .kpop .ok { grid-row: span 3; font-size: 19px;   /* onay: şeffaf turkuaz cam */
   background: linear-gradient(160deg, color-mix(in srgb, var(--accent) 18%, transparent), color-mix(in srgb, var(--accent) 5%, transparent));
   box-shadow: 0 0 0 .35px color-mix(in srgb, var(--accent) 60%, transparent); color: color-mix(in srgb, var(--accent) 35%, #fff); }

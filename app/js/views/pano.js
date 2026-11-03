@@ -164,11 +164,11 @@ export function chargeCard(M) {
   const s = M.activeSession;
   if (!s) return '';
   const min = (Date.now() / 1000 - s.start) / 60;
-  const km = s.km ? ` · <span class="nw">+${num(s.km)} km</span>` : '';
+  const km = s.km >= 1 ? ` · <span class="nw">${s.kmTahmini ? '≈ ' : ''}+${num(s.km)} km</span>` : '';
   const known = s.socNow != null;
   // Yüzde biliniyorsa: tahmini şarj durumu ve hedefe kalan süre; bilinmiyorsa girme düğmesi
   const socLine = known
-    ? `<div class="soc-line"><b>≈ %${num(s.socNow)}</b>${s.socNow >= s.target - 0.5 ? ` · Hedef %${num(s.target)} · Araç Doldu` : s.etaMin != null ? ` · Hedef %${num(s.target)} · ≈ ${dur(s.etaMin)} Kaldı` : ` · Hedef %${num(s.target)}`}
+    ? `<div class="soc-line"><b>≈ %${num(s.socNow)}</b><span class="nw">${s.socNow >= s.target - 0.5 ? ` · Hedef %${num(s.target)} · Araç Doldu` : s.etaMin != null ? ` · Hedef %${num(s.target)} · ≈ ${dur(s.etaMin)} Kaldı` : ` · Hedef %${num(s.target)}`}</span>
         <button class="soc-edit" data-soc aria-label="Şarj yüzdesini düzelt">${icon('edit')}</button></div>`
     : `<button class="soc-ask" data-soc>${icon('plus')}Araçta Şu An Kaç %? Gir, Kalan Süreyi Hesaplayayım</button>`;
   // Akan ışık: kart 3 sn'de bir yeniden çizildiği için animasyonun evresi saate bağlanır, kesilmeden akar

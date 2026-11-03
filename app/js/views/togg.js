@@ -71,7 +71,7 @@ function openSession(M, s, app) {
       <div><b>${s.avg_w ? watt(s.avg_w) : '–'}</b><span>ortalama</span></div>
       <div><b>${num(sktt, 0)}</b><span>SKTT'de ₺</span></div>
     </div>
-    ${s.socStart != null ? `<p class="chart-note" style="margin:4px 0 6px">${s.socAuto ? '≈ ' : ''}%${num(s.socStart)} → ${s.socAuto ? `<b>%${num(s.socEnd)}</b> (Araç Doldu · Başlangıç Hesaplandı)` : s.socEnd != null ? `<b>%${num(s.socEnd)}</b>` : (s.full ? `%${num(s.socEst)} (Araç Doldu)` : `≈ %${num(s.socEst)} (Tahmin)`)}${s.km ? ` · +${num(s.km)} km Menzil` : ''}${sEff ? ` · Bu Şarjda Verim %${num(sEff * 100)}` : ''}</p>` : ''}
+    ${s.socStart != null ? `<p class="chart-note" style="margin:4px 0 6px">${s.socAuto ? '≈ ' : ''}%${num(s.socStart)} → ${s.socAuto ? `<b>%${num(s.socEnd)}</b> (Araç Doldu · Başlangıç Hesaplandı)` : s.socEnd != null ? `<b>%${num(s.socEnd)}</b>` : (s.full ? `%${num(s.socEst)} (Araç Doldu)` : `≈ %${num(s.socEst)} (Tahmin)`)}${s.km >= 1 ? ` · ${s.kmTahmini ? '≈ ' : ''}+${num(s.km)} km Menzil` : ''}${sEff ? ` · Bu Şarjda Verim %${num(sEff * 100)}` : ''}</p>` : ''}
     <div class="field">
       <div><label for="ss">Başlangıç %</label><small>Şarj başlarken araçtaki yüzde.</small></div>
       <input class="input num" id="ss" inputmode="numeric" placeholder="${s.socAuto ? '≈' + num(s.socStart) : '%'}" value="${s.socAuto ? '' : s.socStart ?? ''}">

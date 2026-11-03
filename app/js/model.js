@@ -203,6 +203,10 @@ export function build(raw) {
   car.learnedEff = effSamples.length ? median(effSamples) : null;
   car.learnedN = effSamples.length;
   car.eff = car.learnedEff ?? car.efficiency;
+  // Eklenen menzil: km girişlerinden öğrenilen duvar kWh/100 km varsa o; yoksa aracın menzil
+  // göstergesinin varsaydığı batarya tüketimi (kullanıcının verdiği %58→291 km, %48→233 km ≈ 18 kWh/100 km)
+  const bataryaTuketim = Number(car.tuketim_kwh_100) || 18;
+  const kmOf = (duvarKwh) => (per100 ? (duvarKwh / per100) * 100 : ((duvarKwh * car.eff) / bataryaTuketim) * 100);
   const socAdd = (kwhWall) => (kwhWall * car.eff) / cap * 100;
   const hedef = Number(car.hedef_yuzde) || 100;
   for (const s of sessions) {
@@ -217,7 +221,8 @@ export function build(raw) {
     if (s.socStart != null) s.socEst = Math.min(100, s.socStart + socAdd(s.kwh || 0));
     // Pi gücün kademeli düştüğünü gördüyse araç hedefine ulaşmıştır: bitiş = hedef
     if (s.full && s.socStart != null && s.socEnd == null) s.socEst = Math.max(s.socStart, Number(car.hedef_yuzde) || 100);
-    if (per100) s.km = ((s.kwh || 0) / per100) * 100;   // bu şarjla eklenen menzil
+    s.km = kmOf(s.kwh || 0);   // bu şarjla eklenen menzil
+    s.kmTahmini = !per100;
   }
 
   // Üç zamanlı tarife karşılaştırması (son 30 gün saatlik ölçüm)
@@ -249,7 +254,8 @@ export function build(raw) {
     const w = a.dev.live?.w || 0;
     a.socStart = Number.isFinite(v.basla) ? v.basla : null;
     a.added = socAdd(a.kwh || 0);
-    a.km = per100 ? ((a.kwh || 0) / per100) * 100 : null;
+    a.km = kmOf(a.kwh || 0);
+    a.kmTahmini = !per100;
     if (a.socStart != null) {
       a.socNow = Math.min(100, a.socStart + a.added);
       a.target = Math.max(a.socNow, Number(car.hedef_yuzde) || 100);

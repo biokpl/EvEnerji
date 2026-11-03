@@ -164,7 +164,7 @@ export function renderTogg(el, M, app) {
       <div class="legend" style="position:relative;z-index:1"><span><i style="background:var(--ev)"></i>Togg ${pct(M.evShare * 100)}</span><span><i style="background:var(--home)"></i>Evin geri kalanı</span></div>
       <div class="trio">
         <div><b>${yak}${num(M.per100Duvar, 1)}</b><span>kWh/100 km</span><small class="tri-not">Çekilen Elektrik</small></div>
-        <div><b>${yak}${num(tlPer100, 0)}</b><span>₺/100 km</span><small class="tri-not">Masraf</small></div>
+        <div><b>${yak}${num(tlPer100, 0)}</b><span>₺/100 km</span><small class="tri-not">Masraf · ${num(tlPer100 / 100, 2)} ₺/km</small></div>
         <div><b>${num(M.evProj)}</b><span>Yıl Sonu kWh</span><small class="tri-not">Beklenen Toplam</small></div>
       </div>
     </div>

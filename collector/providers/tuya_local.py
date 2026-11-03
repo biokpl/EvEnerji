@@ -72,6 +72,7 @@ class TuyaPlug:
             if self.fails and self.versions[self.vi] != self.versions[0]:
                 log.warning("%s sürüm %s ile okundu (kayıtlı %s)", self.t["dev_id"], self.versions[self.vi], self.versions[0])
             self.fails, self.proto_bad_since = 0, None
+            self._tazele()
             return r
         except Exception as e:
             self.fails += 1
@@ -97,6 +98,16 @@ class TuyaPlug:
             elif self.proto_bad_since is None:
                 self.proto_bad_since = now
             return Reading(ok=False, err=str(e))
+
+    def _tazele(self) -> None:
+        """Prizden güç/gerilim/akımı yeniden ölçmesini ister (yanıt beklenmez).
+        status() yalnız prizin son bildirdiği değeri verir; bu prizler ölçümü kendiliğinden seyrek
+        yeniler (Togg şarjında 1890,9 W dakikalarca aynı kaldı). İstek her okumadan sonra gönderilir,
+        tazelenen değer bir sonraki okumada (~3 sn sonra) gelir; ayrıca beklemeye gerek kalmaz."""
+        try:
+            self.d.updatedps([str(self.dps[k]) for k in ("current", "power", "voltage")], nowait=True)
+        except Exception as e:
+            log.debug("%s tazeleme isteği gitmedi: %s", self.t["dev_id"], e)
 
     def set_switch(self, on: bool) -> None:
         res = self.d.turn_on() if on else self.d.turn_off()

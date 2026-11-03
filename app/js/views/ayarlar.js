@@ -12,9 +12,13 @@ const n = (v) => {
 };
 const f = (v) => (v == null ? '' : String(v));
 
-const piSinyal = (ts) => {
-  const sn = Math.max(0, Date.now() / 1000 - ts);
-  return sn < 90 ? 'az önce (çalışıyor)' : sn < 3600 ? `${Math.round(sn / 60)} dk önce` : `${Math.round(sn / 3600)} saat önce`;
+// Pi durumu: son sinyalin yaşına göre yeşil / sarı / kırmızı
+const piDurum = (st) => {
+  if (!st?.ts) return '<div class="pi-dur kotu"><i></i>Sinyal yok</div>';
+  const sn = Math.max(0, Date.now() / 1000 - st.ts);
+  const once = sn < 90 ? 'az önce' : sn < 3600 ? `${Math.round(sn / 60)} dk önce` : `${Math.round(sn / 3600)} saat önce`;
+  const [cls, yazi] = sn < 90 ? ['iyi', 'Çalışıyor'] : sn < 600 ? ['orta', 'Gecikiyor'] : ['kotu', 'Kapalı ya da bağlantı yok'];
+  return `<div class="pi-dur ${cls}"><i></i>${yazi} · son sinyal ${once}</div>`;
 };
 
 export function renderAyarlar(el, M, app) {
@@ -85,13 +89,17 @@ export function renderAyarlar(el, M, app) {
       <button class="btn ghost" id="saveK" style="margin-top:12px">${icon('key')}Anahtarı kaydet</button>
     </div>
 
-    <div class="card">
-      <h2>Raspberry Pi</h2>
-      <p class="hint">Pi 3'te açma/kapama düğmesi yok. Fişini çekmeden önce buradan <b>güvenli kapat</b>: kayıtlar diske yazılır, SD kart korunur. Işığı sönünce fişi çekebilirsin; fişi geri takınca kendiliğinden açılır.${M.raw.status?.ts ? ` Son sinyal: <b>${piSinyal(M.raw.status.ts)}</b>.` : ''}</p>
-      <div class="btn-row" style="margin-top:10px">
-        <button class="btn ghost" data-pi="yeniden">${icon('refresh')}Yeniden başlat</button>
-        <button class="btn ghost" data-pi="kapat">${icon('power')}Güvenli kapat</button>
+    <div class="card pi-card">
+      <div class="pi-head">
+        <div class="pi-ic">${icon('pc')}</div>
+        <div><h2>Raspberry Pi</h2>${piDurum(M.raw.status)}</div>
       </div>
+      <p class="hint">Pi 3'te açma/kapama düğmesi yok. Fişini çekmeden önce <b>Güvenli kapat</b>: kayıtlar diske yazılır, SD kart korunur. Işığı sönünce fişi çekebilirsin; fişi geri takınca kendiliğinden açılır.</p>
+      <div class="btn-row">
+        <button class="btn pi-btn re" data-pi="yeniden">${icon('refresh')}<span>Yeniden başlat</span></button>
+        <button class="btn pi-btn off" data-pi="kapat">${icon('power')}<span>Güvenli kapat</span></button>
+      </div>
+    </div>
     </div>
 
     <div class="card">
@@ -165,11 +173,12 @@ export function renderAyarlar(el, M, app) {
     b.addEventListener('click', async () => {
       if (Date.now() - onay > 4000) {
         onay = Date.now();
-        b.textContent = 'Emin misin? Tekrar dokun';
-        setTimeout(() => { if (b.isConnected && Date.now() - onay >= 4000) b.innerHTML = ilk; }, 4100);
+        b.classList.add('onay');
+        b.innerHTML = `${icon(b.dataset.pi === 'kapat' ? 'power' : 'refresh')}<span>Emin misin? Tekrar dokun</span>`;
+        setTimeout(() => { if (b.isConnected && Date.now() - onay >= 4000) { b.innerHTML = ilk; b.classList.remove('onay'); } }, 4100);
         return;
       }
-      onay = 0; b.disabled = true; b.innerHTML = ilk;
+      onay = 0; b.disabled = true; b.innerHTML = ilk; b.classList.remove('onay');
       try {
         const r = await st.command('pi', b.dataset.pi);
         toast(r.msg || (r.ok ? 'Gönderildi' : 'Başarısız'), 4500);

@@ -576,3 +576,30 @@ input.num, input[data-m] { caret-color: transparent; cursor: pointer; }
 .est-note { display: block; margin-top: -2px; line-height: 1.15; font-size: 11px; font-style: italic; color: var(--faint); font-weight: 600; }
 .hero-meta p b.est-val, .est-val { color: color-mix(in srgb, var(--home) 60%, var(--muted)); font-weight: 800; }   /* tahmini dönem: ev rengi */
 :root[data-theme="light"] .hero-meta p b.est-val { color: color-mix(in srgb, var(--home) 65%, var(--muted)); }
+
+/* Ayarlar > Raspberry Pi kartı */
+.pi-head { display: flex; align-items: center; gap: 12px; margin-bottom: 8px; }
+.pi-head h2 { margin: 0 0 3px; }
+.pi-ic { width: 42px; height: 42px; border-radius: 13px; flex: none; display: grid; place-items: center;
+  color: var(--good); background: color-mix(in srgb, var(--good) 14%, transparent); border: 1px solid color-mix(in srgb, var(--good) 30%, transparent); }
+.pi-ic svg { width: 22px; height: 22px; }
+.pi-dur { display: inline-flex; align-items: center; gap: 7px; font-size: 12.5px; font-weight: 700; color: var(--muted); }
+.pi-dur i { width: 8px; height: 8px; border-radius: 50%; background: var(--good); box-shadow: 0 0 0 0 var(--good); animation: pulse 1.6s infinite; }
+.pi-dur.iyi { color: color-mix(in srgb, var(--good) 75%, var(--text)); }
+.pi-dur.orta i { background: var(--mid); box-shadow: none; animation: none; }
+.pi-dur.orta { color: var(--mid); }
+.pi-dur.kotu i { background: var(--bad); box-shadow: none; animation: none; }
+.pi-dur.kotu { color: var(--bad); }
+.pi-card:has(.pi-dur.orta) .pi-ic { color: var(--mid); background: color-mix(in srgb, var(--mid) 14%, transparent); border-color: color-mix(in srgb, var(--mid) 30%, transparent); }
+.pi-card:has(.pi-dur.kotu) .pi-ic { color: var(--bad); background: color-mix(in srgb, var(--bad) 14%, transparent); border-color: color-mix(in srgb, var(--bad) 30%, transparent); }
+.pi-btn { --c: var(--mid); background: color-mix(in srgb, var(--c) 12%, var(--card-hi)); border: 1px solid color-mix(in srgb, var(--c) 38%, transparent);
+  color: color-mix(in srgb, var(--c) 80%, var(--text)); transition: background .2s, color .2s, box-shadow .2s; }
+.pi-btn.off { --c: var(--bad); }
+.pi-btn svg { width: 18px; height: 18px; }
+.pi-btn.onay { background: var(--c); color: #fff; border-color: var(--c); box-shadow: 0 6px 18px color-mix(in srgb, var(--c) 40%, transparent); }
+.pi-btn { padding: 12px 10px; font-size: 13.5px; white-space: nowrap; }
+.pi-btn span { line-height: 1.15; overflow: hidden; text-overflow: ellipsis; }
+.pi-card .btn-row { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+.pi-btn { min-width: 0; }
+.pi-btn.onay { font-size: 12.5px; white-space: normal; }
+.pi-btn.onay span { text-align: left; }

@@ -60,6 +60,20 @@ export function build(raw) {
   const histMonth = (ym) => sum(Object.entries(hist).filter(([k]) => k.startsWith(ym)).map(([, v]) => Number(v) || 0));
   for (let i = 0; i < 12; i++) evMonths[i] += histMonth(`${y}-${String(i + 1).padStart(2, '0')}`);
   const histTotal = sum(Object.values(hist).map((v) => Number(v) || 0));
+  // Eski uygulamadan yalnız günlük toplamlar geldi; şarj sayısı günlerden çıkarılır: şarj gece yarısını
+  // aşınca ertesi güne sarkar, bu yüzden art arda günler tek şarjdır. Bir şarj bataryanın alabileceğinden
+  // (~kapasite / verim) fazla çekemez; o kadarı aşılırsa birden çok şarj sayılır.
+  const histSarjlar = (yil, tavan) => {
+    const g = Object.keys(hist).filter((k) => k.startsWith(String(yil)) && Number(hist[k]) > 0.5).sort();
+    let adet = 0, kos = 0, onceki = null;
+    const bitir = () => { if (kos > 0) adet += Math.max(1, Math.ceil(kos / tavan - 0.02)); kos = 0; };
+    for (const k of g) {
+      if (onceki && (new Date(k) - new Date(onceki)) / 864e5 > 1.5) bitir();
+      kos += Number(hist[k]); onceki = k;
+    }
+    bitir();
+    return adet;
+  };
 
   // Önceki yılın toplamı (yeni yılın tarifesini belirler): elle girilmediyse kendi verisinden
   // (her ay için ana sayaç ölçümü ile faturadan büyük olan).
@@ -271,7 +285,7 @@ export function build(raw) {
   return {
     raw, now, y, mi, today, S, t, tNext, durum, projDurum, devices, enabled, home, evs, plugs, winderDev,
     homeMonths, projMonths, evMonths, evTlByMonth, ytd, ytdEst, rate, son30, proj, butce, evYtd, evShare, evProj, evTl, evAvgTl, noEvProj,
-    exceedDate, level, levelText, scenarios, nextYear, kademeAylari, sessions, per100, per100Duvar, per100Tahmini, activeSession, covEnd, start, holeStart, holeEnd, estTotal, estMonths, nowDurum,
+    exceedDate, level, levelText, scenarios, nextYear, kademeAylari, sessions, per100, per100Duvar, per100Tahmini, histSarj: histSarjlar(y, cap / car.eff), activeSession, covEnd, start, holeStart, holeEnd, estTotal, estMonths, nowDurum,
     priceNow: birimFiyat(t, projDurum, mi + 1),
     monthTl: projDurum.aylikTl[mi], monthKwh: projMonths[mi],
     homeW: home?.live?.w ?? null,

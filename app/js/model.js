@@ -204,8 +204,8 @@ export function build(raw) {
   car.learnedN = effSamples.length;
   car.eff = car.learnedEff ?? car.efficiency;
   // Eklenen menzil: km girişlerinden öğrenilen duvar kWh/100 km varsa o; yoksa aracın menzil
-  // göstergesinin varsaydığı batarya tüketimi (kullanıcının verdiği %58→291 km, %48→233 km ≈ 18 kWh/100 km)
-  const bataryaTuketim = Number(car.tuketim_kwh_100) || 18;
+  // Ayarlar'daki araç tüketimi (Trumore ortalaması; 2026-11: 3108 km'de 19 kWh/100 km)
+  const bataryaTuketim = Number(car.tuketim_kwh_100) || 19;
   const kmOf = (duvarKwh) => (per100 ? (duvarKwh / per100) * 100 : ((duvarKwh * car.eff) / bataryaTuketim) * 100);
   const socAdd = (kwhWall) => (kwhWall * car.eff) / cap * 100;
   const hedef = Number(car.hedef_yuzde) || 100;

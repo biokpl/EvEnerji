@@ -382,6 +382,43 @@ select.input { padding-right: 6px; }
 .bills { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
 .bills label { font-size: 11px; color: var(--muted); font-weight: 800; display: grid; gap: 4px; }
 .bills .input { width: 100%; text-align: right; }
+/* Sayı tuş takımı: kutunun yanında açılan cam baloncuk (iOS bildirim camı gibi) */
+.input.kp-on { border-color: var(--accent); box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 30%, transparent); }
+input.num, input[data-m] { caret-color: transparent; cursor: pointer; }
+.input.kp-sec { color: var(--accent); }   /* ilk tuşta değişecek değer */
+.kpop { position: fixed; left: 0; top: 0; z-index: 70; display: grid; grid-template-columns: repeat(4, 40px); grid-auto-rows: 38px; gap: 6px; padding: 8px;
+  border-radius: 22px;
+  /* iOS sıvı cam: arka plan büyük ölçüde görünür, hafif bulanık; kenarlarda ışık yansıması */
+  background: linear-gradient(135deg, rgba(255, 255, 255, .09), rgba(255, 255, 255, .01) 45%, rgba(255, 255, 255, .05));
+  backdrop-filter: blur(6px) saturate(2.4) brightness(1.18) contrast(1.05); -webkit-backdrop-filter: blur(6px) saturate(2.4) brightness(1.18) contrast(1.05);
+  border: 0;
+  box-shadow: 0 0 0 .35px rgba(255, 255, 255, .18),
+    inset 0 0 18px rgba(255, 255, 255, .04), 0 8px 24px rgba(0, 0, 0, .14);
+  opacity: 0; pointer-events: none; transform-origin: top right; transition: opacity .16s ease; }
+.kpop.on { opacity: 1; pointer-events: auto; }
+/* Işık kenarı: sol üst ve sağ alt köşede parlak yansıma, aralarda kaybolur (iOS camı) */
+.kpop::before, .kpop button::before { content: ''; position: absolute; inset: 0; border-radius: inherit; pointer-events: none;
+  padding: .75px; -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0); -webkit-mask-composite: xor; mask-composite: exclude;
+  background: linear-gradient(135deg, rgba(255, 255, 255, .95) 0%, rgba(255, 255, 255, .35) 14%, rgba(255, 255, 255, 0) 38%,
+    rgba(255, 255, 255, 0) 62%, rgba(255, 255, 255, .3) 86%, rgba(255, 255, 255, .8) 100%); }
+.kpop button { position: relative; }
+.kpop button::before { padding: .6px; opacity: .75; }
+.kpop button { border: 0; border-radius: 13px; padding: 0; cursor: pointer;
+  background: linear-gradient(160deg, rgba(255, 255, 255, .08), rgba(255, 255, 255, .01));
+  box-shadow: 0 0 0 .35px rgba(255, 255, 255, .14);
+  color: color-mix(in srgb, var(--accent) 32%, #fff); font: inherit; font-size: 17px; font-weight: 700; text-shadow: 0 1px 3px rgba(0, 0, 0, .6); }
+.kpop button:active { background: rgba(255, 255, 255, .30); }
+.kpop .fn { font-size: 15px; color: color-mix(in srgb, var(--accent) 32%, rgba(255, 255, 255, .85)); }
+.kpop .ok { grid-row: span 3; font-size: 19px;
+  background: linear-gradient(160deg, color-mix(in srgb, var(--accent) 18%, transparent), color-mix(in srgb, var(--accent) 5%, transparent));
+  box-shadow: 0 0 0 .35px color-mix(in srgb, var(--accent) 60%, transparent); color: color-mix(in srgb, var(--accent) 35%, #fff); }
+.kpop .dot { font-size: 22px; line-height: 1; }
+.kpop.int .dot { visibility: hidden; }
+:root[data-theme="light"] .kpop { background: linear-gradient(135deg, rgba(255, 255, 255, .30), rgba(255, 255, 255, .10) 45%, rgba(255, 255, 255, .20));
+  border-color: rgba(255, 255, 255, .85); box-shadow: inset .5px .5px 0 #fff, inset -.5px -.5px 0 rgba(255, 255, 255, .6), 0 10px 30px rgba(20, 35, 60, .18); }
+:root[data-theme="light"] .kpop button { color: color-mix(in srgb, var(--accent) 40%, #10223a); text-shadow: none; background: linear-gradient(160deg, rgba(255, 255, 255, .40), rgba(255, 255, 255, .12)); border-color: rgba(255, 255, 255, .9); }
+:root[data-theme="light"] .kpop .fn { color: #4a5a70; }
+:root[data-theme="light"] .kpop .ok { color: color-mix(in srgb, var(--accent) 80%, #000); background: linear-gradient(160deg, color-mix(in srgb, var(--accent) 28%, transparent), color-mix(in srgb, var(--accent) 10%, transparent)); }
 
 .btn { border: 0; border-radius: 15px; padding: 13px 16px; font-weight: 800; font-size: 14.5px; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; gap: 8px; width: 100%; transition: transform 0.1s ease, filter 0.15s; }
 .btn:active { transform: scale(0.98); }

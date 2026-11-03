@@ -3,17 +3,14 @@ import { AY_K, downloadFile, esc, icon, num, toast } from '../ui.js';
 import { yasalLimit } from '../tariff.js';
 
 let yearSel = null;
-// "3,24" / "3.24" / "4.000" / "4000" hepsini doğru okur.
-// ondalikNokta: faturalarda "453.405" = 453,405 kWh (aylık tüketim binlerce olamaz; binlik ayracı sanma)
-const n = (v, { ondalikNokta = false } = {}) => {
-  let s = String(v ?? '').trim().replace(/\s/g, '');
+// Tuş takımında yalnız nokta var: nokta her zaman ondalık ("3.238" = 3,238). Eski virgüllü değer de okunur.
+const n = (v) => {
+  const s = String(v ?? '').trim().replace(/\s/g, '').replace(',', '.');
   if (!s) return null;
-  if (s.includes(',')) s = s.replace(/\./g, '').replace(',', '.');
-  else if (!ondalikNokta && /^\d{1,3}(\.\d{3})+$/.test(s)) s = s.replace(/\./g, '');
   const x = Number(s);
   return Number.isFinite(x) ? x : null;
 };
-const f = (v, d = 2) => (v == null ? '' : String(v).replace('.', ','));
+const f = (v) => (v == null ? '' : String(v));
 
 export function renderAyarlar(el, M, app) {
   const yr = yearSel ?? M.y;
@@ -45,7 +42,7 @@ export function renderAyarlar(el, M, app) {
     <div class="card">
       <h2>${yr} faturaları (kWh)</h2>
       <p class="hint">Şalter takılmadan önceki aylar için faturadaki tüketimi gir. Her ay için fatura ile ölçümden büyük olan kullanılır. Faturayı tüketimin yapıldığı aya yaz: ör. Ekim başında gelen (2 Eyl – 2 Eki) fatura → <b>Eyl</b>. <b>Son fatura okuması</b> tarihi kendiliğinden bir ay ilerler.</p>
-      <div class="bills">${AY_K.map((a, i) => { const k = String(i + 1).padStart(2, '0'); return `<label>${a}<input class="input" data-m="${k}" inputmode="decimal" value="${f(bills[k])}" placeholder="–"></label>`; }).join('')}</div>
+      <div class="bills">${AY_K.map((a, i) => { const k = String(i + 1).padStart(2, '0'); return `<label>${a}<input class="input num" data-m="${k}" inputmode="decimal" value="${bills[k] ?? ''}" placeholder="–"></label>`; }).join('')}</div>
       <button class="btn ghost" id="saveB" style="margin-top:12px">${icon('check')}Faturaları kaydet</button>
     </div>
 
@@ -110,7 +107,7 @@ export function renderAyarlar(el, M, app) {
   };
   $('#saveB').onclick = () => {
     const b = {};
-    el.querySelectorAll('[data-m]').forEach((i) => { const x = n(i.value, { ondalikNokta: true }); if (x != null) b[i.dataset.m] = x; });
+    el.querySelectorAll('[data-m]').forEach((i) => { const x = n(i.value); if (x != null) b[i.dataset.m] = x; });
     save(`settings/bills/${yr}`, Object.keys(b).length ? b : null, 'Faturalar kaydedildi');
     // Son okuma tarihini kendiliğinden ilerlet: m. ayın faturası (m+1). ayın okuma gününde biter.
     // Okuma günü önceki son okumadan alınır (her ay aynı gün okunur); daha ileriye hiç geri almaz.

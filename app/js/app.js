@@ -8,6 +8,7 @@ import { renderEv, updateEv } from './views/ev.js';
 import { renderCihazlar, updateCihazlar } from './views/cihazlar.js';
 import { renderSarici } from './views/sarici.js';
 import { renderAyarlar } from './views/ayarlar.js';
+import { initKeypad } from './keypad.js';
 
 // live: canlı veride ne yapılacağı — 'update' (yalnız sayılar), 'render' (yeniden çiz), yok = dokunma
 const VIEWS = {
@@ -162,6 +163,7 @@ store.subscribe((kind) => {
 });
 
 applyTheme();
+initKeypad();
 // Test seçeneği: adres ?hareket=1 ile açılırsa "hareketi azalt" ayarı yok sayılır (önizlemede animasyonları görmek için)
 if (/[?&]hareket=1/.test(location.search)) document.documentElement.dataset.motion = 'force';
 // Araç resmini açılışta bir kez çözüp bellekte tut: Pano/Togg sekmesinde beklemeden görünsün

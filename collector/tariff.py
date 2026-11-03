@@ -28,15 +28,16 @@ class Tarife:
     limit_kwh: float = 4000.0
     normal_tl: float = 3.24          # vergiler dahil TL/kWh
     sktt_tl: float = 6.49            # son kaynak, vergiler dahil TL/kWh
-    kademe_kwh_ay: float = 0.0       # 0 = kademe yok
-    kademe2_tl: float = 0.0          # aylık kademe üstü fiyat
+    kademe_kwh_ay: float = 0.0       # eski ayar: aylık sabit sınır (kademe_kwh_gun yoksa)
+    kademe2_tl: float = 0.0          # kademe üstü fiyat
+    kademe_kwh_gun: float = 0.0      # faturadaki gerçek kural: günlük 8 kWh × dönemdeki gün (0 = kullanılmaz)
     onceki_yil_kwh: float | None = None
 
     @classmethod
     def from_dict(cls, yil: int, d: dict | None) -> "Tarife":
         d = d or {}
         t = cls(yil=yil, limit_kwh=yasal_limit(yil))
-        for k in ("limit_kwh", "normal_tl", "sktt_tl", "kademe_kwh_ay", "kademe2_tl"):
+        for k in ("limit_kwh", "normal_tl", "sktt_tl", "kademe_kwh_ay", "kademe2_tl", "kademe_kwh_gun"):
             if d.get(k) is not None:
                 setattr(t, k, float(d[k]))
         if d.get("onceki_yil_kwh") is not None:
@@ -63,11 +64,21 @@ def sktt_ayi_mi(t: Tarife, durum: YilDurumu, ay: int) -> bool:
     return y == t.yil and ay >= m
 
 
-def ay_maliyeti(t: Tarife, kwh: float, sktt: bool) -> float:
+def kademe_siniri(t: Tarife, ay: int | None = None) -> float:
+    """Ucuz kademe sınırı (kWh). Faturada: 8 kWh/gün × dönemin gün sayısı (32 günlük dönem → 256).
+    Dönem gün sayısı bilinmediğinde takvim ayının gün sayısı kullanılır."""
+    if t.kademe_kwh_gun > 0:
+        gun = calendar.monthrange(t.yil, ay)[1] if ay else 30
+        return t.kademe_kwh_gun * gun
+    return t.kademe_kwh_ay
+
+
+def ay_maliyeti(t: Tarife, kwh: float, sktt: bool, ay: int | None = None) -> float:
     if sktt:
         return kwh * t.sktt_tl
-    if t.kademe_kwh_ay > 0 and t.kademe2_tl > 0 and kwh > t.kademe_kwh_ay:
-        return t.kademe_kwh_ay * t.normal_tl + (kwh - t.kademe_kwh_ay) * t.kademe2_tl
+    k = kademe_siniri(t, ay)
+    if k > 0 and t.kademe2_tl > 0 and kwh > k:
+        return k * t.normal_tl + (kwh - k) * t.kademe2_tl
     return kwh * t.normal_tl
 
 
@@ -83,7 +94,7 @@ def yil_durumu(t: Tarife, aylik_kwh: list[float]) -> YilDurumu:
         m = asim + GECIS_GECIKME_AY
         basla = (t.yil, m) if m <= 12 else (t.yil + 1, m - 12)
     d = YilDurumu(aylik_kwh=aylik, kumulatif=kum, asim_ayi=asim, sktt_baslangic=basla)
-    d.aylik_tl = [ay_maliyeti(t, aylik[i], sktt_ayi_mi(t, d, i + 1)) for i in range(12)]
+    d.aylik_tl = [ay_maliyeti(t, aylik[i], sktt_ayi_mi(t, d, i + 1), i + 1) for i in range(12)]
     d.toplam_tl = sum(d.aylik_tl)
     return d
 
@@ -92,7 +103,8 @@ def birim_fiyat(t: Tarife, durum: YilDurumu, ay: int) -> float:
     """O aydaki son kWh'nin fiyatı (şarj oturumu maliyeti için)."""
     if sktt_ayi_mi(t, durum, ay):
         return t.sktt_tl
-    if t.kademe_kwh_ay > 0 and t.kademe2_tl > 0 and durum.aylik_kwh[ay - 1] > t.kademe_kwh_ay:
+    k = kademe_siniri(t, ay)
+    if k > 0 and t.kademe2_tl > 0 and durum.aylik_kwh[ay - 1] > k:
         return t.kademe2_tl
     return t.normal_tl
 

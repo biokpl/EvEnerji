@@ -68,6 +68,15 @@ def test_gelecek_yil_senaryosu():
     assert s == {3000: True, 3500: False, 4000: False}
 
 
+def test_gunluk_kademe_faturayla_ayni():
+    # Ekim 2026 faturası: 02.10–03.11 (32 gün) → ucuz kademe 8 × 32 = 256 kWh; 453,405 kWh; 1.789,63 ₺
+    from tariff import Tarife, ay_maliyeti, kademe_siniri
+    t = Tarife(yil=2026, normal_tl=3.238, kademe2_tl=4.857, kademe_kwh_gun=8)
+    assert kademe_siniri(t, 10) == 248 and kademe_siniri(t, 11) == 240     # takvim ayı yaklaşımı
+    t32 = Tarife(yil=2026, normal_tl=3.238, kademe2_tl=4.857, kademe_kwh_ay=256)
+    assert abs(ay_maliyeti(t32, 453.405, False) - 1789.63) < 3            # faturayla ±3 ₺ (yuvarlama)
+
+
 if __name__ == "__main__":
     import sys
     fails = 0

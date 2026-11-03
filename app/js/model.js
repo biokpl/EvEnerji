@@ -1,5 +1,5 @@
 // Ham veriden ekranların kullandığı özetleri çıkarır.
-import { UC_ZAMAN, ayMaliyeti, birimFiyat, dilim, gunlukButce, kalanGun, tarife, ucZamanKiyas, yilDurumu } from './tariff.js';
+import { UC_ZAMAN, ayMaliyeti, birimFiyat, kademeSiniri, dilim, gunlukButce, kalanGun, tarife, ucZamanKiyas, yilDurumu } from './tariff.js';
 import { iso } from './ui.js';
 
 const z12 = () => Array(12).fill(0);
@@ -41,7 +41,16 @@ export function build(raw) {
 
   // Yıllık aylık tüketim: ana sayaç + elle girilen faturalar (büyük olan)
   const bills = S.bills?.[y] || {};
-  const meterMonths = home ? monthsOf(raw, home.id, y) : z12();
+  // Son fatura okumasından ÖNCEKİ sayaç günleri o faturanın içinde (ör. şalter 2 Kas'ta başladı, fatura
+  // 3 Kas'a kadar): iki kez sayılmasın diye ay toplamından düşülür.
+  const sonOkuma = S.tariff?.[y]?.son_okuma || '';
+  const meterMonths = (home ? monthsOf(raw, home.id, y) : z12()).map((v, i) => {
+    if (!home || !sonOkuma) return v;
+    const ym = `${y}-${String(i + 1).padStart(2, '0')}`;
+    const ici = Object.entries(raw.days?.[home.id] || {}).filter(([k]) => k.startsWith(ym) && k < sonOkuma)
+      .reduce((a, [, x]) => a + Number(x || 0), 0);
+    return Math.max(0, v - ici);
+  });
   const homeMonths = meterMonths.map((v, i) => Math.max(v, Number(bills[String(i + 1).padStart(2, '0')] || 0)));
   const evMonths = z12();
   evs.forEach((d) => monthsOf(raw, d.id, y).forEach((v, i) => { evMonths[i] += v; }));
@@ -123,7 +132,7 @@ export function build(raw) {
     if (!k) return 0;
     const tot = Math.max(projMonths[i], k);
     const sk = projDurum.aylikSktt[i];
-    return ayMaliyeti(t, tot, sk) - ayMaliyeti(t, tot - k, sk);
+    return ayMaliyeti(t, tot, sk, i + 1) - ayMaliyeti(t, tot - k, sk, i + 1);
   });
   const evTl = sum(evTlByMonth);
   const evAvgTl = evYtd > 0 ? evTl / evYtd : 0;
@@ -131,7 +140,7 @@ export function build(raw) {
   const evProj = proj * evShare;
   const noEvProj = proj - evProj;
   // Togg'un evi yüksek kademeye taşıdığı aylar
-  const kademeAylari = t.kademe_kwh_ay > 0 ? homeMonths.map((h, i) => (h > t.kademe_kwh_ay && h - evMonths[i] <= t.kademe_kwh_ay ? i : -1)).filter((i) => i >= 0) : [];
+  const kademeAylari = homeMonths.map((h, i) => { const k = kademeSiniri(t, i + 1); return k > 0 && h > k && h - evMonths[i] <= k ? i : -1; }).filter((i) => i >= 0);
 
   // Tahmini aşım tarihi
   let exceedDate = null;

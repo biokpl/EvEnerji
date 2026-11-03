@@ -1,5 +1,6 @@
 // Ana pano: yıllık limit halkası, canlı güç, şarj durumu, uyarılar, 30 gün, gelecek yıl senaryosu
 import { colors, mount, stackedBars } from '../charts.js';
+import { kademeSiniri } from '../tariff.js';
 import { AYLAR, alertBox, ayDa, ayDan, dur, esc, icon, kwh, num, pct, tl, watt, wattFine } from '../ui.js';
 
 const R = 96, C = 2 * Math.PI * R, ARC = 0.75 * C;
@@ -209,7 +210,7 @@ function insights(M) {
   }
   if (M.kademeAylari.length && M.evYtd > 0) {
     const i = M.kademeAylari.at(-1);
-    const h = M.homeMonths[i], e = M.evMonths[i], k = M.t.kademe_kwh_ay;
+    const h = M.homeMonths[i], e = M.evMonths[i], k = kademeSiniri(M.t, i + 1);
     out.push(alertBox('warn', 'car', 'Togg evi pahalı kademeye taşıyor',
       `${ayDa(i)} Togg olmadan ev ≈ ${kwh(h - e, 0)} ile ucuz kademede (${num(k)} kWh'ye kadar ${num(M.t.normal_tl, 2)} ₺) kalırdı. Togg'la ${kwh(h, 0)} oldu; ${kwh(h - k, 0)} ${num(M.t.kademe2_tl, 2)} ₺'den faturalandı. Bu yüzden Togg'un kWh'si sana ortalama <b>${num(M.evAvgTl, 2)} ₺</b>'ye geliyor.`));
   }

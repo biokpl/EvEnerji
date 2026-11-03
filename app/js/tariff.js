@@ -4,7 +4,7 @@
 // limitini aşmışsa bütün yıl SKTT.
 export const GECIKME = 3;
 
-export const VARSAYILAN = { limit_kwh: 4000, normal_tl: 3.24, sktt_tl: 6.49, kademe_kwh_ay: 0, kademe2_tl: 0, onceki_yil_kwh: null };
+export const VARSAYILAN = { limit_kwh: 4000, normal_tl: 3.24, sktt_tl: 6.49, kademe_kwh_ay: 0, kademe_kwh_gun: 0, kademe2_tl: 0, onceki_yil_kwh: null };
 
 // Ayarlarda girilmemişse yıla göre yasal limit
 export const yasalLimit = (yil) => (yil >= 2027 ? 3000 : 4000);
@@ -22,10 +22,17 @@ export function skttAyi(t, d, ay) {
   return y === t.yil && ay >= m;
 }
 
-export function ayMaliyeti(t, kwh, sktt) {
+// Ucuz kademe sınırı (kWh). Faturadaki kural: 8 kWh/gün × dönemin gün sayısı (32 günlük dönem → 256).
+// Dönem bilinmediğinde takvim ayının gün sayısı; eski ayar (kademe_kwh_ay) varsa o.
+export function kademeSiniri(t, ay) {
+  if (t.kademe_kwh_gun > 0) return t.kademe_kwh_gun * (ay ? new Date(t.yil, ay, 0).getDate() : 30);
+  return t.kademe_kwh_ay || 0;
+}
+
+export function ayMaliyeti(t, kwh, sktt, ay) {
   if (sktt) return kwh * t.sktt_tl;
-  if (t.kademe_kwh_ay > 0 && t.kademe2_tl > 0 && kwh > t.kademe_kwh_ay)
-    return t.kademe_kwh_ay * t.normal_tl + (kwh - t.kademe_kwh_ay) * t.kademe2_tl;
+  const k = kademeSiniri(t, ay);
+  if (k > 0 && t.kademe2_tl > 0 && kwh > k) return k * t.normal_tl + (kwh - k) * t.kademe2_tl;
   return kwh * t.normal_tl;
 }
 
@@ -40,14 +47,15 @@ export function yilDurumu(t, aylikKwh) {
   }
   const d = { aylik, kum, asimAyi: asim, skttBas };
   d.aylikSktt = aylik.map((_, i) => skttAyi(t, d, i + 1));
-  d.aylikTl = aylik.map((k, i) => ayMaliyeti(t, k, d.aylikSktt[i]));
+  d.aylikTl = aylik.map((k, i) => ayMaliyeti(t, k, d.aylikSktt[i], i + 1));
   d.toplamTl = d.aylikTl.reduce((a, b) => a + b, 0);
   return d;
 }
 
 export function birimFiyat(t, d, ay) {
   if (skttAyi(t, d, ay)) return t.sktt_tl;
-  if (t.kademe_kwh_ay > 0 && t.kademe2_tl > 0 && d.aylik[ay - 1] > t.kademe_kwh_ay) return t.kademe2_tl;
+  const k = kademeSiniri(t, ay);
+  if (k > 0 && t.kademe2_tl > 0 && d.aylik[ay - 1] > k) return t.kademe2_tl;
   return t.normal_tl;
 }
 

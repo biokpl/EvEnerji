@@ -32,7 +32,7 @@ export function renderAyarlar(el, M, app) {
       <div class="field"><div><label for="lim">Yıllık limit (kWh)</label><small>2026: 4.000 · 1 Ocak 2027'den itibaren 3.000 (EPDK).</small></div><input class="input num" id="lim" inputmode="numeric" value="${T.limit_kwh ?? yasalLimit(yr)}" placeholder="${M.t.limit_kwh}"></div>
       <div class="field"><div><label for="nt">Normal fiyat (₺/kWh)</label></div><input class="input num" id="nt" inputmode="decimal" value="${f(T.normal_tl)}" placeholder="${f(3.24)}"></div>
       <div class="field"><div><label for="st">Son kaynak fiyatı (₺/kWh)</label><small>Limit aşılınca uygulanan fiyat.</small></div><input class="input num" id="st" inputmode="decimal" value="${f(T.sktt_tl)}" placeholder="${f(6.49)}"></div>
-      <div class="field"><div><label for="ky">Aylık kademe (kWh)</label><small>Aylık kademe uygulanıyorsa sınır; yoksa boş bırak.</small></div><input class="input num" id="ky" inputmode="numeric" value="${T.kademe_kwh_ay || ''}" placeholder="yok"></div>
+      <div class="field"><div><label for="ky">Günlük kademe (kWh/gün)</label><small>Faturada ucuz kademe = bu × dönemin gün sayısı (8 × 32 gün = 256 kWh). Yoksa boş bırak.</small></div><input class="input num" id="ky" inputmode="numeric" value="${T.kademe_kwh_gun || (T.kademe_kwh_ay ? Math.round(T.kademe_kwh_ay / 30) : '')}" placeholder="yok"></div>
       <div class="field"><div><label for="k2">Kademe üstü fiyat</label></div><input class="input num" id="k2" inputmode="decimal" value="${f(T.kademe2_tl || '')}" placeholder="–"></div>
       <div class="field"><div><label>Üç zamanlı (₺/kWh)</label><small>Karşılaştırma için: gece · gündüz · puant</small></div>
         <div style="display:flex;gap:6px"><input class="input num" id="ug" inputmode="decimal" value="${f(T.uc_gece || '')}" placeholder="${f(3.261)}" style="width:62px" aria-label="Gece">
@@ -111,7 +111,7 @@ export function renderAyarlar(el, M, app) {
 
   $('#ys').onclick = (e) => { const b = e.target.closest('[data-y]'); if (b) { yearSel = +b.dataset.y; app.refresh(); } };
   $('#saveT').onclick = () => {
-    const v = { limit_kwh: n($('#lim').value), normal_tl: n($('#nt').value), sktt_tl: n($('#st').value), kademe_kwh_ay: n($('#ky').value), kademe2_tl: n($('#k2').value),
+    const v = { limit_kwh: n($('#lim').value), normal_tl: n($('#nt').value), sktt_tl: n($('#st').value), kademe_kwh_gun: n($('#ky').value), kademe_kwh_ay: null, kademe2_tl: n($('#k2').value),
       uc_gece: n($('#ug').value), uc_gunduz: n($('#ud').value), uc_puant: n($('#up').value) };
     if ($('#py')) v.onceki_yil_kwh = n($('#py').value);
     if ($('#bs')?.value) v.baslangic = $('#bs').value;

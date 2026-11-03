@@ -214,9 +214,14 @@ class Collector:
     def year_months(self, year: int) -> list[float]:
         hid = self.home_id()
         meter = {}
+        son_okuma = str(((self.settings.get("tariff") or {}).get(str(year)) or {}).get("son_okuma") or "")
         if hid and hid in self.meters:
+            gunler = self.meters[hid].st["days"]
             for m in range(1, 13):
-                meter[f"{m:02d}"] = self.meters[hid].month_total(f"{year}-{m:02d}")
+                ym = f"{year}-{m:02d}"
+                # son fatura okumasından önceki sayaç günleri o faturanın içinde: iki kez sayılmasın
+                ici = sum(v for k, v in gunler.items() if k.startswith(ym) and son_okuma and k < son_okuma)
+                meter[f"{m:02d}"] = max(0.0, self.meters[hid].month_total(ym) - ici)
         bills = (self.settings.get("bills") or {}).get(str(year), {})
         return merge_months(bills, meter)
 

@@ -63,7 +63,8 @@ export function renderAyarlar(el, M, app) {
         : 'Duvardan çekilenin bataryaya giden payı (Mode-2 AC ≈ %88–92). Şarjlara başlangıç ve bitiş yüzdesi girersen gerçek değer öğrenilir.'}</small></div><input class="input num" id="ef" inputmode="numeric" value="${Math.round(car.efficiency * 100)}"></div>
       <div class="field"><div><label for="hy">Şarj hedefi (%)</label><small>Araçta ayarlı şarj sınırı; kalan süre buna göre hesaplanır.</small></div><input class="input num" id="hy" inputmode="numeric" value="${Math.round(Number(car.hedef_yuzde) || 100)}"></div>
       <div class="field"><div><label for="tk">Araç tüketimi (kWh/100 km)</label><small>Trumore'daki ortalama; şarj kartındaki "≈ +km" buna göre hesaplanır.</small></div><input class="input num" id="tk" inputmode="decimal" value="${f(car.tuketim_kwh_100 ?? 19)}"></div>
-      <div class="field"><div><label for="pt">İstasyon fiyatı (₺/kWh)</label><small>Togg sekmesindeki kıyas için.</small></div><input class="input num" id="pt" inputmode="decimal" value="${f(car.public_tl)}"></div>
+      <div class="field"><div><label for="pt">DC şarj · indirimli (₺/kWh)</label><small>Trugo indirimli DC; şarj kararı ve kıyaslar için.</small></div><input class="input num" id="pt" inputmode="decimal" value="${f(car.public_tl)}"></div>
+      <div class="field"><div><label for="pt2">DC şarj · indirimsiz (₺/kWh)</label></div><input class="input num" id="pt2" inputmode="decimal" value="${f(car.public_tl_tam ?? 14.9)}"></div>
       ${M.history ? `<div class="field"><div><label>Aktarılan geçmiş</label><small>${esc(M.history.source || '')} · ${esc(M.history.from || '')} – ${esc(M.history.until || '')}. Togg toplamlarına eklenir.</small></div><b class="num">${num(M.histTotal, 1)} kWh</b></div>` : ''}
       <button class="btn ghost" id="saveC" style="margin-top:12px">${icon('check')}Kaydet</button>
     </div>
@@ -149,7 +150,7 @@ export function renderAyarlar(el, M, app) {
   };
   $('#saveC').onclick = () => save('settings/car', {
     ...(M.S.car || {}),   // batarya kimyası gibi formda olmayan alanlar korunur
-    battery_kwh: n($('#bk').value) || 88.5, efficiency: Math.min(1, (n($('#ef').value) || 90) / 100), public_tl: n($('#pt').value) || 9,
+    battery_kwh: n($('#bk').value) || 88.5, efficiency: Math.min(1, (n($('#ef').value) || 90) / 100), public_tl: n($('#pt').value) || 12, public_tl_tam: n($('#pt2').value) || 14.9,
     hedef_yuzde: Math.min(100, Math.max(10, n($('#hy').value) || 100)),
     tuketim_kwh_100: Math.min(60, Math.max(8, n($('#tk').value) || 19)),
   });

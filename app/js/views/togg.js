@@ -138,6 +138,61 @@ function ucCard(M) {
     </div>`;
 }
 
+// Şarj kararı: gelecek yıl Togg evde mi (limit aşılır), DC'de mi (limit içinde kalınır)? Değerler canlı veriden.
+function kararCard(M) {
+  const k = M.karar;
+  if (!k) return '';
+  const evde = k.evdeKarli;
+  const enBuyuk = Math.max(k.evde, k.dcInd, k.dcTam);
+  const w = (x) => `${Math.max(0, (x / enBuyuk) * 100).toFixed(1)}%`;
+  const evPay = k.H * k.sktt;                              // evde seçeneğinde evin payı (son kaynak)
+  const satir = (ad, top, parcalar, soluk) => `
+    <div class="kr-row${soluk ? ' soluk' : ''}"><span>${ad}</span><b>≈ ${num(top)} ₺</b></div>
+    <div class="kr-bar${soluk ? ' soluk' : ''}">${parcalar.map(([x, c]) => `<i style="width:${w(x)};background:${c}"></i>`).join('')}</div>`;
+  const pos = (v) => `${Math.min(97, Math.max(3, ((v - 6) / 10) * 100)).toFixed(1)}%`;   // 6–16 ₺ ölçeği
+  const ayRenk = (i) => (k.hepsiSktt || (k.skttBas && i + 1 >= k.skttBas) ? 'var(--bad)' : k.asimAyi && i + 1 >= k.asimAyi ? 'var(--mid)' : 'var(--good)');
+  const yolNot = k.hepsiSktt ? `${k.yil} tamamen son kaynak fiyatıyla`
+    : k.asimAyi ? `${AYLAR[k.asimAyi - 1]} ayında aşılır${k.skttBas ? ` · ${AYLAR[k.skttBas - 1]} ayından son kaynak` : ''} · ${k.yil + 1} tamamen son kaynak`
+    : 'Bu tempoyla limit aşılmıyor';
+  const ilerleme = Math.min(100, (k.sktt / k.esikSktt) * 100);
+  const dcYaz = (v) => num(v, v % 1 ? 2 : 0);
+  return `
+  <div class="card karar ${evde ? 'evde' : 'dc'}">
+    <div class="kr-head">
+      <div><div class="kr-lbl">Şarj kararı · ${k.yil}</div>
+        <div class="kr-title">${evde ? 'Evde şarj daha kârlı' : 'DC şarj daha kârlı'}</div></div>
+      <span class="kr-pill">${icon(evde ? 'home' : 'bolt')}${evde ? 'Evde' : 'DC'}</span>
+    </div>
+    <p class="kr-sub">${evde ? "İndirimli DC'ye göre" : 'Evde şarja göre'} yılda <b>≈ ${num(k.fark)} ₺</b> tasarruf</p>
+    <div class="kr-bars">
+      ${satir('Evde şarj · limit aşılır', k.evde, [[evPay, 'var(--home)'], [k.evde - evPay, 'var(--ev)']], false)}
+      ${satir(`DC indirimli · ${dcYaz(k.dc)} ₺`, k.dcInd, [[k.evNormal, 'var(--home)'], [k.evHakTl, 'var(--ev)'], [(k.T - k.hak) * k.dc, 'var(--mid)']], false)}
+      ${satir(`DC indirimsiz · ${dcYaz(k.dcTamFiyat)} ₺`, k.dcTam, [[k.evNormal, 'var(--home)'], [k.evHakTl, 'var(--ev)'], [(k.T - k.hak) * k.dcTamFiyat, 'var(--mid)']], true)}
+      <div class="kr-lg"><span><i style="background:var(--home)"></i>Ev</span><span><i style="background:var(--ev)"></i>Togg evde</span><span><i style="background:var(--mid)"></i>Togg DC</span></div>
+    </div>
+    <div class="kr-cam">
+      <div class="kr-lbl">Togg'un 1 kWh maliyeti</div>
+      <div class="kr-olcek">
+        <div class="kr-iz"></div>
+        <div class="kr-im ana" style="left:${pos(k.toggBirim)}"><span>Evde ${num(k.toggBirim, 1)}</span></div>
+        <div class="kr-im alt" style="left:${pos(k.dc)}"><span>DC ${dcYaz(k.dc)}</span></div>
+        <div class="kr-im alt soluk" style="left:${pos(k.dcTamFiyat)}"><span>${dcYaz(k.dcTamFiyat)}</span></div>
+      </div>
+      <p class="kr-not">Evdeki maliyete limit aşımı yüzünden evin zamlı faturası da dahil</p>
+      <div class="kr-ayrac"></div>
+      <div class="kr-row"><span>${icon('trend')} Karar değişir</span><span class="kr-not" style="margin:0">son kaynak fiyatı</span></div>
+      <div class="kr-esik"><b>${num(k.sktt, 2)} ₺</b><span>→</span><b class="hedef">${num(k.esikSktt, 2)} ₺</b></div>
+      <div class="kr-bar ince"><i style="width:${ilerleme.toFixed(1)}%;background:${ilerleme > 95 ? 'var(--mid)' : 'var(--good)'}"></i></div>
+      <p class="kr-not">${evde ? 'Bunu geçerse DC daha ucuz olur' : 'Bunun altına inerse evde şarj yeniden kârlı'} · fiyat her ay güncellenir</p>
+    </div>
+    <div class="kr-cam">
+      <div class="kr-lbl">${k.yil} limit yolu · ${num(k.L)} kWh</div>
+      <div class="kr-aylar">${AY_K.map((a, i) => `<div><i style="--c:${ayRenk(i)}"></i><span>${a[0]}</span></div>`).join('')}</div>
+      <p class="kr-not">${yolNot}${evde ? '' : ` · limit içinde Togg'a evde ≈ ${num(k.hak)} kWh hak`}</p>
+    </div>
+  </div>`;
+}
+
 export function renderTogg(el, M, app) {
   if (!M.evs.length && !M.histTotal) {
     el.innerHTML = `<div class="card"><div class="empty">${icon('car')}<br>Araç şarj prizi tanımlı değil.<br>Cihazlar sekmesinden prizin türünü <b>Araç şarjı</b> yap.</div></div>`;
@@ -170,6 +225,7 @@ export function renderTogg(el, M, app) {
       </div>
     </div>
     <div data-slot="charge">${chargeCard(M)}</div>
+    ${kararCard(M)}
     <div class="card">
       <div class="card-head"><h2>Aylık şarj</h2><span class="muted" style="font-size:12px;font-weight:700">kWh</span></div>
       <div class="chart short" id="cm"></div>

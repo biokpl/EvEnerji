@@ -224,6 +224,42 @@ export function build(raw) {
   const per100Duvar = per100 ?? bataryaTuketim / car.eff;
   const per100Tahmini = !per100;
   const kmOf = (duvarKwh) => (duvarKwh / per100Duvar) * 100;
+
+  // ---- Şarj kararı: gelecek yıl Togg evde mi (limit aşılır, her şey son kaynak), DC'de mi (limit içinde kalınır)?
+  // Togg: son 60 günün şarjı; ev toplamı: son iki tam ayın (fatura/sayaç) günlük ortalaması (yarım aylar ortalamayı bozmasın)
+  const karar = (() => {
+    const g60 = Array.from({ length: 60 }, (_, i) => iso(new Date(now.getTime() - (i + 1) * DAY)));
+    const toggGun = sum(g60.map((k) => evs.reduce((a, d) => a + Number(days(d.id)[k] || 0), 0) + Number(hist[k] || 0))) / 60;
+    const tamAylar = [mi - 1, mi - 2].filter((i) => i >= 0 && homeMonths[i] > 0);
+    const toplamGun = tamAylar.length ? sum(tamAylar.map((i) => homeMonths[i])) / sum(tamAylar.map((i) => new Date(y, i + 1, 0).getDate())) : rate;
+    if (!(toplamGun > 0) || !(toggGun > 0.5)) return null;
+    const evGun = Math.max(0, toplamGun - toggGun);
+    const Y = y + 1, L = tNext.limit_kwh;
+    const gunler = Array.from({ length: 12 }, (_, i) => new Date(Y, i + 1, 0).getDate());
+    const yil = sum(gunler);
+    const T = toggGun * yil, H = evGun * yil, top = T + H;
+    const fiyat = { ...tNext, normal_tl: t.normal_tl, kademe2_tl: t.kademe2_tl, kademe_kwh_gun: t.kademe_kwh_gun, kademe_kwh_ay: t.kademe_kwh_ay, yil: Y };
+    const sktt = t.sktt_tl;                                     // en güncel son kaynak fiyatı (Pi her ay günceller)
+    const dc = Number(car.public_tl) || 12, dcTam = Number(car.public_tl_tam) || 14.9;
+    const evNormal = sum(gunler.map((g, i) => ayMaliyeti(fiyat, evGun * g, false, i + 1)));
+    const hak = Math.max(0, Math.min(T, L * 0.95 - H));        // limit içinde kalırken Togg'un evde şarj hakkı (%5 pay)
+    const evHak = sum(gunler.map((g, i) => ayMaliyeti(fiyat, (evGun + hak / yil) * g, false, i + 1)));
+    const evde = top * sktt;                                    // her yıl son kaynak (bir önceki yıl limiti aştığı için)
+    const dcIle = (p) => evHak + (T - hak) * p;
+    const dcInd = dcIle(dc), dcTamTl = dcIle(dcTam);
+    // İlk yıl: limit yıl içinde aşılır, aşılan ayı izleyen 3. aydan son kaynak
+    const ayKwh = gunler.map((g) => (evGun + toggGun) * g);
+    const ilk = yilDurumu({ ...fiyat, sktt_tl: sktt, onceki_yil_kwh: proj }, ayKwh);
+    return {
+      yil: Y, L, T, H, top, sktt, dc, dcTamFiyat: dcTam, hak,
+      evde, dcInd, dcTam: dcTamTl, evNormal, evHakTl: evHak - evNormal,
+      evdeKarli: evde <= dcInd, fark: Math.abs(dcInd - evde),
+      toggBirim: (evde - evNormal) / T,                         // limit cezası dahil Togg'un evdeki 1 kWh'si
+      esikSktt: dcInd / top,                                    // son kaynak bunu geçerse DC daha ucuz
+      asimAyi: ilk.asimAyi, skttBas: ilk.skttBas && ilk.skttBas[0] === Y ? ilk.skttBas[1] : null,
+      ilkYilTl: ilk.toplamTl, hepsiSktt: proj > L,
+    };
+  })();
   const socAdd = (kwhWall) => (kwhWall * car.eff) / cap * 100;
   const hedef = Number(car.hedef_yuzde) || 100;
   for (const s of sessions) {
@@ -285,7 +321,7 @@ export function build(raw) {
   return {
     raw, now, y, mi, today, S, t, tNext, durum, projDurum, devices, enabled, home, evs, plugs, winderDev,
     homeMonths, projMonths, evMonths, evTlByMonth, ytd, ytdEst, rate, son30, proj, butce, evYtd, evShare, evProj, evTl, evAvgTl, noEvProj,
-    exceedDate, level, levelText, scenarios, nextYear, kademeAylari, sessions, per100, per100Duvar, per100Tahmini, histSarj: histSarjlar(y, cap / car.eff), activeSession, covEnd, start, holeStart, holeEnd, estTotal, estMonths, nowDurum,
+    exceedDate, level, levelText, scenarios, nextYear, kademeAylari, sessions, per100, per100Duvar, per100Tahmini, histSarj: histSarjlar(y, cap / car.eff), karar, activeSession, covEnd, start, holeStart, holeEnd, estTotal, estMonths, nowDurum,
     priceNow: birimFiyat(t, projDurum, mi + 1),
     monthTl: projDurum.aylikTl[mi], monthKwh: projMonths[mi],
     homeW: home?.live?.w ?? null,

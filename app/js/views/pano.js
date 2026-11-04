@@ -255,7 +255,7 @@ function scenarios(M) {
 
 export function renderPano(el, M, app) {
   el.innerHTML = `
-    <div class="card hero" style="--hero-glow:${M.level === 'bad' ? 'rgba(255,77,106,.18)' : M.level === 'mid' ? 'rgba(255,176,32,.16)' : 'var(--glow1)'}">
+    <div class="card hero isilti ${M.level}" style="--hero-glow:${M.level === 'bad' ? 'rgba(255,77,106,.18)' : M.level === 'mid' ? 'rgba(255,176,32,.16)' : 'var(--glow1)'}">
       ${ring(M)}
       <div class="hero-meta">
         <span class="badge ${M.level}">${icon(M.level === 'good' ? 'shield' : 'alert')}${M.levelText}</span>

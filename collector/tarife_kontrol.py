@@ -30,7 +30,7 @@ import re
 import statistics
 import sys
 import time
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 from pathlib import Path
 
 import requests
@@ -115,6 +115,27 @@ def sktt_hesapla(ptf_gun: dict[str, float], gun_sayisi: int, yekdem_tl_mwh: floa
             "gun": len(ptf_gun), "sktt_tl": fiyat(enerji, dagitim_tl)}
 
 
+def sarj_karari(ev_gun: float, togg_gun: float, tarife: dict, limit_kwh: float, sktt_tl: float,
+                dc_tl: float, dc_tam_tl: float, yil: int) -> dict:
+    """Gelecek yıl Togg evde mi şarj edilmeli (limit aşılır, her şey son kaynak) yoksa limit içinde kalıp
+    DC'de mi? Uygulamadaki Togg > Şarj kararı kartıyla aynı hesap (js/model.js karar)."""
+    import calendar
+    from tariff import Tarife, ay_maliyeti
+    t = Tarife(yil=yil, normal_tl=float(tarife.get("normal_tl") or 3.24), kademe2_tl=float(tarife.get("kademe2_tl") or 0),
+               kademe_kwh_gun=float(tarife.get("kademe_kwh_gun") or 0), kademe_kwh_ay=float(tarife.get("kademe_kwh_ay") or 0))
+    gunler = [calendar.monthrange(yil, m)[1] for m in range(1, 13)]
+    gun_yil = sum(gunler)
+    T, H = togg_gun * gun_yil, ev_gun * gun_yil
+    top = T + H
+    hak = max(0.0, min(T, limit_kwh * 0.95 - H))                 # limit içinde Togg'un evde şarj hakkı (%5 pay)
+    ev_hak = sum(ay_maliyeti(t, (ev_gun + hak / gun_yil) * g, False, i + 1) for i, g in enumerate(gunler))
+    evde = top * sktt_tl
+    dc_ind = ev_hak + (T - hak) * dc_tl
+    return {"evde": evde <= dc_ind, "evde_tl": round(evde), "dc_tl": round(dc_ind),
+            "dc_tam_tl": round(ev_hak + (T - hak) * dc_tam_tl), "esik_sktt": round(dc_ind / top, 3),
+            "fark_tl": round(abs(dc_ind - evde)), "togg_kwh": round(T), "ev_kwh": round(H)}
+
+
 def tl(x: float) -> str:
     return f"{x:.2f}".replace(".", ",")
 
@@ -148,6 +169,55 @@ class Kontrol:
             self.bildir("Tarife değişmiş olabilir, Kontrol et..!!",
                         f"Otomatik tarife kontrolü yapılamadı: {neden[:160]}", tags="warning", priority=3)
             self.durum["son_uyari"] = int(time.time())
+
+    def karar_kontrol(self, bugun: date):
+        S = self.fb.get("settings") or {}
+        cihazlar = self.fb.get("devices") or {}
+        ev_id = next((k for k, d in cihazlar.items() if d.get("type") == "ana_sayac" and d.get("enabled")), None)
+        togglar = [k for k, d in cihazlar.items() if d.get("type") == "ev_sarj" and d.get("enabled")]
+        gecmis = (S.get("ev_history") or {}).get("days") or {}
+        gunler = {(bugun - timedelta(days=i + 1)).isoformat() for i in range(60)}
+        togg = sum(float(v) for k, v in gecmis.items() if k in gunler)
+        for d in togglar:
+            togg += sum(float(v) for k, v in (self.fb.get(f"days/{d}") or {}).items() if k in gunler)
+        togg_gun = togg / 60
+        # ev toplamı: son iki tam ayın (fatura ya da sayaç, büyüğü) günlük ortalaması
+        import calendar
+        top_kwh, top_gun = 0.0, 0
+        for geri in (1, 2):
+            yy, mm = bugun.year, bugun.month - geri
+            if mm <= 0:
+                yy, mm = yy - 1, mm + 12
+            fatura = float(((S.get("bills") or {}).get(str(yy)) or {}).get(f"{mm:02d}") or 0)
+            sayac = float(self.fb.get(f"months/{ev_id}/{yy}-{mm:02d}") or 0) if ev_id else 0.0
+            k = max(fatura, sayac)
+            if k > 0:
+                top_kwh += k
+                top_gun += calendar.monthrange(yy, mm)[1]
+        if not top_gun or togg_gun < 0.5:
+            print("  Şarj kararı için yeterli veri yok")
+            return
+        ev_gun = max(0.0, top_kwh / top_gun - togg_gun)
+        bu = (S.get("tariff") or {}).get(str(bugun.year)) or {}
+        sonraki = (S.get("tariff") or {}).get(str(bugun.year + 1)) or {}
+        car = S.get("car") or {}
+        from tariff import yasal_limit
+        k = sarj_karari(ev_gun, togg_gun, bu, float(sonraki.get("limit_kwh") or yasal_limit(bugun.year + 1)),
+                        float(bu.get("sktt_tl") or 6.5), float(car.get("public_tl") or 12),
+                        float(car.get("public_tl_tam") or 14.9), bugun.year + 1)
+        onceki = (self.durum.get("karar") or {}).get("evde")
+        print(f"Şarj kararı {bugun.year + 1}: {'EVDE' if k['evde'] else 'DC'} (evde {k['evde_tl']} ₺, "
+              f"DC {k['dc_tl']} ₺, eşik son kaynak {k['esik_sktt']} ₺)")
+        if onceki is not None and onceki != k["evde"]:
+            if k["evde"]:
+                self.bildir("Togg'u yeniden evde şarj et",
+                            f"Evde şarj artık DC'den ucuz: yılda ≈ {k['fark_tl']:,} ₺ fark".replace(",", "."),
+                            tags="house", priority=4)
+            else:
+                self.bildir("Artık DC şarj daha ucuz",
+                            f"Son kaynak fiyatı yükseldi; limit içinde kalıp DC'de şarj etmek yılda ≈ "
+                            f"{k['fark_tl']:,} ₺ daha ucuz".replace(",", "."), tags="zap", priority=4)
+        self.durum["karar"] = {**k, "kontrol": bugun.isoformat()}
 
     def calis(self):
         bugun = date.today()
@@ -225,6 +295,11 @@ class Kontrol:
                 self.durum["sktt"] = s
             except Exception as e:
                 self.uyar(f"SKTT: {e}")
+        # 3) Şarj kararı (evde mi, DC mi?) — sonuç değişirse bildir
+        try:
+            self.karar_kontrol(bugun)
+        except Exception as e:
+            print("  Şarj kararı hesaplanamadı:", e)
         self.durum["son_calisma"] = datetime.now().isoformat(timespec="seconds")
         self.yaz("settings/tarife_oto", self.durum)
 

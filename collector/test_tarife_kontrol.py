@@ -87,6 +87,15 @@ def test_ayna_ptf_ay_suzulur():
     assert len(g) == 31 and set(g.values()) == {2.0}
 
 
+def test_sarj_karari():
+    # Kasım 2026 verisi: ev ~6,9 kWh/gün, Togg ~8 kWh/gün; 2027 limiti 3.000
+    tf = {"normal_tl": 3.238, "kademe2_tl": 4.857, "kademe_kwh_gun": 8}
+    k = T.sarj_karari(6.9, 8.0, tf, 3000, 6.944, 12, 14.9, 2027)
+    assert k["evde"] is True and 30000 < k["evde_tl"] < 45000 and k["dc_tl"] > k["evde_tl"]
+    assert 7.0 < k["esik_sktt"] < 7.6
+    assert T.sarj_karari(6.9, 8.0, tf, 3000, 8.0, 12, 14.9, 2027)["evde"] is False   # son kaynak pahalanırsa DC
+
+
 if __name__ == "__main__":
     n = 0
     for k, f in sorted(globals().items()):

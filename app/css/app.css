@@ -720,3 +720,12 @@ input.num, input[data-m] { caret-color: transparent; cursor: pointer; }
   backdrop-filter: blur(10px) saturate(1.1); -webkit-backdrop-filter: blur(10px) saturate(1.1); box-shadow: 0 0 0 .35px rgba(255, 255, 255, .11); }
 .hero.isilti .trio div::before { opacity: .6; }
 :root[data-theme="light"] .hero.isilti .trio div { background: rgba(20, 35, 60, .045); box-shadow: 0 0 0 .5px rgba(20, 35, 60, .08); }
+
+/* Google ile giriş ekranı */
+.giris { margin-top: 40px; text-align: center; padding: 26px 20px 22px; }
+.giris h2 { margin: 12px 0 6px; }
+.giris .hint { margin: 0 auto 16px; max-width: 300px; }
+.giris-ic { width: 56px; height: 56px; margin: 0 auto; border-radius: 18px; display: grid; place-items: center; color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 14%, transparent); box-shadow: 0 0 0 .5px color-mix(in srgb, var(--accent) 45%, transparent); }
+.giris-ic svg { width: 26px; height: 26px; }
+.giris-hata { color: var(--bad); font-size: 12.5px; font-weight: 700; margin: -6px 0 14px; }

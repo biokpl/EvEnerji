@@ -1,6 +1,7 @@
 // Veri katmanı: Firebase Realtime Database (REST + canlı akış) veya örnek veri.
 import { buildDemo, tickDemo } from './demo.js';
 import { iso } from './ui.js';
+import { authBaslat, jeton, oturum } from './auth.js';
 
 const DEFAULT_FB = "https://ev-enerji-default-rtdb.europe-west1.firebasedatabase.app";
 const LS = (k, v) => { try { if (v === undefined) return localStorage.getItem(k); if (v === null) localStorage.removeItem(k); else localStorage.setItem(k, v); } catch { return null; } };
@@ -10,7 +11,7 @@ let es = null, esWinder = null, demoTimer = null, refreshTimer = null;
 
 export const store = {
   raw: null,
-  mode: 'loading',        // 'live' | 'demo' | 'loading'
+  mode: 'loading',        // 'live' | 'demo' | 'loading' | 'giris' (veritabanı kilitli, giriş gerekli)
   reason: '',
   online: false,
   lastLive: 0,
@@ -24,6 +25,11 @@ export const store = {
 
   async init() {
     if (this.forcedDemo) return this.startDemo('Demo modu açık (Ayarlar).');
+    // Google oturumu: giriş/çıkışta sayfa yeniden yüklenir; saatlik jeton yenilemesinde canlı akış yeni jetonla yeniden açılır
+    await authBaslat(() => {
+      if (!oturum.user || this.mode === 'giris') location.reload();
+      else if (this.mode === 'live') this.startStreams();
+    });
     try {
       const raw = await loadAll(this.fb);
       const enabled = Object.values(raw.devices || {}).filter((d) => d.enabled);
@@ -38,6 +44,7 @@ export const store = {
       this.emit('all');
     } catch (e) {
       console.warn(e);
+      if (e.status === 401) { this.mode = 'giris'; this.reason = oturum.user ? 'Bu hesabın erişim izni yok.' : ''; this.emit('giris'); return; }
       this.startDemo('Sunucuya ulaşılamadı; örnek verilerle gösteriliyor.');
     }
   },
@@ -111,9 +118,12 @@ export const store = {
 };
 
 // ---------- Firebase yardımcıları
+// Veritabanı isteklerine oturum jetonu eklenir (kurallar yalnız sahibin hesabına izin verir)
+const withAuth = (url, tok) => (tok ? `${url}${url.includes('?') ? '&' : '?'}auth=${encodeURIComponent(tok)}` : url);
+
 async function req(method, url, body) {
-  const r = await fetch(url, { method, body: body === undefined ? undefined : JSON.stringify(body), cache: 'no-store' });
-  if (!r.ok) throw new Error(`${method} ${r.status}`);
+  const r = await fetch(withAuth(url, await jeton()), { method, body: body === undefined ? undefined : JSON.stringify(body), cache: 'no-store' });
+  if (!r.ok) { const e = new Error(`${method} ${r.status}`); e.status = r.status; throw e; }
   return r.json();
 }
 const q = (start) => `?orderBy=${encodeURIComponent('"$key"')}&startAt=${encodeURIComponent(`"${start}"`)}`;
@@ -140,7 +150,7 @@ async function loadAll(fb) {
 }
 
 function stream(url, onData, onError) {
-  const s = new EventSource(url);
+  const s = new EventSource(withAuth(url, oturum.token));
   const h = (e) => { try { const { path, data } = JSON.parse(e.data); onData(path, data); } catch {} };
   s.addEventListener('put', h);
   s.addEventListener('patch', (e) => {

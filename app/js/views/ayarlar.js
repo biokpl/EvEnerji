@@ -1,6 +1,7 @@
 // Ayarlar: tarife, geçmiş faturalar, uyarılar, araç, kontrol anahtarı, görünüm, dışa aktarım
 import { AY_K, downloadFile, esc, icon, num, toast } from '../ui.js';
 import { yasalLimit } from '../tariff.js';
+import { cikisYap, girisYap, oturum } from '../auth.js';
 
 let yearSel = null;
 // Tuş takımında yalnız nokta var: nokta her zaman ondalık ("3.238" = 3,238). Eski virgüllü değer de okunur.
@@ -89,6 +90,15 @@ export function renderAyarlar(el, M, app) {
       <p class="hint">Priz açma/kapama ve sarıcı komutları bu anahtarla imzalanır. Pi'deki <b>config.json → control_secret</b> ile aynı olmalı. Yalnız bu telefonda saklanır.</p>
       <div class="field"><div><label for="key">Kontrol anahtarı</label><small>${st.key ? 'Kayıtlı' : 'Girilmemiş'}</small></div><input class="input" id="key" type="password" autocomplete="off" placeholder="${st.key ? '••••••••' : 'anahtar'}" style="width:150px"></div>
       <button class="btn ghost" id="saveK" style="margin-top:12px">${icon('key')}Anahtarı kaydet</button>
+    </div>
+
+    <div class="card">
+      <h2>Hesap</h2>
+      ${oturum.user
+        ? `<div class="field"><div><label>Google hesabı</label><small>${esc(oturum.user.email || '')}</small></div><button class="btn ghost sm" id="gCikis" style="width:auto">Çıkış yap</button></div>
+           <p class="chart-note" style="margin:2px 0 0">Kimlik: <span style="user-select:text;-webkit-user-select:text">${esc(oturum.user.uid)}</span></p>`
+        : `<p class="hint">Veritabanını yalnız senin hesabına kilitlemek için bir kez Google ile giriş yap.</p>
+           <button class="btn primary" id="gGiris2">${icon('key')}Google ile giriş yap</button>`}
     </div>
 
     <div class="card pi-card">
@@ -190,6 +200,8 @@ export function renderAyarlar(el, M, app) {
       b.disabled = false;
     });
   });
+  $('#gGiris2') && ($('#gGiris2').onclick = async () => { try { await girisYap(); } catch (e) { toast(`Giriş yapılamadı: ${e.code || e.message}`, 4000); } });
+  $('#gCikis') && ($('#gCikis').onclick = async () => { await cikisYap(); });
   $('#saveK').onclick = () => { const k = $('#key').value.trim(); if (!k) return toast('Anahtar boş'); st.setKey(k); toast('Anahtar bu telefona kaydedildi'); app.refresh(); };
   $('#th').onclick = (e) => { const b = e.target.closest('[data-t]'); if (b) app.setTheme(b.dataset.t); };
   $('#demo').onclick = () => st.setForcedDemo(!st.forcedDemo);

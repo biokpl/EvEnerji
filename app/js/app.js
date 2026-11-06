@@ -9,6 +9,7 @@ import { renderCihazlar, updateCihazlar } from './views/cihazlar.js';
 import { renderSarici } from './views/sarici.js';
 import { renderAyarlar } from './views/ayarlar.js';
 import { initKeypad } from './keypad.js';
+import { cikisYap, girisYap, oturum } from './auth.js';
 
 // live: canlı veride ne yapılacağı — 'update' (yalnız sayılar), 'render' (yeniden çiz), yok = dokunma
 const VIEWS = {
@@ -153,8 +154,30 @@ document.getElementById('themeBtn').addEventListener('click', () => {
   app.setTheme(document.documentElement.dataset.theme === 'light' ? 'dark' : 'light');
 });
 
+// Veritabanı kilitli ve oturum yok (ya da yetkisiz hesap): Google ile giriş ekranı
+function renderGiris() {
+  document.getElementById('title').textContent = 'Ev Enerji';
+  document.getElementById('subtxt').textContent = 'Giriş gerekli';
+  document.getElementById('banner').innerHTML = '';
+  const u = oturum.user;
+  viewEl.innerHTML = `
+    <div class="card giris">
+      <div class="giris-ic">${icon('lock')}</div>
+      <h2>Verilerin korunuyor</h2>
+      <p class="hint">Ev Enerji yalnız senin Google hesabınla açılır. Bir kez giriş yapman yeterli; telefon seni hatırlar.</p>
+      ${u ? `<p class="giris-hata">${store.reason || ''} (${u.email})</p>` : ''}
+      ${oturum.hata && !u ? `<p class="giris-hata">${oturum.hata}</p>` : ''}
+      <button class="btn primary" id="gGiris">${icon('key')}${u ? 'Başka hesapla giriş yap' : 'Google ile giriş yap'}</button>
+    </div>`;
+  document.getElementById('gGiris').onclick = async (e) => {
+    e.currentTarget.disabled = true;
+    try { if (u) await cikisYap(); await girisYap(); } catch (err) { toast(`Giriş yapılamadı: ${err.code || err.message}`, 4000); e.currentTarget.disabled = false; }
+  };
+}
+
 let pending = false;
 store.subscribe((kind) => {
+  if (kind === 'giris') return renderGiris();
   if (kind === 'live') return onLive();
   if (kind === 'reload') return refresh({ silent: true });
   if (pending) return;

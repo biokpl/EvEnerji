@@ -1,8 +1,8 @@
 // Çevrimdışı önbellek (yalnız uygulama dosyaları; Firebase verisi önbelleğe alınmaz).
-const CACHE = 'evenerji-v71';
+const CACHE = 'evenerji-v72';
 const ASSETS = [
   './', './index.html', './manifest.json', './css/app.css', './vendor/echarts.min.js',
-  './js/app.js', './js/data.js', './js/demo.js', './js/model.js', './js/tariff.js', './js/ui.js', './js/charts.js', './js/keypad.js',
+  './js/app.js', './js/data.js', './js/demo.js', './js/model.js', './js/tariff.js', './js/ui.js', './js/charts.js', './js/keypad.js', './js/auth.js',
   './js/views/pano.js', './js/views/togg.js', './js/views/ev.js', './js/views/cihazlar.js', './js/views/sarici.js', './js/views/ayarlar.js',
   './img/t10x.webp', './icons/icon-192.png', './icons/icon-512.png',
 ];
@@ -30,6 +30,7 @@ function cacheFirst(e) {
 self.addEventListener('fetch', (e) => {
   const url = new URL(e.request.url);
   if (e.request.method !== 'GET' || url.hostname.endsWith('firebasedatabase.app')) return;
+  if (url.origin !== location.origin && !FONTS.test(url.hostname)) return;   // Google girişi ve SDK: tarayıcıya bırak
   if ((url.origin === location.origin && STATIC.test(url.pathname)) || FONTS.test(url.hostname)) {
     e.respondWith(cacheFirst(e));
     return;

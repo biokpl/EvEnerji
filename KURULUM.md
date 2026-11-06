@@ -103,3 +103,13 @@ Geri almak: dosyaları sil, `sudo systemctl disable --now ag-bekcisi.timer && su
   poweroff/reboot). Pi 3'te düğme yok; fişi çekmeden önce bunu kullan.
 - Güç: vcgencmd get_throttled 0x50000 gördü (düşük voltaj + yavaşlatma). Resmi 5,1 V 2,5 A adaptör önerilir;
   modemin USB'si yetmez (0,5–1 A) ve modem her yeniden başladığında Pi'yi de ani kapatır.
+
+## Veritabanı kilidi (2026-11-06)
+
+- Uygulama Google ile giriş yapar (app/js/auth.js, Firebase Auth; proje web uygulaması "Ev Enerji").
+  Her veritabanı isteğine ?auth=<kimlik jetonu> eklenir; jeton saatlik yenilenir, canlı akış yeniden açılır.
+- firebase-rules.json: okuma ve telefonun yazdığı yollar yalnız sahibin hesabına (uid H877KbSNOTe6Sw3Kxd7KQFHcHv12).
+  Pi ve ESP32 veritabanı gizli anahtarıyla bağlanır, kurallardan etkilenmez.
+- Kuralları yükleme / geri alma Pi'den: `cd ~/evenerji/collector && ../venv/bin/python kural.py yukle firebase-rules.json`
+  (önceki açık kurallar: kurallar.yedek.json → `kural.py geri`).
+- Yeni telefon/hesap: Ayarlar > Hesap'tan giriş yap, Kimlik'i kurallara ekle ve yeniden yükle.

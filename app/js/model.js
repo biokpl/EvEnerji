@@ -142,12 +142,22 @@ export function build(raw) {
 
   // Togg'un gerçek maliyeti = faturası Togg'la - Togg olmadan (kademe/SKTT farkı dahil)
   const evYtd = sum(evMonths);
-  const evTlByMonth = evMonths.map((k, i) => {
-    if (!k) return 0;
-    const tot = Math.max(projMonths[i], k);
-    const sk = projDurum.aylikSktt[i];
-    return ayMaliyeti(t, tot, sk, i + 1) - ayMaliyeti(t, tot - k, sk, i + 1);
-  });
+  // ---- Togg'un ay içindeki gerçek birim maliyeti (₺/kWh): ay faturası − Togg'suz ay faturası, Togg kWh'ine bölünür.
+  // Geçmiş aylar ölçülen; bu ay için Togg'un ay sonu tahmini (son 60 günün şarj hızı) kullanılır, ay başında
+  // ucuz kademe henüz dolmadı diye Togg'u ucuz göstermesin.
+  const toggGun60 = (() => {
+    const g = Array.from({ length: 60 }, (_, i) => iso(new Date(now.getTime() - (i + 1) * DAY)));
+    return sum(g.map((k) => evs.reduce((a, d) => a + Number(days(d.id)[k] || 0), 0) + Number(hist[k] || 0))) / 60;
+  })();
+  const toggAyBirim = (i) => {
+    const gunSay = new Date(y, i + 1, 0).getDate();
+    const tg = i < mi ? evMonths[i] : Math.max(evMonths[i], toggGun60 * gunSay);
+    if (!(tg > 0.5)) return birimFiyat(t, projDurum, i + 1);
+    const top = Math.max(projMonths[i], tg), sk = projDurum.aylikSktt[i];
+    return (ayMaliyeti(t, top, sk, i + 1) - ayMaliyeti(t, top - tg, sk, i + 1)) / tg;
+  };
+
+  const evTlByMonth = evMonths.map((k, i) => (k ? k * toggAyBirim(i) : 0));
   const evTl = sum(evTlByMonth);
   const evAvgTl = evYtd > 0 ? evTl / evYtd : 0;
   const evShare = proj > 0 ? Math.min(1, sum(evMonths.map((k, i) => Math.min(k, projMonths[i]))) / sum(projMonths.slice(0, mi + 1))) : 0;
@@ -187,16 +197,6 @@ export function build(raw) {
     for (const [sid, s] of Object.entries(raw.sessions?.[d.id] || {})) sessions.push({ dev: d.id, sid, ...s });
   }
   sessions.sort((a, b) => b.start - a.start);
-  // kWh/100 km: art arda iki km girişi arasındaki sürüşe, sonraki şarjın enerjisi karşılık gelir
-  const withOdo = sessions.filter((s) => s.odo).sort((a, b) => a.start - b.start);
-  for (let i = 1; i < withOdo.length; i++) {
-    const km = withOdo[i].odo - withOdo[i - 1].odo;
-    const between = sessions.filter((s) => s.start > withOdo[i - 1].start && s.start <= withOdo[i].start);
-    const k = sum(between.map((s) => s.kwh || 0));
-    if (km > 5 && km < 3000) withOdo[i].per100 = (k / km) * 100;
-  }
-  const eff = withOdo.filter((s) => s.per100);
-  const per100 = eff.length ? sum(eff.map((s) => s.per100)) / eff.length : null;
 
   // Şarj yüzdesi (SoC): araç veri vermediği için prizden ölçülen kWh ile tahmin.
   // Kullanıcı başlangıç (ve isterse bitiş) yüzdesini girer: settings/soc/{oturum} = {basla, bitis}
@@ -217,6 +217,21 @@ export function build(raw) {
   car.learnedEff = effSamples.length ? median(effSamples) : null;
   car.learnedN = effSamples.length;
   car.eff = car.learnedEff ?? car.efficiency;
+  // kWh/100 km (prizden): iki şarj arasındaki sürüş. Önceki şarjın bitiş %'si ile sonrakinin başlangıç %'si ve
+  // aradaki km'den (Trumore değerleri). Kısa yollar (ısıtma, park) yanıltıcı: en az 80 km'lik yollar sayılır.
+  const sirali = [...sessions].sort((a, b) => a.start - b.start);
+  const yollar = [];
+  for (let i = 1; i < sirali.length; i++) {
+    const o = sirali[i - 1], n = sirali[i];
+    const oOdo = o.odo, nOdo = n.odo, oSon = o.socEnd ?? (o.full ? Number(car.hedef_yuzde) || 100 : null);
+    if (!oOdo || !nOdo || oSon == null || n.socStart == null) continue;
+    const km = nOdo - oOdo, dus = oSon - n.socStart;
+    if (km >= 80 && km < 3000 && dus > 0) {
+      n.per100 = ((dus / 100) * cap / car.eff / km) * 100;
+      yollar.push(n.per100);
+    }
+  }
+  const per100 = yollar.length ? sum(yollar) / yollar.length : null;
   // Eklenen menzil: km girişlerinden öğrenilen duvar kWh/100 km varsa o; yoksa aracın menzil
   // Ayarlar'daki araç tüketimi (Trumore ortalaması; 2026-11: 3108 km'de 19 kWh/100 km)
   const bataryaTuketim = Number(car.tuketim_kwh_100) || 19;
@@ -325,7 +340,8 @@ export function build(raw) {
     raw, now, y, mi, today, S, t, tNext, durum, projDurum, devices, enabled, home, evs, plugs, winderDev,
     homeMonths, projMonths, evMonths, evTlByMonth, ytd, ytdEst, rate, son30, proj, butce, evYtd, evShare, evProj, evTl, evAvgTl, noEvProj,
     exceedDate, level, levelText, scenarios, nextYear, kademeAylari, sessions, per100, per100Duvar, per100Tahmini, histSarj: histSarjlar(y, cap / car.eff), karar, activeSession, covEnd, start, holeStart, holeEnd, estTotal, estMonths, nowDurum,
-    priceNow: birimFiyat(t, projDurum, mi + 1),
+    priceNow: birimFiyat(t, projDurum, mi + 1), toggAyBirim,
+    sarjTl: (sx) => (sx.kwh || 0) * toggAyBirim(new Date(sx.start * 1000).getMonth()),
     monthTl: projDurum.aylikTl[mi], monthKwh: projMonths[mi],
     homeW: home?.live?.w ?? null,
     evW: evs.reduce((a, d) => a + (d.live?.w || 0), 0), evKopuk,

@@ -41,7 +41,7 @@ from fb import FB
 from meter import JOB_END_S, JOB_RUN_W, DeviceMeter, JobTracker, SessionTracker, day_key, merge_months, next_wait
 from notify import Notifier
 from providers import Reading, make_provider
-from tariff import Tarife, birim_fiyat, gunluk_butce, yil_durumu, yil_sonu_tahmini
+from tariff import Tarife, ay_maliyeti, birim_fiyat, sktt_ayi_mi, gunluk_butce, yil_durumu, yil_sonu_tahmini
 
 HERE = Path(__file__).resolve().parent
 CFG_FILE = HERE / "config.json"
@@ -239,6 +239,36 @@ class Collector:
                 t.onceki_yil_kwh = round(onceki)
         return t
 
+    def togg_birim(self, did: str) -> float | None:
+        """Togg'un bu ayki gerçek birim maliyeti (₺/kWh): ay faturası − Togg'suz ay faturası, Togg kWh'ine bölünür.
+        Ay toplamı ve Togg'un ay payı son günlerin hızından tahmin edilir (uygulamadaki toggAyBirim ile aynı mantık),
+        ay başında ucuz kademe henüz dolmadı diye Togg'u ucuz göstermez."""
+        import calendar
+        bugun = date.today()
+        y, m = bugun.year, bugun.month
+        gun_say = calendar.monthrange(y, m)[1]
+        gunler = [(bugun - timedelta(days=i + 1)).isoformat() for i in range(60)]
+        gecmis = ((self.settings.get("ev_history") or {}).get("days")) or {}
+        tm = self.meters.get(did)
+        if not tm:
+            return None
+        togg60 = sum(float(tm.st["days"].get(k, 0)) + float(gecmis.get(k, 0)) for k in gunler) / 60
+        ym = f"{y}-{m:02d}"
+        tg = max(tm.month_total(ym), togg60 * gun_say)
+        hid = self.home_id()
+        if hid and hid in self.meters:
+            h = self.meters[hid].st["days"]
+            g30 = [k for k in gunler[:30] if float(h.get(k, 0)) > 0]
+            top = (sum(float(h[k]) for k in g30) / len(g30) * gun_say) if g30 else 0.0
+        else:
+            top = self.year_months(y)[m - 1] / max(1, bugun.day) * gun_say
+        if tg < 0.5:
+            return None
+        t = self.tariff(y)
+        sk = sktt_ayi_mi(t, yil_durumu(t, self.year_months(y)), m)
+        top = max(top, tg)
+        return (ay_maliyeti(t, top, sk, m) - ay_maliyeti(t, top - tg, sk, m)) / tg
+
     def price_now(self) -> tuple[float, float]:
         today = date.today()
         t = self.tariff(today.year)
@@ -304,6 +334,10 @@ class Collector:
 
     def on_session_end(self, did, m, s):
         price, sktt = self.price_now()
+        try:
+            price = self.togg_birim(did) or price      # uygulamayla aynı: Togg'un bu ayki gerçek birim maliyeti
+        except Exception as e:
+            log.warning("Togg birim maliyeti hesaplanamadı: %s", e)
         dur = (s["end"] - s["start"]) / 60
         s.update({"kwh": round(s["kwh"], 3), "birim_tl": price, "tl": round(s["kwh"] * price, 2),
                   "tl_sktt": round(s["kwh"] * sktt, 2), "minutes": round(dur),

@@ -227,7 +227,7 @@ export function chargeCard(M) {
       <div class="car-wrap"><img class="car-img" src="img/t10x.webp" alt="Togg T10X" width="120" height="63"></div>
       <div>
         <div class="t"><span class="pulse" style="display:inline-block;margin-right:6px"></span>Şarj Ediliyor · ${esc(s.dev.name)}</div>
-        <div class="v">${kwh(s.kwh, 2)} · <span class="tl-ev">${tl(s.kwh * M.priceNow)}</span></div>
+        <div class="v">${kwh(s.kwh, 2)} · <span class="tl-ev">${tl(M.sarjTl(s))}</span></div>
         <div class="s"><span class="nw">${s.kopuk ? '<span class="kv-kopuk sm">Bağlantı yok</span>' : wattFine(M.evW)}</span> · <span class="nw">${dur(min)}</span><br><span class="nw">Bu şarjda +${pct(s.added)}</span>${km}</div>
       </div>
     </div>

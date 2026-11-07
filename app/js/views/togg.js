@@ -7,14 +7,14 @@ let showAll = false;
 
 function sessItem(M, s) {
   const d = new Date(s.start * 1000);
-  const live = s.active || (M.activeSession && M.activeSession.id === s.id);
-  const cost = s.tl ?? s.kwh * M.priceNow;
+  const live = !!(M.activeSession && M.activeSession.id === s.id);   // canlı veriye göre (Pi'nin bitiş kaydını beklemez)
+  const cost = M.sarjTl(s);
   return `
   <button class="sess-item ${live ? 'live' : ''}" data-sid="${esc(s.sid)}" data-dev="${esc(s.dev)}">
     <div class="sess-date"><b>${d.getDate()}</b><span>${AY_K[d.getMonth()]}</span></div>
     <div class="sess-main">
       <div class="t">${live ? 'Şarj sürüyor' : `${GUN_K[d.getDay()]} ${hm(s.start)}${s.end ? ' – ' + hm(s.end) : ''}`}</div>
-      <div class="s">${live ? `Başlangıç ${hm(s.start)}` : dur(s.minutes ?? ((s.end - s.start) / 60))}${s.socStart != null ? ` · ${s.socAuto ? '≈' : ''}%${num(s.socStart)}→${s.socEnd != null || s.full ? '' : '≈'}%${num(s.socEnd ?? s.socEst)}` : ''}${s.per100 ? ` · ${num(s.per100, 1)} kWh/100 km` : ''}${s.odo ? ` · ${num(s.odo)} km` : ''}</div>
+      <div class="s">${live ? `Başlangıç ${hm(s.start)}` : s.end || s.minutes ? dur(s.minutes ?? ((s.end - s.start) / 60)) : 'Bitti · kaydediliyor'}${s.socStart != null ? ` · ${s.socAuto ? '≈' : ''}%${num(s.socStart)}→${s.socEnd != null || s.full ? '' : '≈'}%${num(s.socEnd ?? s.socEst)}` : ''}${s.per100 ? ` · ${num(s.per100, 1)} kWh/100 km` : ''}${s.odo ? ` · ${num(s.odo)} km` : ''}</div>
     </div>
     <div class="sess-amt"><b>${num(s.kwh, 1)} kWh</b>${tl(cost)}</div>
   </button>`;
@@ -52,7 +52,7 @@ export function openSocSheet(M, app) {
 }
 
 function openSession(M, s, app) {
-  const cost = s.tl ?? s.kwh * M.priceNow;
+  const cost = M.sarjTl(s);
   const sktt = s.tl_sktt ?? s.kwh * M.t.sktt_tl;
   const soc = (s.kwh * M.car.eff) / M.car.battery_kwh * 100;
   const ended = !!s.end;
@@ -203,7 +203,7 @@ export function renderTogg(el, M, app) {
   const n = yearSess.length + (M.histSarj || 0);
   const avg = n ? M.evYtd / n : 0;
   const nYak = M.histSarj ? '≈ ' : '';
-  const tlPer100 = M.per100Duvar * M.priceNow;   // prizden çekilen enerjinin güncel birim fiyatla bedeli
+  const tlPer100 = M.per100Duvar * M.toggAyBirim(M.mi);   // prizden çekilen enerjinin bu ayki Togg birim maliyetiyle bedeli
   const yak = M.per100Tahmini ? '≈ ' : '';
   const skttCost = M.evYtd * M.t.sktt_tl;
   const list = showAll ? M.sessions : M.sessions.slice(0, 8);

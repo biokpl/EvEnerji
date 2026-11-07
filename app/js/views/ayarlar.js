@@ -66,8 +66,8 @@ export function renderAyarlar(el, M, app) {
       <div class="field"><div><label for="tk">Araç tüketimi (kWh/100 km)</label><small>Trumore'daki ortalama; şarj kartındaki "≈ +km" buna göre hesaplanır.</small></div><input class="input num" id="tk" inputmode="decimal" value="${f(car.tuketim_kwh_100 ?? 19)}"></div>
       <div class="field"><div><label for="pt">DC şarj · indirimli (₺/kWh)</label><small>Trugo indirimli DC; şarj kararı ve kıyaslar için.</small></div><input class="input num" id="pt" inputmode="decimal" value="${f(car.public_tl)}"></div>
       <div class="field"><div><label for="pt2">DC şarj · indirimsiz (₺/kWh)</label></div><input class="input num" id="pt2" inputmode="decimal" value="${f(car.public_tl_tam ?? 14.9)}"></div>
-      <div class="field"><div><label for="lp">LPG fiyatı (₺/L)</label><small>Pano'daki km başı kıyas için (İstanbul Avrupa).</small></div><input class="input num" id="lp" inputmode="decimal" value="${f(car.lpg_tl ?? 50.7)}"></div>
-      <div class="field"><div><label for="lpt">LPG'li araç tüketimi (L/100 km)</label><small>Togg boyutunda SUV için ~10.</small></div><input class="input num" id="lpt" inputmode="decimal" value="${f(car.lpg_l100 ?? 10)}"></div>
+      <div class="field"><div><label for="lp">LPG fiyatı (₺/L)</label><small>Her sabah Petrol Ofisi'nden (İstanbul Avrupa) otomatik güncellenir.</small></div><input class="input num" id="lp" inputmode="decimal" value="${f(car.lpg_tl ?? 50.7)}"></div>
+      <div class="field"><div><label for="lpt">LPG'li araç tüketimi (L/100 km)</label><small>Kendi LPG'li aracınız: 41 L ile 400 km.</small></div><input class="input num" id="lpt" inputmode="decimal" value="${f(car.lpg_l100 ?? 10)}"></div>
       ${M.history ? `<div class="field"><div><label>Aktarılan geçmiş</label><small>${esc(M.history.source || '')} · ${esc(M.history.from || '')} – ${esc(M.history.until || '')}. Togg toplamlarına eklenir.</small></div><b class="num">${num(M.histTotal, 1)} kWh</b></div>` : ''}
       <button class="btn ghost" id="saveC" style="margin-top:12px">${icon('check')}Kaydet</button>
     </div>

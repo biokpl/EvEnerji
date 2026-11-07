@@ -169,7 +169,7 @@ function kmCard(M) {
         <div><span>Yıllık · ≈ ${num(kmTempo)} km</span><b class="kmk-yesil">≈ ${num(kmTempo * (lpg - ev))} ₺</b><span>bu tempoyla</span></div>
       </div>
     </div>
-    <p class="kr-not">LPG ${num(lpgTl, 2)} ₺/L (İstanbul Avrupa) · ${num(lpgL, lpgL % 1 ? 1 : 0)} L/100 km varsayım · Ayarlar'dan değişir</p>
+    <p class="kr-not">LPG ${num(lpgTl, 2)} ₺/L · ${c.lpg_guncel?.tarih ? `Petrol Ofisi, ${c.lpg_guncel.tarih.slice(8, 10)}.${c.lpg_guncel.tarih.slice(5, 7)}` : 'İstanbul Avrupa'} · LPG'li aracınız ${num(lpgL, lpgL % 1 ? 2 : 0)} L/100 km</p>
   </div>`;
 }
 

@@ -77,6 +77,7 @@ function header() {
   conn.className = `conn ${store.mode === 'demo' ? 'demo' : !store.online || stale ? 'off' : 'on'}`;
   let sub = 'Ev Enerji';
   if (store.mode === 'demo') sub = 'Örnek veri';
+  else if (store.guncelleniyor) sub = 'Güncelleniyor…';
   else if (!store.online) sub = 'Bağlantı yok';
   else if (stale) sub = 'Pi yanıt vermiyor';
   else if (M?.activeSession) sub = 'Togg şarj oluyor';
@@ -179,7 +180,7 @@ let pending = false;
 store.subscribe((kind) => {
   if (kind === 'giris') return renderGiris();
   if (kind === 'live') return onLive();
-  if (kind === 'reload') return refresh({ silent: true });
+  if (kind === 'reload') { if (M) header(); return refresh({ silent: true }); }
   if (pending) return;
   pending = true;
   requestAnimationFrame(() => { pending = false; refresh(); });

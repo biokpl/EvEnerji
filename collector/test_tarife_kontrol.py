@@ -96,6 +96,15 @@ def test_sarj_karari():
     assert T.sarj_karari(6.9, 8.0, tf, 3000, 8.0, 12, 14.9, 2027)["evde"] is False   # son kaynak pahalanırsa DC
 
 
+def test_po_lpg_okunur():
+    sayfa = """<table><tr><th>Şehir</th><th>V/Max Kurşunsuz 95</th><th>V/Max Diesel</th><th>Gazyağı</th>
+    <th>Kalorifer Yakıtı</th><th>Fuel Oil</th><th>PO/gaz Otogaz</th></tr>
+    <tr><td>ISTANBUL (AVRUPA)</td><td>74.60 62.17 TL/LT</td><td>95.20 79.34</td><td>92.39 77.00</td>
+    <td>66.26 55.22</td><td>50.10 41.75</td><td>50.70 42.25 TL/LT</td></tr>
+    <tr><td>ISTANBUL (ANADOLU)</td><td>74.40</td><td>62.00</td><td>95.00</td><td>79.17</td><td>1</td><td>1</td><td>1</td><td>1</td><td>1</td><td>1</td><td>50.10</td><td>41.70</td></tr></table>"""
+    assert T.oku_po_lpg(sayfa) == 50.70
+
+
 if __name__ == "__main__":
     n = 0
     for k, f in sorted(globals().items()):

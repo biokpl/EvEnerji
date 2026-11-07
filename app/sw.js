@@ -1,5 +1,5 @@
 // Çevrimdışı önbellek (yalnız uygulama dosyaları; Firebase verisi önbelleğe alınmaz).
-const CACHE = 'evenerji-v76';
+const CACHE = 'evenerji-v77';
 const ASSETS = [
   './', './index.html', './manifest.json', './css/app.css', './vendor/echarts.min.js',
   './js/app.js', './js/data.js', './js/demo.js', './js/model.js', './js/tariff.js', './js/ui.js', './js/charts.js', './js/keypad.js', './js/auth.js',
@@ -30,18 +30,21 @@ function cacheFirst(e) {
 self.addEventListener('fetch', (e) => {
   const url = new URL(e.request.url);
   if (e.request.method !== 'GET' || url.hostname.endsWith('firebasedatabase.app')) return;
-  if (url.origin !== location.origin && !FONTS.test(url.hostname)) return;   // Google girişi ve SDK: tarayıcıya bırak
+  // Google giriş kütüphanesi sürüm numaralı adreste: değişmez, önbellekten anında
+  if (url.hostname === 'www.gstatic.com' && url.pathname.startsWith('/firebasejs/')) { e.respondWith(cacheFirst(e)); return; }
+  if (url.origin !== location.origin && !FONTS.test(url.hostname)) return;   // Google girişi: tarayıcıya bırak
   if ((url.origin === location.origin && STATIC.test(url.pathname)) || FONTS.test(url.hostname)) {
     e.respondWith(cacheFirst(e));
     return;
   }
-  e.respondWith(
-    // no-cache: tarayıcı önbelleğindeki eski modülle yenisi karışmasın (sunucuya doğrulatır)
-    fetch(e.request, url.origin === location.origin ? { cache: 'no-cache' } : undefined)
-      .then((res) => {
-        if (res.ok && url.origin === location.origin) { const copy = res.clone(); caches.open(CACHE).then((c) => c.put(e.request, copy)); }
-        return res;
-      })
-      .catch(() => caches.match(e.request, { ignoreSearch: true }).then((r) => r || caches.match('./index.html')))
-  );
+  // Uygulama dosyaları: önce telefondaki kopya (anında açılır), arkada sunucudan tazelenir.
+  // Her yayında CACHE sürümü değiştiği için yeni sürüm kurulumda bütünüyle iner; dosyalar karışmaz.
+  const ag = fetch(e.request, { cache: 'no-cache' }).then((res) => {
+    if (res.ok) { const copy = res.clone(); caches.open(CACHE).then((c) => c.put(e.request, copy)); }
+    return res;
+  });
+  e.respondWith(caches.match(e.request, { ignoreSearch: true }).then((hit) => {
+    if (hit) { e.waitUntil(ag.then(() => {}, () => {})); return hit; }
+    return ag.catch(() => caches.match('./index.html'));
+  }));
 });

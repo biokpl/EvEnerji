@@ -6,6 +6,11 @@ import { authBaslat, jeton, oturum } from './auth.js';
 const DEFAULT_FB = "https://ev-enerji-default-rtdb.europe-west1.firebasedatabase.app";
 const LS = (k, v) => { try { if (v === undefined) return localStorage.getItem(k); if (v === null) localStorage.removeItem(k); else localStorage.setItem(k, v); } catch { return null; } };
 
+// Son veri telefonda saklanır: açılışta anında çizilir, arkada güncellenir (yavaş bağlantıda bekletmesin)
+const ONBELLEK = 'evEnerji.sonVeri';
+const onbellekOku = () => { try { return JSON.parse(LS(ONBELLEK) || 'null'); } catch { return null; } };
+const onbellekYaz = (raw) => { try { LS(ONBELLEK, JSON.stringify(raw)); } catch { /* yer yoksa geç */ } };
+
 const subs = new Set();
 let es = null, esWinder = null, demoTimer = null, refreshTimer = null;
 
@@ -15,6 +20,7 @@ export const store = {
   reason: '',
   online: false,
   lastLive: 0,
+  guncelleniyor: false,   // önbellekteki veri gösteriliyor, taze veri bekleniyor
   get fb() { return LS('evEnerji.fb') || DEFAULT_FB; },
   get forcedDemo() { return LS('evEnerji.demo') === '1'; },
   setForcedDemo(on) { LS('evEnerji.demo', on ? '1' : null); location.reload(); },
@@ -25,8 +31,14 @@ export const store = {
 
   async init() {
     if (this.forcedDemo) return this.startDemo('Demo modu açık (Ayarlar).');
+    const eski = onbellekOku();
+    if (eski?.devices) {
+      this.raw = eski; this.mode = 'live'; this.online = true; this.guncelleniyor = true;
+      this.emit('all');
+    }
     // Google oturumu: giriş/çıkışta sayfa yeniden yüklenir; saatlik jeton yenilemesinde canlı akış yeni jetonla yeniden açılır
     await authBaslat(() => {
+      if (!oturum.user) LS(ONBELLEK, null);
       if (!oturum.user || this.mode === 'giris') location.reload();
       else if (this.mode === 'live') this.startStreams();
     });
@@ -35,16 +47,20 @@ export const store = {
       const enabled = Object.values(raw.devices || {}).filter((d) => d.enabled);
       const hasData = Object.keys(raw.settings?.bills || {}).length || raw.settings?.ev_history;
       if (!enabled.length && !hasData) return this.startDemo('Henüz cihaz bağlanmadı; örnek verilerle gösteriliyor.');
+      const ilk = !this.guncelleniyor;
       this.raw = raw;
       this.mode = 'live';
       this.online = true;
+      this.guncelleniyor = false;
+      onbellekYaz(raw);
       this.startStreams();
       refreshTimer = setInterval(() => this.reload(), 120e3);
       document.addEventListener('visibilitychange', () => { if (!document.hidden) this.reload(); });
-      this.emit('all');
+      this.emit(ilk ? 'all' : 'reload');
     } catch (e) {
       console.warn(e);
-      if (e.status === 401) { this.mode = 'giris'; this.reason = oturum.user ? 'Bu hesabın erişim izni yok.' : ''; this.emit('giris'); return; }
+      this.guncelleniyor = false;
+      if (e.status === 401) { LS(ONBELLEK, null); this.raw = null; this.mode = 'giris'; this.reason = oturum.user ? 'Bu hesabın erişim izni yok.' : ''; this.emit('giris'); return; }
       this.startDemo('Sunucuya ulaşılamadı; örnek verilerle gösteriliyor.');
     }
   },
@@ -65,6 +81,7 @@ export const store = {
       const raw = await loadAll(this.fb);
       raw.live = { ...raw.live, ...this.raw.live };
       this.raw = raw;
+      onbellekYaz(raw);
       this.online = true;
       this.emit('reload');
     } catch { this.online = false; this.emit('live'); }

@@ -136,6 +136,32 @@ def sarj_karari(ev_gun: float, togg_gun: float, tarife: dict, limit_kwh: float, 
             "fark_tl": round(abs(dc_ind - evde)), "togg_kwh": round(T), "ev_kwh": round(H)}
 
 
+PO_ISTANBUL = "https://www.petrolofisi.com.tr/akaryakit-fiyatlari/istanbul-akaryakit-fiyatlari"
+
+
+def oku_po_lpg(sayfa: str, bolge: str = "ISTANBUL (AVRUPA)") -> float:
+    """Petrol Ofisi il fiyat tablosundan otogaz (PO/gaz) litre fiyatı, KDV dahil ₺/L.
+    Tablo başlığındaki ürün sırasına göre okunur; satırda her ürün için önce KDV dahil, sonra hariç fiyat var."""
+    import html as _h
+    metin = lambda x: _h.unescape(re.sub(r"\s+", " ", re.sub(r"<[^>]+>", " ", x))).strip()
+    tablo = sayfa[sayfa.find("<table"):]
+    basliklar = [metin(h) for h in re.findall(r"<th[^>]*>(.*?)</th>", tablo, re.S)]
+    urunler = [b for b in basliklar if b and b.lower() != "şehir"]
+    sira = next((i for i, b in enumerate(urunler) if "otogaz" in b.lower()), None)
+    if sira is None:
+        raise ValueError("PO tablosunda otogaz sütunu yok")
+    for satir in re.findall(r"<tr[^>]*>(.*?)</tr>", tablo, re.S):
+        if bolge in metin(satir).upper():
+            sayilar = [float(x) for x in re.findall(r"\b\d{1,3}\.\d{2}\b", metin(satir))]
+            if len(sayilar) < 2 * (sira + 1):
+                raise ValueError(f"PO satırı eksik: {sayilar}")
+            fiyat = sayilar[2 * sira]
+            if not 15 < fiyat < 200:
+                raise ValueError(f"LPG fiyatı olağan dışı: {fiyat}")
+            return fiyat
+    raise ValueError(f"PO tablosunda {bolge} yok")
+
+
 def tl(x: float) -> str:
     return f"{x:.2f}".replace(".", ",")
 
@@ -295,7 +321,21 @@ class Kontrol:
                 self.durum["sktt"] = s
             except Exception as e:
                 self.uyar(f"SKTT: {e}")
-        # 3) Şarj kararı (evde mi, DC mi?) — sonuç değişirse bildir
+        # 3) LPG fiyatı (km başı kıyas kartı için): Petrol Ofisi İstanbul Avrupa otogaz
+        try:
+            lpg = oku_po_lpg(requests.get(PO_ISTANBUL, headers=UA, timeout=30).text)
+            eski = float((self.fb.get("settings/car/lpg_tl") or 0))
+            print(f"LPG (PO İstanbul Avrupa): {lpg} ₺/L (eski {eski})")
+            if abs(lpg - eski) > 0.005:
+                self.yaz("settings/car", {"lpg_tl": lpg})
+                if eski:
+                    self.bildir("LPG fiyatı " + ("arttı" if lpg > eski else "düştü"),
+                                f"Otogaz {tl(eski)} → {tl(lpg)} ₺/L (İstanbul Avrupa); km başı kıyas güncellendi.",
+                                tags="fuelpump", priority=1)
+            self.yaz("settings/car/lpg_guncel", {"tarih": bugun.isoformat(), "kaynak": "Petrol Ofisi · İstanbul Avrupa"})
+        except Exception as e:
+            print("  LPG fiyatı okunamadı:", e)
+        # 4) Şarj kararı (evde mi, DC mi?) — sonuç değişirse bildir
         try:
             self.karar_kontrol(bugun)
         except Exception as e:

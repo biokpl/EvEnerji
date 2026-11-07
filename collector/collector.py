@@ -26,6 +26,8 @@ import hmac
 import json
 import logging
 import os
+import queue
+import secrets
 import signal
 import subprocess
 import sys
@@ -36,7 +38,7 @@ from datetime import date, datetime, timedelta
 from pathlib import Path
 
 from fb import FB
-from meter import JOB_END_S, DeviceMeter, JobTracker, SessionTracker, day_key, merge_months, next_wait
+from meter import JOB_END_S, JOB_RUN_W, DeviceMeter, JobTracker, SessionTracker, day_key, merge_months, next_wait
 from notify import Notifier
 from providers import Reading, make_provider
 from tariff import Tarife, birim_fiyat, gunluk_butce, yil_durumu, yil_sonu_tahmini
@@ -52,6 +54,8 @@ logging.basicConfig(level=logging.INFO, format="%(asctime)s %(name)s %(levelname
 log = logging.getLogger("collector")
 
 WINDER_BLOCKS_CHARGE = {"sarili", "sariyor", "aciliyor", "hata"}
+OTO_KAPAT_W = 40          # iş bittikten sonra bu gücün altındaysa priz kapatılabilir (Bambu bekleme ~15 W)
+LAN_PORT = 8099           # ev ağı "prizi aç" kapısı (yalnız açar, asla kapatmaz)
 
 
 def load_json(p: Path, default):
@@ -126,6 +130,8 @@ class Collector:
         self.state.setdefault("meters", {})
         self.state.setdefault("alerts", {})
         self.state.setdefault("hi_amp_since", {})
+        self.state.setdefault("oto_kapat", {})      # cihaz -> {"zaman": ts}: iş bitince bu zamanda kapat
+        self.lan_q: queue.Queue = queue.Queue()
         self.meta: dict = {}
         self.providers: dict = {}
         # sağlayıcılar arası ortak nesneler; save_cfg: yenilenen eWeLink jetonunu config.json'a yazar
@@ -284,6 +290,7 @@ class Collector:
                     self.on_job_end(did, m, data)
                 elif ev == "devam":
                     self.on_job_resume(did, m, data["gap"], end_s)
+                self.oto_kapat_kontrol(did, m, r, w, now)
             self.check_safety(did, m, r, now)
         if live_out:
             self.fb.safe(self.fb.patch, "live", live_out)
@@ -329,6 +336,10 @@ class Collector:
     def on_job_end(self, did, m, job):
         mins = (job["end"] - job["start"]) / 60
         log.info("İş bitti: %s %.0f dk %.3f kWh", did, mins, job["kwh"])
+        dk = float(m.get("oto_kapat_dk") or 0)
+        if dk > 0:
+            self.state["oto_kapat"][did] = {"zaman": time.time() + dk * 60}
+            log.info("%s %g dk sonra kapatılacak (bekleme gücünde kalırsa)", did, dk)
         if not m.get("bitti_bildirim", True):
             return
         price, _ = self.price_now()
@@ -342,6 +353,102 @@ class Collector:
         # bildirim ağı beklerken ölçüm döngüsü durmasın
         self.pool.submit(self.ntfy.send, f"{m.get('name', did)} bitti", msg,
                          tags="white_check_mark", open_tab="cihazlar")
+
+    def oto_kapat_kontrol(self, did, m, r: Reading, w, now):
+        """İş bittikten sonra soğuma süresi doldu ve cihaz hâlâ bekleme gücündeyse prizi kapatır.
+        Güç yeniden yükselirse (yeni iş) kapatma iptal; baskı/iş sürerken priz asla kapanmaz."""
+        bek = self.state["oto_kapat"].get(did)
+        if not bek:
+            return
+        if not float(m.get("oto_kapat_dk") or 0) or (r.ok and r.on is False):
+            self.state["oto_kapat"].pop(did, None)
+            return
+        if w is not None and w >= JOB_RUN_W:
+            self.state["oto_kapat"].pop(did, None)
+            log.info("%s yeniden çalışıyor (%.0f W): otomatik kapatma iptal", did, w)
+            return
+        if now < bek["zaman"] or not r.ok or w is None or w >= OTO_KAPAT_W:
+            return
+        prov = self.providers.get(did)
+        try:
+            prov.set_switch(False)
+        except Exception as e:
+            log.warning("%s otomatik kapatılamadı: %s", did, e)
+            bek["zaman"] = now + 60
+            return
+        self.state["oto_kapat"].pop(did, None)
+        log.info("%s otomatik kapatıldı (%.0f W bekleme)", did, w)
+        self.pool.submit(self.ntfy.send, f"{m.get('name', did)} kapatıldı",
+                         f"İş bittikten sonra {float(m.get('oto_kapat_dk')):g} dk bekleme gücünde ({w:.0f} W) kaldı; priz kapatıldı. "
+                         "Bambu Studio ya da Bambu Handy açılınca yeniden açılır.",
+                         tags="zzz", priority=2, open_tab="cihazlar")
+
+    # ---------------------------------------------------------- ev ağı "prizi aç" kapısı
+    def lan_baslat(self):
+        """http://<pi>:8099/ac/<cihaz>?k=<anahtar> — yalnız AÇAR. Bambu Studio (PC) / Bambu Handy (telefon) açılınca çağrılır."""
+        from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+        from urllib.parse import parse_qs, urlparse
+        if not self.cfg.get("lan_token"):
+            self.cfg["lan_token"] = secrets.token_urlsafe(18)
+            self.save_cfg()
+        token = self.cfg["lan_token"]
+        topla = self
+
+        class H(BaseHTTPRequestHandler):
+            def log_message(self, *a):
+                pass
+
+            def do_GET(self):
+                u = urlparse(self.path)
+                k = (parse_qs(u.query).get("k") or [""])[0]
+                parca = u.path.strip("/").split("/")
+                if len(parca) != 2 or parca[0] != "ac" or not hmac.compare_digest(k, token):
+                    self.send_response(404); self.end_headers(); return
+                bitti = threading.Event()
+                sonuc: dict = {}
+                topla.lan_q.put((parca[1], bitti, sonuc))
+                bitti.wait(8)
+                govde = json.dumps(sonuc or {"ok": False, "msg": "zaman aşımı"}, ensure_ascii=False).encode()
+                self.send_response(200 if sonuc.get("ok") else 409)
+                self.send_header("Content-Type", "application/json; charset=utf-8")
+                self.end_headers()
+                self.wfile.write(govde)
+
+        srv = ThreadingHTTPServer(("0.0.0.0", int(self.cfg.get("lan_port", LAN_PORT))), H)
+        threading.Thread(target=srv.serve_forever, daemon=True, name="lan").start()
+        log.info("Ev ağı aç kapısı: port %s", srv.server_port)
+        # Telefon otomasyonu (MacroDroid) için adres: uygulama Ayarlar'da kopyalanabilir gösterir (veritabanı yalnız sahibe açık)
+        try:
+            import socket
+            with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as so:
+                so.connect(("192.168.1.1", 80))
+                ip = so.getsockname()[0]
+            self.fb.safe(self.fb.patch, "settings/lan", {"ac_url": f"http://{ip}:{srv.server_port}/ac/{{cihaz}}?k={token}"})
+        except OSError as e:
+            log.warning("Pi ev ağı adresi bulunamadı: %s", e)
+
+    def lan_isle(self):
+        while not self.lan_q.empty():
+            did, bitti, sonuc = self.lan_q.get()
+            try:
+                sonuc.update(self.lan_ac(did))
+            except Exception as e:
+                sonuc.update({"ok": False, "msg": str(e)})
+            bitti.set()
+
+    def lan_ac(self, did: str) -> dict:
+        m = self.meta.get(did)
+        if not m or did not in self.providers:
+            return {"ok": False, "msg": "cihaz yok"}
+        dk = float(m.get("oto_kapat_dk") or 0)
+        if did in self.state["oto_kapat"] and dk:          # kapatma bekleniyordu: süre baştan başlar
+            self.state["oto_kapat"][did]["zaman"] = time.time() + dk * 60
+        lv = self.live.get(did)
+        if lv and lv.on:
+            return {"ok": True, "msg": "zaten açık"}
+        res = self.execute(did, "on")                       # sarıcı/şarj kuralları burada da geçerli
+        log.info("Ev ağından açma isteği: %s -> %s", did, res)
+        return res
 
     def check_safety(self, did, m, r: Reading, now):
         sf = self.cfg.get("safety", {})
@@ -514,6 +621,10 @@ class Collector:
         self.t_meta = time.time()
         self.discover()
         self.t_disc = time.time()
+        try:
+            self.lan_baslat()
+        except Exception as e:
+            log.warning("Ev ağı kapısı açılamadı: %s", e)
         while self.running:
             t0 = time.time()
             if t0 - self.t_meta >= 60:
@@ -533,6 +644,7 @@ class Collector:
                 if time.time() - self.t_cmd >= 3:
                     self.run_commands()
                     self.t_cmd = time.time()
+                self.lan_isle()
                 time.sleep(0.5)
         self.flush()
         log.info("Durdu")

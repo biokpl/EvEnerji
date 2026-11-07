@@ -107,6 +107,10 @@ export function renderAyarlar(el, M, app) {
         <div><h2>Raspberry Pi</h2>${piDurum(M.raw.status)}</div>
       </div>
       <p class="hint">Pi 3'te açma/kapama düğmesi yok. Fişini çekmeden önce <b>Güvenli kapat</b>: kayıtlar diske yazılır, SD kart korunur. Işığı sönünce fişi çekebilirsin; fişi geri takınca kendiliğinden açılır.</p>
+      ${M.S.lan?.ac_url && M.devices.some((d) => d.type === 'priz') ? `<details class="tbl" style="margin:0 0 10px"><summary>Telefon otomasyonu (prizi aç adresi)</summary>
+        <p class="chart-note">MacroDroid'de "uygulama açılınca → HTTP isteği (GET)" eylemine yapıştır. Yalnız ev Wi-Fi'ında çalışır ve yalnız <b>açar</b>, asla kapatmaz.</p>
+        ${M.devices.filter((d) => d.type === 'priz').map((d) => `<div class="field"><div><label>${esc(d.name)}</label></div><button class="btn ghost sm" data-lan="${esc(M.S.lan.ac_url.replace('{cihaz}', d.id))}" style="width:auto">${icon('download')}Kopyala</button></div>`).join('')}
+      </details>` : ''}
       <div class="btn-row">
         <button class="btn pi-btn re" data-pi="yeniden">${icon('refresh')}<span>Yeniden başlat</span></button>
         <button class="btn pi-btn off" data-pi="kapat">${icon('power')}<span>Güvenli kapat</span></button>
@@ -202,6 +206,9 @@ export function renderAyarlar(el, M, app) {
   });
   $('#gGiris2') && ($('#gGiris2').onclick = async () => { try { await girisYap(); } catch (e) { toast(`Giriş yapılamadı: ${e.code || e.message}`, 4000); } });
   $('#gCikis') && ($('#gCikis').onclick = async () => { await cikisYap(); });
+  el.querySelectorAll('[data-lan]').forEach((b) => b.addEventListener('click', async () => {
+    try { await navigator.clipboard.writeText(b.dataset.lan); toast('Adres kopyalandı'); } catch { toast('Kopyalanamadı'); }
+  }));
   $('#saveK').onclick = () => { const k = $('#key').value.trim(); if (!k) return toast('Anahtar boş'); st.setKey(k); toast('Anahtar bu telefona kaydedildi'); app.refresh(); };
   $('#th').onclick = (e) => { const b = e.target.closest('[data-t]'); if (b) app.setTheme(b.dataset.t); };
   $('#demo').onclick = () => st.setForcedDemo(!st.forcedDemo);

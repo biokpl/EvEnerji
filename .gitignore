@@ -8,3 +8,5 @@ collector/devices.json
 collector/snapshot.json
 __pycache__/
 *.pyc
+pc/bambu_ac.json
+pc/bambu_ac.log

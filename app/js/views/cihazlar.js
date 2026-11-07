@@ -83,6 +83,8 @@ function editSheet(M, id, app, fresh = null) {
     <div class="field"><label for="rm">Oda / yer</label><input class="input" id="rm" value="${esc(d.room || '')}" placeholder="ör. Mutfak" style="width:190px"></div>
     <div class="field"><label for="tp">Tür</label>
       <select class="input" id="tp">${Object.entries(TYPES).filter(([k]) => k !== 'kablo_sarici' || d.type === 'kablo_sarici').map(([k, v]) => `<option value="${k}" ${d.type === k ? 'selected' : ''}>${v}</option>`).join('')}</select></div>
+    ${(d.type || 'priz') === 'priz' ? `<div class="field"><div><label for="ok">İş bitince prizi kapat</label><small>İş bittikten sonra bu kadar beklemede kalırsa priz kapanır (ör. 3D yazıcı soğusun diye 20 dk). İş sürerken asla kapanmaz.</small></div>
+      <select class="input" id="ok" style="width:110px">${[[0, 'Kapalı'], [10, '10 dk sonra'], [20, '20 dk sonra'], [30, '30 dk sonra'], [60, '1 sa sonra']].map(([v, t]) => `<option value="${v}" ${Number(d.oto_kapat_dk || 0) === v ? 'selected' : ''}>${t}</option>`).join('')}</select></div>` : ''}
     <div class="field"><div><label for="ma">Akım sınırı (A)</label><small>Uzun süre bunun %85'i aşılırsa uyarı gelir.</small></div><input class="input num" id="ma" inputmode="decimal" value="${d.max_amp ?? 16}"></div>
     <div style="margin:14px 0 8px;font-weight:800;font-size:14px">İkon</div>
     <div class="icon-pick" id="ip">${DEVICE_ICONS.map((n) => `<button data-i="${n}" class="${n === ic ? 'on' : ''}" aria-label="${n}">${icon(n)}</button>`).join('')}</div>
@@ -112,8 +114,11 @@ function editSheet(M, id, app, fresh = null) {
         max_amp: Number(String(sh.querySelector('#ma').value).replace(',', '.')) || 16,
         enabled: en.classList.contains('on'), order: d.order ?? M.devices.length,
       };
+      const ok = sh.querySelector('#ok');
+      if (ok) meta.oto_kapat_dk = Number(ok.value) || null;
       try {
-        await app.store.put(`devices/${id}`, meta);
+        // patch: formda olmayan ayarlar (bitti süresi, bildirim tercihi) silinmesin
+        await app.store.patch(`devices/${id}`, meta);
         if (fresh) await app.store.put(`discovered/${id}`, null);
         closeSheet(); toast(fresh ? 'Priz eklendi; 1 dk içinde ölçüm başlar' : 'Kaydedildi');
       } catch { toast('Kaydedilemedi'); }

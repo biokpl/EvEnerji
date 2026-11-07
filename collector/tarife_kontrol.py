@@ -328,10 +328,6 @@ class Kontrol:
             print(f"LPG (PO İstanbul Avrupa): {lpg} ₺/L (eski {eski})")
             if abs(lpg - eski) > 0.005:
                 self.yaz("settings/car", {"lpg_tl": lpg})
-                if eski:
-                    self.bildir("LPG fiyatı " + ("arttı" if lpg > eski else "düştü"),
-                                f"Otogaz {tl(eski)} → {tl(lpg)} ₺/L (İstanbul Avrupa); km başı kıyas güncellendi.",
-                                tags="fuelpump", priority=1)
             self.yaz("settings/car/lpg_guncel", {"tarih": bugun.isoformat(), "kaynak": "Petrol Ofisi · İstanbul Avrupa"})
         except Exception as e:
             print("  LPG fiyatı okunamadı:", e)

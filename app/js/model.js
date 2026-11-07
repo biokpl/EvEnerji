@@ -301,7 +301,10 @@ export function build(raw) {
       toggGece: toggOlc > 0.5 ? toggSaat.gece / toggOlc : null, toggAy: togg * 30 / ucN };
   }
 
-  const activeSession = evs.map((d) => d.live?.session && (d.live?.w || 0) > 50 ? { dev: d, ...d.live.session } : null).find(Boolean) || null;
+  // Priz Wi-Fi'dan kısa süre koparsa Pi oturumu sürdürür; kart da kaybolmasın (kopuk: güç bilinmiyor)
+  const evKopuk = evs.some((d) => d.live && d.live.ok === false);
+  const activeSession = evs.map((d) => d.live?.session && ((d.live?.w || 0) > 50 || d.live?.ok === false)
+    ? { dev: d, ...d.live.session, kopuk: d.live?.ok === false } : null).find(Boolean) || null;
   if (activeSession) {
     const a = activeSession, v = socIn[a.id] || {};
     const w = a.dev.live?.w || 0;
@@ -325,7 +328,7 @@ export function build(raw) {
     priceNow: birimFiyat(t, projDurum, mi + 1),
     monthTl: projDurum.aylikTl[mi], monthKwh: projMonths[mi],
     homeW: home?.live?.w ?? null,
-    evW: evs.reduce((a, d) => a + (d.live?.w || 0), 0),
+    evW: evs.reduce((a, d) => a + (d.live?.w || 0), 0), evKopuk,
     todayHome: home ? Math.max(Number(days(home.id)[today] || 0), Number(home.live?.today || 0)) : 0,
     todayEv: evs.reduce((a, d) => a + Math.max(Number(days(d.id)[today] || 0), Number(d.live?.today || 0)), 0),
     ucz, lastN, days, histMonth, histTotal, history: S.ev_history || null,

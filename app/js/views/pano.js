@@ -78,7 +78,7 @@ const dots = (id, dur) => (motionOK() ? [0, dur / 2].map((b) =>
 function flow(M) {
   if (!M.home) return '';
   const f = flowVals(M);
-  const [hn, hu] = wParts(f.home), [tn, tu] = wParts(f.togg), [pn, pu] = wParts(f.priz);
+  const [hn, hu] = wParts(f.home), [tn, tu] = M.evKopuk && f.togg <= 50 ? ['—', ''] : wParts(f.togg), [pn, pu] = wParts(f.priz);
   const chg = f.togg > 50;
   const on = (w) => (w > 5 ? ' on' : '');
   return `
@@ -133,6 +133,7 @@ function flow(M) {
 
 function kpis(M) {
   const charging = M.evW > 50;
+  const kopuk = M.evKopuk && !charging;
   return `
   <div class="kpis kpis-c">
     <div class="kpi" data-go="ev">
@@ -142,7 +143,7 @@ function kpis(M) {
     </div>
     <div class="kpi ${charging ? 'charging' : ''}" data-go="togg" data-live-cls="evKpi">
       <div class="k-label">${charging ? '<span class="pulse"></span>' : icon('car')}Togg</div>
-      <div class="k-val" data-live="evW">${charging ? wHtml(M.evW, true) : 'Boşta'}</div>
+      <div class="k-val" data-live="evW">${evDurum(M)}</div>
       <div class="k-sub">Bugün <span data-live="todayEv">${kwh(M.todayEv)}</span></div>
     </div>
     <div class="kpi" data-go="ev">
@@ -185,7 +186,7 @@ export function chargeCard(M) {
       <div>
         <div class="t"><span class="pulse" style="display:inline-block;margin-right:6px"></span>Şarj Ediliyor · ${esc(s.dev.name)}</div>
         <div class="v">${kwh(s.kwh, 2)} · <span class="tl-ev">${tl(s.kwh * M.priceNow)}</span></div>
-        <div class="s"><span class="nw">${wattFine(M.evW)}</span> · <span class="nw">${dur(min)}</span><br><span class="nw">Bu şarjda +${pct(s.added)}</span>${km}</div>
+        <div class="s"><span class="nw">${s.kopuk ? '<span class="kv-kopuk sm">Bağlantı yok</span>' : wattFine(M.evW)}</span> · <span class="nw">${dur(min)}</span><br><span class="nw">Bu şarjda +${pct(s.added)}</span>${km}</div>
       </div>
     </div>
     ${socLine}
@@ -299,12 +300,18 @@ export function renderPano(el, M, app) {
   }
 }
 
+// Togg kutusu: şarjda güç, priz Wi-Fi'dan koptuysa "Bağlantı yok" (araç şarj oluyor olabilir), yoksa "Boşta"
+function evDurum(M) {
+  if (M.evW > 50) return wHtml(M.evW, true);
+  return M.evKopuk ? '<span class="kv-kopuk">Bağlantı yok</span>' : 'Boşta';
+}
+
 // Canlı güncelleme: grafiklere dokunmadan yalnız sayılar
 export function updatePano(el, M) {
   const set = (k, v) => { const n = el.querySelector(`[data-live="${k}"]`); if (n) n.textContent = v; };
   const setH = (k, v) => { const n = el.querySelector(`[data-live="${k}"]`); if (n && n.innerHTML !== v) n.innerHTML = v; };
   setH('homeW', wHtml(M.homeW));
-  setH('evW', M.evW > 50 ? wHtml(M.evW, true) : 'Boşta');
+  setH('evW', evDurum(M));
   set('todayHome', kwh(M.todayHome));
   set('todayHome2', num(M.todayHome, 1));
   set('todayEv', kwh(M.todayEv));
@@ -316,7 +323,7 @@ export function updatePano(el, M) {
   if (fl) {
     const f = flowVals(M);
     const fv = (k, v) => { const n = fl.querySelector(`[data-fv="${k}"]`); if (n && n.textContent !== v) n.textContent = v; };
-    const [hn, hu] = wParts(f.home), [tn, tu] = wParts(f.togg), [pn, pu] = wParts(f.priz);
+    const [hn, hu] = wParts(f.home), [tn, tu] = M.evKopuk && f.togg <= 50 ? ['—', ''] : wParts(f.togg), [pn, pu] = wParts(f.priz);
     fv('v', f.v ? `${num(f.v)} V` : '–'); fv('hn', hn); fv('hu', hu); fv('tn', tn); fv('tu', tu); fv('pn', pn); fv('pu', pu);
     for (const [k, w] of [['h', f.home], ['t', f.togg], ['p', f.priz]]) {
       fl.querySelector(`[data-fl="${k}"]`)?.classList.toggle('on', w > 5);

@@ -333,7 +333,7 @@ class Collector:
         self.fb.safe(self.fb.put, f"sessions/{did}/{s['id']}", s)
         self.ntfy.send(f"{m.get('name', 'Araç')} şarjı başladı",
                        f"Saat {datetime.fromtimestamp(s['start']):%H:%M}. Dokun: başlangıç yüzdesi ve km'yi gir.",
-                       tags="electric_plug", priority=2, open_tab=f"togg/basla/{s['id']}")
+                       tags="electric_plug", priority=4, open_tab=f"togg/basla/{s['id']}", buton="Yüzde ve km gir")
 
     def on_session_end(self, did, m, s):
         price, sktt = self.price_now()
@@ -356,7 +356,8 @@ class Collector:
             # Pi gücün kademeli düştüğünü gördüyse araç hedefine ulaştı
             title = f"{m.get('name', 'Araç')}: Araç Doldu" if s.get("full") else f"{m.get('name', 'Araç')} şarjı bitti"
             msg += "" if s.get("full") else "\nDokun: bitiş yüzdesini gir."
-            self.ntfy.send(title, msg, tags="white_check_mark", priority=4, open_tab=f"togg/bitis/{s['id']}")
+            self.ntfy.send(title, msg, tags="white_check_mark", priority=4, open_tab=f"togg/bitis/{s['id']}",
+                           buton="Tamam" if s.get("full") else "Yüzdeyi gir")
 
     def on_job_resume(self, did, m, gap, end_s):
         """Bildirilen iş sürdü: bekleme kısa kalmış. Duraklamayı kapsayan kademeye çıkar ve kaydet."""

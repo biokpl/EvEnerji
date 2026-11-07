@@ -52,12 +52,12 @@ export function openHizliKayit(M, app, tur, sid) {
   if (!s) return false;
   soruldIsaretle(`${tur}/${sid}`);
   const bitis = tur === 'bitis';
-  const yuzdeSor = bitis ? !s.full : true;
+  const yuzdeSor = bitis ? !s.full && s.socEnd == null : true;
   const kmSor = bitis ? !s.odo : true;
-  if (!yuzdeSor && !kmSor) { toast('Araç doldu · kayıt tamam'); return true; }
+  if (!yuzdeSor && !kmSor) { toast(s.full ? 'Araç doldu · kayıt tamam' : 'Kayıt tamam'); return true; }
   const dev = s.dev || s.dev?.id;
   const ozet = bitis
-    ? `${num(s.kwh, 1)} kWh · ${tl(M.sarjTl(s))} · ${dur(s.minutes ?? ((s.end - s.start) / 60))}${s.full ? ' · Araç Doldu' : ''}`
+    ? `${num(s.kwh, 1)} kWh · ${tl(M.sarjTl(s))} · ${dur(s.minutes ?? (((s.end || Date.now() / 1000) - s.start) / 60))}${s.full ? ' · Araç Doldu' : ''}`
     : `Saat ${hm(s.start)} · araçtaki değerleri gir`;
   openSheet(`
     <h3>${bitis ? 'Şarj bitti' : 'Şarj başladı'}</h3>

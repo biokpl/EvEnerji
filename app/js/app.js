@@ -46,6 +46,10 @@ function hashOku() {
 }
 let current = (hashOku() in VIEWS) ? location.hash.slice(1) : 'pano';
 let otomatikSoruldu = false;
+// Uygulama arka plandan öne gelince (telefonu açıp uygulamaya dönünce) bekleyen kayıt yeniden sorulur
+document.addEventListener('visibilitychange', () => {
+  if (!document.hidden) { otomatikSoruldu = false; setTimeout(kayitSor, 1500); }
+});
 function kayitSor() {
   if (!M || store.mode !== 'live' || store.guncelleniyor || sheetOpen()) return;
   if (bekleyenKayit) {
@@ -141,10 +145,23 @@ function refresh({ keepScroll = true, silent = false, force = false } = {}) {
   setTimeout(kayitSor, 400);
 }
 
+// Uygulama açıkken kablo çekilirse (güç birden düşer) Pi'yi beklemeden bitiş penceresi açılır
+let oncekiSarj = null;
+function sarjDususu() {
+  const a = M.activeSession;
+  if (a && M.evW > 50 && !a.kopuk) { oncekiSarj = { id: a.id, w: M.evW }; return; }
+  if (oncekiSarj && !M.evKopuk && M.evW < 50) {
+    const p = oncekiSarj;
+    oncekiSarj = null;
+    if (p.w > 1000 && !sheetOpen() && store.mode === 'live') openHizliKayit(M, app, 'bitis', p.id);
+  }
+}
+
 function onLive() {
   if (!store.raw) return;
   M = build(store.raw);
   header();
+  sarjDususu();
   const v = VIEWS[current];
   const wrap = viewEl.querySelector('.view');
   if (!wrap) return;

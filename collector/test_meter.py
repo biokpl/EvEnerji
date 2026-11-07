@@ -143,6 +143,18 @@ def test_kisa_aradan_sonra_ayni_oturum_devam_eder():
     assert len({i for _, i in olay}) == 1                             # hep aynı oturum
 
 
+def test_kablo_cekilince_30_sn_de_biter():
+    s = SessionTracker({})
+    t, bitis = 1000, None
+    for w in [2000] * 20 + [0] * 20:
+        ev, _ = s.update(t, w, 0.01)
+        if ev == "bitti" and bitis is None:
+            bitis = t
+        t += 3
+    dusus = 1000 + 20 * 3
+    assert bitis is not None and 30 <= bitis - dusus <= 33
+
+
 def test_uzun_aradan_sonra_yeni_oturum():
     s = SessionTracker({})
     t, olay = 1000, []

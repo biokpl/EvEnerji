@@ -25,7 +25,8 @@ SESSION_START_W = 300
 SESSION_START_N = 2          # art arda en az kaç ölçüm
 SESSION_START_S = 10         # ve en az kaç saniye (ölçüm sıklığından bağımsız olsun)
 SESSION_END_W = 50
-SESSION_END_S = 120          # bu kadar süre düşük güç -> bitti (kablo çekilince güç anında düşer)
+SESSION_END_S = 120          # kademeli bitiş (araç doldu): bu kadar süre düşük güç -> bitti
+SESSION_END_FAST_S = 30      # ani düşüş (kablo çekildi / araçtan durduruldu): daha çabuk bitti
 SESSION_RESUME_S = 900       # bittikten sonra bu süre içinde yeniden başlarsa aynı şarjın devamı sayılır
 SESSION_MIN_KWH = 0.05       # bundan küçükse oturum sayılmaz
 FULL_TAIL_RATIO = 0.6        # bitişten önceki son güç tepenin bu oranından düşükse: araç doldu
@@ -145,7 +146,10 @@ class SessionTracker:
             a["tail_w"] = w          # şarj sürerken görülen son güç
         if w < SESSION_END_W:
             st["low_since"] = st["low_since"] or ts
-            if ts - st["low_since"] >= SESSION_END_S:
+            # son şarj gücü tepeye yakınken birden düştüyse kablo çekilmiştir: çabuk bitir (kısa duraklama olursa
+            # SESSION_RESUME_S içinde aynı oturum devam eder)
+            ani = a.get("tail_w") is not None and a["tail_w"] >= FULL_TAIL_RATIO * a["peak_w"]
+            if ts - st["low_since"] >= (SESSION_END_FAST_S if ani else SESSION_END_S):
                 a["end"] = int(st["low_since"])
                 a["active"] = False
                 # Araç hedefine ulaşınca gücü kademeli düşürür (son güç tepenin çok altında);

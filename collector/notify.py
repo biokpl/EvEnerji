@@ -18,13 +18,13 @@ class Notifier:
         self.app_url = app_url
 
     def payload(self, title: str, msg: str, *, tags: str = "zap", priority: int = 3,
-                open_tab: str | None = None) -> dict:
+                open_tab: str | None = None, buton: str = "Uygulamayı aç") -> dict:
         p = {"topic": self.topic, "title": title, "message": msg,
              "tags": [t for t in tags.split(",") if t], "priority": int(priority)}
         if self.app_url:
             url = self.app_url + (f"#{open_tab}" if open_tab else "")
             p["click"] = url
-            p["actions"] = [{"action": "view", "label": "Uygulamayı aç", "url": url}]
+            p["actions"] = [{"action": "view", "label": buton, "url": url}]
         return p
 
     def send(self, title: str, msg: str, **kw) -> bool:

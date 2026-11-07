@@ -3,7 +3,7 @@ import { build } from './model.js';
 import { disposeAll, setQuiet } from './charts.js';
 import { closeSheet, hydrateIcons, icon, sheetOpen, toast } from './ui.js';
 import { renderPano, updatePano } from './views/pano.js';
-import { openSocSheet, renderTogg, updateTogg } from './views/togg.js';
+import { hizliKayitGerek, openHizliKayit, openSocSheet, renderTogg, updateTogg } from './views/togg.js';
 import { renderEv, updateEv } from './views/ev.js';
 import { renderCihazlar, updateCihazlar } from './views/cihazlar.js';
 import { renderSarici } from './views/sarici.js';
@@ -34,7 +34,29 @@ let keySaved = false;
     history.replaceState(null, '', location.pathname + '#cihazlar');
   }
 }
-let current = (location.hash.slice(1) in VIEWS) ? location.hash.slice(1) : 'pano';
+// Bildirim bağlantısı: #togg/bitis/<oturum> ya da #togg/basla/<oturum> → Togg sekmesi + kısa kayıt penceresi
+let bekleyenKayit = null;
+function hashOku() {
+  const [tab, tur, sid] = location.hash.slice(1).split('/');
+  if (tur && sid && (tur === 'bitis' || tur === 'basla')) {
+    bekleyenKayit = { tur, sid: decodeURIComponent(sid) };
+    history.replaceState(null, '', `#${tab}`);
+  }
+  return tab;
+}
+let current = (hashOku() in VIEWS) ? location.hash.slice(1) : 'pano';
+let otomatikSoruldu = false;
+function kayitSor() {
+  if (!M || store.mode !== 'live' || store.guncelleniyor || sheetOpen()) return;
+  if (bekleyenKayit) {
+    if (openHizliKayit(M, app, bekleyenKayit.tur, bekleyenKayit.sid)) bekleyenKayit = null;
+    return;
+  }
+  if (otomatikSoruldu) return;
+  otomatikSoruldu = true;
+  const g = hizliKayitGerek(M);
+  if (g) openHizliKayit(M, app, g[0], g[1]);
+}
 let M = null;
 let lastLiveRender = 0;
 
@@ -116,6 +138,7 @@ function refresh({ keepScroll = true, silent = false, force = false } = {}) {
   setQuiet(silent);
   try { v.render(wrap, M, app); } finally { setQuiet(false); }
   if (keepScroll) window.scrollTo(0, y);
+  setTimeout(kayitSor, 400);
 }
 
 function onLive() {
@@ -148,7 +171,7 @@ document.getElementById('nav').addEventListener('click', (e) => {
 });
 window.addEventListener('hashchange', () => {
   closeSheet();
-  const t = location.hash.slice(1);
+  const t = hashOku();
   if (t in VIEWS && t !== current) { current = t; refresh({ keepScroll: false }); window.scrollTo(0, 0); }
 });
 document.getElementById('themeBtn').addEventListener('click', () => {
@@ -180,7 +203,7 @@ let pending = false;
 store.subscribe((kind) => {
   if (kind === 'giris') return renderGiris();
   if (kind === 'live') return onLive();
-  if (kind === 'reload') { if (M) header(); return refresh({ silent: true }); }
+  if (kind === 'reload') { if (M) header(); refresh({ silent: true }); setTimeout(kayitSor, 400); return; }
   if (pending) return;
   pending = true;
   requestAnimationFrame(() => { pending = false; refresh(); });

@@ -23,6 +23,69 @@ function sessItem(M, s) {
 const socVal = (v) => { const x = parseFloat(String(v).replace(',', '.')); return Number.isFinite(x) && x >= 0 && x <= 100 ? Math.round(x) : null; };
 
 // Şarj sürerken: aracın şu anki yüzdesini sor, bu şarjda eklenen kadarını düşüp başlangıç olarak kaydet
+// Şarj başlayınca / bitince açılan kısa kayıt penceresi (bildirimden ya da uygulama açılınca bir kez).
+// Bitişte araç %100 dolduysa yüzde sorulmaz; km bu şarja girilmemişse sorulur (şarj sırasında araç yol yapmaz).
+const SORULDU = 'evEnerji.soruldu';
+const soruldu = (k) => { try { return (JSON.parse(localStorage.getItem(SORULDU) || '{}'))[k]; } catch { return false; } };
+const soruldIsaretle = (k) => {
+  try {
+    const o = JSON.parse(localStorage.getItem(SORULDU) || '{}');
+    o[k] = Date.now();
+    for (const [x, t] of Object.entries(o)) if (Date.now() - t > 30 * 864e5) delete o[x];   // eskileri temizle
+    localStorage.setItem(SORULDU, JSON.stringify(o));
+  } catch { /* yoksay */ }
+};
+
+export function hizliKayitGerek(M) {
+  // Uygulama açılınca kendiliğinden sorulacak bir şey var mı? → [tür, oturum kimliği] ya da null
+  const now = Date.now() / 1000;
+  const a = M.activeSession;
+  if (a && now - a.start < 3600 && a.socStart == null && !soruldu(`basla/${a.id}`)) return ['basla', a.id];
+  const son = M.sessions.find((x) => x.end);
+  if (son && now - son.end < 3 * 3600 && !soruldu(`bitis/${son.sid}`)
+      && ((!son.full && son.socEnd == null) || !son.odo)) return ['bitis', son.sid];
+  return null;
+}
+
+export function openHizliKayit(M, app, tur, sid) {
+  const s = M.sessions.find((x) => x.sid === sid || x.id === sid) || (M.activeSession?.id === sid ? M.activeSession : null);
+  if (!s) return false;
+  soruldIsaretle(`${tur}/${sid}`);
+  const bitis = tur === 'bitis';
+  const yuzdeSor = bitis ? !s.full : true;
+  const kmSor = bitis ? !s.odo : true;
+  if (!yuzdeSor && !kmSor) { toast('Araç doldu · kayıt tamam'); return true; }
+  const dev = s.dev || s.dev?.id;
+  const ozet = bitis
+    ? `${num(s.kwh, 1)} kWh · ${tl(M.sarjTl(s))} · ${dur(s.minutes ?? ((s.end - s.start) / 60))}${s.full ? ' · Araç Doldu' : ''}`
+    : `Saat ${hm(s.start)} · araçtaki değerleri gir`;
+  openSheet(`
+    <h3>${bitis ? 'Şarj bitti' : 'Şarj başladı'}</h3>
+    <div class="sh-sub">${ozet}</div>
+    ${yuzdeSor ? `<div class="field"><div><label for="hk-y">${bitis ? 'Bitiş yüzdesi' : 'Başlangıç yüzdesi'}</label><small>Trumore ya da araç ekranındaki pil yüzdesi.</small></div>
+      <input class="input num" id="hk-y" inputmode="numeric" placeholder="%" value="${bitis ? (s.socEnd ?? '') : (s.socStart ?? '')}"></div>` : ''}
+    ${kmSor ? `<div class="field"><div><label for="hk-km">Kilometre</label><small>Aracın toplam km'si (tüketimi öğrenmek için).</small></div>
+      <input class="input num" id="hk-km" inputmode="numeric" placeholder="km" value="${s.odo ?? ''}"></div>` : ''}
+    <div class="btn-row" style="margin-top:14px">
+      <button class="btn ghost" id="cancel">Sonra</button>
+      <button class="btn primary" id="save">${icon('check')}Kaydet</button>
+    </div>`, (sh) => {
+    sh.querySelector('#cancel').onclick = () => closeSheet();
+    sh.querySelector('#save').onclick = async () => {
+      const y = sh.querySelector('#hk-y') ? socVal(sh.querySelector('#hk-y').value) : null;
+      const km = sh.querySelector('#hk-km') ? parseInt(String(sh.querySelector('#hk-km').value).replace(/\D/g, ''), 10) : NaN;
+      if (yuzdeSor && sh.querySelector('#hk-y').value && y == null) return toast('0–100 arası bir yüzde gir');
+      if (bitis && y != null && s.socStart != null && y <= s.socStart) return toast('Bitiş yüzdesi başlangıçtan büyük olmalı');
+      try {
+        if (y != null) await app.store.patch(`settings/soc/${s.sid || s.id}`, bitis ? { bitis: y } : { basla: y });
+        if (Number.isFinite(km) && km > 0) await app.store.put(`sessions/${s.dev?.id || s.dev}/${s.sid || s.id}/odo`, km);
+        closeSheet(); toast('Kaydedildi');
+      } catch { toast('Kaydedilemedi'); }
+    };
+  });
+  return true;
+}
+
 export function openSocSheet(M, app) {
   const s = M.activeSession;
   if (!s) return;

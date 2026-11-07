@@ -311,6 +311,9 @@ class Collector:
                                                 "kwh": round(sess["kwh"], 4)}
                 if ev == "basladi":
                     self.on_session_start(did, m, sess)
+                elif ev == "devam":
+                    log.info("Şarj devam ediyor (kısa ara): %s", sess["id"])
+                    self.fb.safe(self.fb.patch, f"sessions/{did}/{sess['id']}", {"active": True, "end": None, "full": None})
                 elif ev == "bitti":
                     self.on_session_end(did, m, sess)
             if did in self.jobs:
@@ -329,8 +332,8 @@ class Collector:
         log.info("Şarj başladı: %s", s["id"])
         self.fb.safe(self.fb.put, f"sessions/{did}/{s['id']}", s)
         self.ntfy.send(f"{m.get('name', 'Araç')} şarjı başladı",
-                       f"Saat {datetime.fromtimestamp(s['start']):%H:%M}. Bitince özet gelecek.",
-                       tags="electric_plug", priority=2, open_tab="togg")
+                       f"Saat {datetime.fromtimestamp(s['start']):%H:%M}. Dokun: başlangıç yüzdesi ve km'yi gir.",
+                       tags="electric_plug", priority=2, open_tab=f"togg/basla/{s['id']}")
 
     def on_session_end(self, did, m, s):
         price, sktt = self.price_now()
@@ -352,7 +355,8 @@ class Collector:
         if m.get("bitti_bildirim", True):
             # Pi gücün kademeli düştüğünü gördüyse araç hedefine ulaştı
             title = f"{m.get('name', 'Araç')}: Araç Doldu" if s.get("full") else f"{m.get('name', 'Araç')} şarjı bitti"
-            self.ntfy.send(title, msg, tags="white_check_mark", open_tab="togg")
+            msg += "" if s.get("full") else "\nDokun: bitiş yüzdesini gir."
+            self.ntfy.send(title, msg, tags="white_check_mark", priority=4, open_tab=f"togg/bitis/{s['id']}")
 
     def on_job_resume(self, did, m, gap, end_s):
         """Bildirilen iş sürdü: bekleme kısa kalmış. Duraklamayı kapsayan kademeye çıkar ve kaydet."""

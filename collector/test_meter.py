@@ -132,6 +132,27 @@ def _oturum(guc_listesi):
     return son
 
 
+def test_kisa_aradan_sonra_ayni_oturum_devam_eder():
+    s = SessionTracker({})
+    t, olay = 1000, []
+    for w in [2000] * 20 + [0] * 50 + [2000] * 20 + [0] * 50:      # 150 sn ara: bitti, sonra devam
+        ev, ses = s.update(t, w, 0.01); t += 3
+        if ev:
+            olay.append((ev, ses["id"]))
+    assert [e for e, _ in olay] == ["basladi", "bitti", "devam", "bitti"]
+    assert len({i for _, i in olay}) == 1                             # hep aynı oturum
+
+
+def test_uzun_aradan_sonra_yeni_oturum():
+    s = SessionTracker({})
+    t, olay = 1000, []
+    for w in [2000] * 20 + [0] * 400 + [2000] * 20:                   # 20 dk ara: yeni oturum
+        ev, ses = s.update(t, w, 0.01); t += 3
+        if ev:
+            olay.append(ev)
+    assert olay == ["basladi", "bitti", "basladi"]
+
+
 def test_oturum_doldu_isareti():
     # araç hedefe ulaşınca güç kademeli düşer -> full
     dolu = _oturum([2200] * 10 + [1500, 900, 400, 150] + [0] * 110)

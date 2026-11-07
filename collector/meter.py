@@ -25,7 +25,8 @@ SESSION_START_W = 300
 SESSION_START_N = 2          # art arda en az kaç ölçüm
 SESSION_START_S = 10         # ve en az kaç saniye (ölçüm sıklığından bağımsız olsun)
 SESSION_END_W = 50
-SESSION_END_S = 300          # bu kadar süre düşük güç -> bitti
+SESSION_END_S = 120          # bu kadar süre düşük güç -> bitti (kablo çekilince güç anında düşer)
+SESSION_RESUME_S = 900       # bittikten sonra bu süre içinde yeniden başlarsa aynı şarjın devamı sayılır
 SESSION_MIN_KWH = 0.05       # bundan küçükse oturum sayılmaz
 FULL_TAIL_RATIO = 0.6        # bitişten önceki son güç tepenin bu oranından düşükse: araç doldu
 
@@ -104,7 +105,9 @@ class SessionTracker:
         return self.st["active"]
 
     def update(self, ts: float, w: float | None, kwh_added: float) -> tuple[str | None, dict | None]:
-        """('basladi'|'bitti'|None, oturum) döndürür."""
+        """('basladi'|'devam'|'bitti'|None, oturum) döndürür.
+        'devam': az önce biten şarj SESSION_RESUME_S içinde yeniden başladı (duraklama / fişi çekip takma),
+        aynı oturum yeniden açıldı."""
         st = self.st
         if w is None:
             if st["active"]:
@@ -116,6 +119,15 @@ class SessionTracker:
                 st["hi_n"] += 1
                 st["hi_first"] = st["hi_first"] or ts
                 if st["hi_n"] >= SESSION_START_N and ts - st["hi_first"] >= SESSION_START_S:
+                    son = st.get("son")
+                    if son and st["hi_first"] - son["end"] <= SESSION_RESUME_S:
+                        son.update({"active": True, "end": None, "last_w": w})
+                        son.pop("full", None)
+                        son["kwh"] += kwh_added
+                        st["active"], st["son"] = son, None
+                        st["hi_n"], st["hi_first"], st["low_since"] = 0, None, None
+                        return "devam", son
+                    st["son"] = None
                     start = st["hi_first"]
                     st["active"] = {
                         "id": datetime.fromtimestamp(start).strftime("%Y%m%d-%H%M"),
@@ -143,6 +155,7 @@ class SessionTracker:
                 st["active"], st["low_since"] = None, None
                 if a["kwh"] < SESSION_MIN_KWH:
                     return None, None
+                st["son"] = dict(a)          # 15 dk içinde yeniden başlarsa devam ettirilir
                 return "bitti", a
         else:
             st["low_since"] = None

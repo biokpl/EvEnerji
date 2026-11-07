@@ -217,21 +217,20 @@ export function build(raw) {
   car.learnedEff = effSamples.length ? median(effSamples) : null;
   car.learnedN = effSamples.length;
   car.eff = car.learnedEff ?? car.efficiency;
-  // kWh/100 km (prizden): iki şarj arasındaki sürüş. Önceki şarjın bitiş %'si ile sonrakinin başlangıç %'si ve
-  // aradaki km'den (Trumore değerleri). Kısa yollar (ısıtma, park) yanıltıcı: en az 80 km'lik yollar sayılır.
+  // kWh/100 km (prizden): iki şarj arasındaki sürüşler. Önceki şarjın bitiş %'si − sonrakinin başlangıç %'si ve
+  // aradaki km (Trumore değerleri). Tek kısa yol yanıltıcı (%1 = 0,9 kWh); bu yüzden tüm yollar TOPLANIR,
+  // toplam 100 km'yi geçince kullanılır (kullanıcı günde 20–40 km gidiyor).
   const sirali = [...sessions].sort((a, b) => a.start - b.start);
-  const yollar = [];
+  let topKm = 0, topKwh = 0;
   for (let i = 1; i < sirali.length; i++) {
     const o = sirali[i - 1], n = sirali[i];
-    const oOdo = o.odo, nOdo = n.odo, oSon = o.socEnd ?? (o.full ? Number(car.hedef_yuzde) || 100 : null);
-    if (!oOdo || !nOdo || oSon == null || n.socStart == null) continue;
-    const km = nOdo - oOdo, dus = oSon - n.socStart;
-    if (km >= 80 && km < 3000 && dus > 0) {
-      n.per100 = ((dus / 100) * cap / car.eff / km) * 100;
-      yollar.push(n.per100);
-    }
+    const oSon = o.socEnd ?? (o.full ? Number(car.hedef_yuzde) || 100 : null);
+    if (!o.odo || !n.odo || oSon == null || n.socStart == null) continue;
+    const km = n.odo - o.odo, dus = oSon - n.socStart;
+    if (km > 0 && km < 3000 && dus >= 0) { topKm += km; topKwh += (dus / 100) * cap / car.eff; }
   }
-  const per100 = yollar.length ? sum(yollar) / yollar.length : null;
+  const per100 = topKm >= 100 && topKwh > 0 ? (topKwh / topKm) * 100 : null;
+  const per100Km = topKm;                                      // öğrenme için biriken km (Ayarlar/Togg'da gösterilebilir)
   // Eklenen menzil: km girişlerinden öğrenilen duvar kWh/100 km varsa o; yoksa aracın menzil
   // Ayarlar'daki araç tüketimi (Trumore ortalaması; 2026-11: 3108 km'de 19 kWh/100 km)
   const bataryaTuketim = Number(car.tuketim_kwh_100) || 19;
@@ -339,7 +338,7 @@ export function build(raw) {
   return {
     raw, now, y, mi, today, S, t, tNext, durum, projDurum, devices, enabled, home, evs, plugs, winderDev,
     homeMonths, projMonths, evMonths, evTlByMonth, ytd, ytdEst, rate, son30, proj, butce, evYtd, evShare, evProj, evTl, evAvgTl, noEvProj,
-    exceedDate, level, levelText, scenarios, nextYear, kademeAylari, sessions, per100, per100Duvar, per100Tahmini, histSarj: histSarjlar(y, cap / car.eff), karar, activeSession, covEnd, start, holeStart, holeEnd, estTotal, estMonths, nowDurum,
+    exceedDate, level, levelText, scenarios, nextYear, kademeAylari, sessions, per100, per100Km, per100Duvar, per100Tahmini, histSarj: histSarjlar(y, cap / car.eff), karar, activeSession, covEnd, start, holeStart, holeEnd, estTotal, estMonths, nowDurum,
     priceNow: birimFiyat(t, projDurum, mi + 1), toggAyBirim,
     sarjTl: (sx) => (sx.kwh || 0) * toggAyBirim(new Date(sx.start * 1000).getMonth()),
     monthTl: projDurum.aylikTl[mi], monthKwh: projMonths[mi],

@@ -66,6 +66,8 @@ export function renderAyarlar(el, M, app) {
       <div class="field"><div><label for="tk">Araç tüketimi (kWh/100 km)</label><small>Trumore'daki ortalama; şarj kartındaki "≈ +km" buna göre hesaplanır.</small></div><input class="input num" id="tk" inputmode="decimal" value="${f(car.tuketim_kwh_100 ?? 19)}"></div>
       <div class="field"><div><label for="pt">DC şarj · indirimli (₺/kWh)</label><small>Trugo indirimli DC; şarj kararı ve kıyaslar için.</small></div><input class="input num" id="pt" inputmode="decimal" value="${f(car.public_tl)}"></div>
       <div class="field"><div><label for="pt2">DC şarj · indirimsiz (₺/kWh)</label></div><input class="input num" id="pt2" inputmode="decimal" value="${f(car.public_tl_tam ?? 14.9)}"></div>
+      <div class="field"><div><label for="lp">LPG fiyatı (₺/L)</label><small>Pano'daki km başı kıyas için (İstanbul Avrupa).</small></div><input class="input num" id="lp" inputmode="decimal" value="${f(car.lpg_tl ?? 50.7)}"></div>
+      <div class="field"><div><label for="lpt">LPG'li araç tüketimi (L/100 km)</label><small>Togg boyutunda SUV için ~10.</small></div><input class="input num" id="lpt" inputmode="decimal" value="${f(car.lpg_l100 ?? 10)}"></div>
       ${M.history ? `<div class="field"><div><label>Aktarılan geçmiş</label><small>${esc(M.history.source || '')} · ${esc(M.history.from || '')} – ${esc(M.history.until || '')}. Togg toplamlarına eklenir.</small></div><b class="num">${num(M.histTotal, 1)} kWh</b></div>` : ''}
       <button class="btn ghost" id="saveC" style="margin-top:12px">${icon('check')}Kaydet</button>
     </div>
@@ -161,6 +163,7 @@ export function renderAyarlar(el, M, app) {
   $('#saveC').onclick = () => save('settings/car', {
     ...(M.S.car || {}),   // batarya kimyası gibi formda olmayan alanlar korunur
     battery_kwh: n($('#bk').value) || 88.5, efficiency: Math.min(1, (n($('#ef').value) || 90) / 100), public_tl: n($('#pt').value) || 12, public_tl_tam: n($('#pt2').value) || 14.9,
+    lpg_tl: n($('#lp').value) || 50.7, lpg_l100: n($('#lpt').value) || 10,
     hedef_yuzde: Math.min(100, Math.max(10, n($('#hy').value) || 100)),
     tuketim_kwh_100: Math.min(60, Math.max(8, n($('#tk').value) || 19)),
   });

@@ -143,6 +143,17 @@ function refresh({ keepScroll = true, silent = false, force = false } = {}) {
   try { v.render(wrap, M, app); } finally { setQuiet(false); }
   if (keepScroll) window.scrollTo(0, y);
   setTimeout(kayitSor, 400);
+  ogrenmeYaz();
+}
+
+// Öğrenme durumunu Pi'ye bildir (değişince): kendi hesaplama modunda Pi bildirimde yüzde/km istemez
+function ogrenmeYaz() {
+  if (!M || store.mode !== 'live') return;
+  const O = M.ogrenme, eski = M.S.ogrenme || {};
+  const yeni = { mod: O.oto ? 'oto' : 'ogren', sor: !O.oto || !!O.kontrol };
+  if (eski.mod === yeni.mod && eski.sor === yeni.sor) return;
+  store.patch('settings/ogrenme', { ...yeni, hata: O.maeKmsiz == null ? null : Math.round(O.maeKmsiz * 10) / 10,
+    guncel: new Date().toISOString().slice(0, 16) }).catch(() => {});
 }
 
 // Uygulama açıkken kablo çekilirse (güç birden düşer) Pi'yi beklemeden bitiş penceresi açılır
@@ -153,7 +164,8 @@ function sarjDususu() {
   if (oncekiSarj && !M.evKopuk && M.evW < 50) {
     const p = oncekiSarj;
     oncekiSarj = null;
-    if (p.w > 1000 && !sheetOpen() && store.mode === 'live') openHizliKayit(M, app, 'bitis', p.id);
+    const otomatik = M.ogrenme?.oto && !M.ogrenme.kontrol;
+    if (p.w > 1000 && !otomatik && !sheetOpen() && store.mode === 'live') openHizliKayit(M, app, 'bitis', p.id);
   }
 }
 

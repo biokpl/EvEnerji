@@ -147,8 +147,8 @@ const q = (start) => `?orderBy=${encodeURIComponent('"$key"')}&startAt=${encodeU
 
 async function loadAll(fb) {
   const get = (p, query = '') => req('GET', `${fb}/${p}.json${query}`).catch(() => null);
-  const [devices, live, months, sessions, settings, status, discovered, winder] = await Promise.all(
-    ['devices', 'live', 'months', 'sessions', 'settings', 'status', 'discovered', 'winder'].map((p) => get(p)));
+  const [devices, live, months, sessions, settings, status, discovered, winder, hava] = await Promise.all(
+    ['devices', 'live', 'months', 'sessions', 'settings', 'status', 'discovered', 'winder', 'hava'].map((p) => get(p)));
   if (devices === null && status === null) {
     // ikisi de boşsa yine de sunucu yanıt verdi mi kontrol et
     await req('GET', `${fb}/status.json`);
@@ -163,7 +163,7 @@ async function loadAll(fb) {
   ]);
   const pack = (arr) => Object.fromEntries(ids.map((id, i) => [id, arr[i] || {}]));
   return { devices: devices || {}, live: live || {}, months: months || {}, sessions: sessions || {}, settings: settings || {},
-    status: status || {}, discovered: discovered || {}, winder: winder || {}, days: pack(days), hours: pack(hours) };
+    status: status || {}, discovered: discovered || {}, winder: winder || {}, hava: hava || {}, days: pack(days), hours: pack(hours) };
 }
 
 function stream(url, onData, onError) {

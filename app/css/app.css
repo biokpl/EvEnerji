@@ -682,6 +682,22 @@ input.num, input[data-m] { caret-color: transparent; cursor: pointer; }
 .kr-cam .kr-lbl, .kr-cam .kr-not, .kr-cam .kr-row, .kr-im span, .kr-aylar span { text-shadow: 0 1px 2px rgba(0, 0, 0, .35); }   /* cam üstünde yazı netliği */
 :root[data-theme="light"] .kr-cam .kr-lbl, :root[data-theme="light"] .kr-cam .kr-not, :root[data-theme="light"] .kr-cam .kr-row, :root[data-theme="light"] .kr-im span, :root[data-theme="light"] .kr-aylar span { text-shadow: none; }
 
+/* Togg > Öğrenen tüketim kartı (şarj kararı kartının cam stili) */
+.ogren .kr-title small { font-size: 13px; font-weight: 700; color: var(--muted); letter-spacing: 0; }
+.og-grafik { height: 170px; margin: 8px -4px 0; }
+.og-kutu { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 8px; margin-top: 9px; }
+.og-kutu div { text-align: center; }
+.og-kutu i { position: relative; display: block; height: 22px; border-radius: 8px;
+  background: linear-gradient(160deg, color-mix(in srgb, var(--c) 58%, transparent), color-mix(in srgb, var(--c) 24%, transparent));
+  box-shadow: 0 0 0 .5px color-mix(in srgb, var(--c) 90%, white), 0 9px 12px -4px color-mix(in srgb, var(--c) 95%, transparent),
+    inset 0 0 10px color-mix(in srgb, var(--c) 35%, transparent), inset 0 1px 0 rgba(255, 255, 255, .45); }
+.og-kutu i.bos { background: rgba(255, 255, 255, .05); box-shadow: inset 0 0 0 .6px rgba(255, 255, 255, .18); }
+.og-kutu span { display: block; margin-top: 7px; font-size: 11px; font-weight: 800; font-variant-numeric: tabular-nums; color: color-mix(in srgb, var(--muted) 70%, var(--text)); }
+.og-uc { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; text-align: center; margin-top: 4px; }
+.og-uc b { display: block; font-size: 17px; font-weight: 800; letter-spacing: -.02em; font-variant-numeric: tabular-nums; }
+.og-uc span { font-size: 11px; font-weight: 700; color: var(--muted); }
+:root[data-theme="light"] .og-kutu i.bos { background: rgba(20, 35, 60, .05); box-shadow: inset 0 0 0 .6px rgba(20, 35, 60, .15); }
+
 /* Pano ana kartı: Togg'daki şarj kararı kartının ışıltılı cam stili.
    Arkada duruma göre renk ışımaları (güvende yeşil, sınıra yakın amber, risk kırmızı) + Togg turkuaz + ev mor;
    akış şeridi ve üçlü kutular sıvı cam. */

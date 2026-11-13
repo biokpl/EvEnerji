@@ -38,12 +38,14 @@ const soruldIsaretle = (k) => {
 
 export function hizliKayitGerek(M) {
   // Uygulama açılınca kendiliğinden sorulacak bir şey var mı? → [tür, oturum kimliği] ya da null
+  // Kendi hesaplama modunda sormaz; yalnız her 5. şarjda kontrol için sorar
+  if (M.ogrenme?.oto && !M.ogrenme.kontrol) return null;
   const now = Date.now() / 1000;
   const a = M.activeSession;
-  if (a && now - a.start < 3600 && a.socStart == null && !soruldu(`basla/${a.id}`)) return ['basla', a.id];
+  if (a && now - a.start < 3600 && (a.socStart == null || a.socAuto) && !soruldu(`basla/${a.id}`)) return ['basla', a.id];
   const son = M.sessions.find((x) => x.end);
   if (son && now - son.end < 3 * 3600 && !soruldu(`bitis/${son.sid}`)
-      && ((!son.full && son.socEnd == null) || !son.odo)) return ['bitis', son.sid];
+      && ((!son.full && (son.socEnd == null || son.socEndAuto)) || !son.odo)) return ['bitis', son.sid];
   return null;
 }
 
@@ -63,7 +65,7 @@ export function openHizliKayit(M, app, tur, sid) {
     <h3>${bitis ? 'Şarj bitti' : 'Şarj başladı'}</h3>
     <div class="sh-sub">${ozet}</div>
     ${yuzdeSor ? `<div class="field"><div><label for="hk-y">${bitis ? 'Bitiş yüzdesi' : 'Başlangıç yüzdesi'}</label><small>Trumore ya da araç ekranındaki pil yüzdesi.</small></div>
-      <input class="input num" id="hk-y" inputmode="numeric" placeholder="%" value="${bitis ? (s.socEnd ?? '') : (s.socStart ?? '')}"></div>` : ''}
+      <input class="input num" id="hk-y" inputmode="numeric" placeholder="${(bitis ? s.socEndAuto && s.socEnd : s.socAuto && s.socStart) ? `≈ %${bitis ? s.socEnd : s.socStart}` : '%'}" value="${bitis ? (s.socEndAuto ? '' : s.socEnd ?? '') : (s.socAuto ? '' : s.socStart ?? '')}"></div>` : ''}
     ${kmSor ? `<div class="field"><div><label for="hk-km">Kilometre</label><small>Aracın toplam km'si (tüketimi öğrenmek için).</small></div>
       <input class="input num" id="hk-km" inputmode="numeric" placeholder="km" value="${s.odo ?? ''}"></div>` : ''}
     <div class="btn-row" style="margin-top:14px">
@@ -202,6 +204,69 @@ function ucCard(M) {
 }
 
 // Şarj kararı: gelecek yıl Togg evde mi (limit aşılır), DC'de mi (limit içinde kalınır)? Değerler canlı veriden.
+// Öğrenen tüketim kartı: sıcaklığa göre tüketim, kendini sınama (son 5 şarj), kendi hesaplama durumu
+function ogrenmeCard(M) {
+  const O = M.ogrenme;
+  if (!O) return '';
+  const T = O.bugunT;
+  const hataRenk = (h) => (h == null ? 'var(--line)' : h <= O.esik ? 'var(--good)' : h <= 2 * O.esik ? 'var(--mid)' : 'var(--bad)');
+  const kutular = Array.from({ length: O.hedefN }, (_, i) => O.son[O.son.length - O.hedefN + i] || null);
+  const iyi = O.son.filter((x) => x.kmsiz <= O.esik).length;
+  const isitma = O.model && O.model.xMax - O.model.xMin >= 4 && O.model.b >= 0.05;
+  const durumNot = O.oto
+    ? (O.kontrol ? 'Bu şarjda kontrol için yüzde ve km sorulacak' : 'Yüzde ve km sorulmuyor · her 5. şarjda bir kontrol')
+    : O.pr.length ? `Son ${O.hedefN} şarjda km'siz tahmin ±${num(O.esik, 0)} puan içinde kalınca sormayı bırakır`
+      : 'İki şarj arası yüzde ve km girdikçe öğrenir';
+  return `
+  <div class="card karar ogren ${O.oto ? 'evde' : 'dc'}">
+    <div class="kr-head">
+      <div><div class="kr-lbl">Öğrenen tüketim</div>
+        <div class="kr-title">${O.bugun != null ? `${num(O.bugun, 1)} <small>kWh/100 km</small>` : 'Veri bekleniyor'}</div></div>
+      <span class="kr-pill">${icon(O.oto ? 'check' : 'trend')}${O.oto ? 'Kendi hesaplıyor' : `Öğreniyor ${iyi}/${O.hedefN}`}</span>
+    </div>
+    <p class="kr-sub">${T != null ? `Bugün İstanbul <b>${num(T, 0)} °C</b>` : 'Sıcaklık bekleniyor'}${M.activeSession?.menzil ? ` · menzil ≈ <b>${num(M.activeSession.menzil)} km</b>` : ''}</p>
+    <div class="og-grafik" id="og-ch"></div>
+    <div class="kr-cam">
+      <div class="kr-lbl">Tahmin sınaması · son ${O.hedefN} şarj</div>
+      <div class="og-kutu">${kutular.map((k) => `<div><i style="--c:${hataRenk(k?.kmsiz)}"${k ? '' : ' class="bos"'}></i><span>${k ? (k.kmsiz > 20 ? '>20' : `±${num(k.kmsiz, 1)}`) : '–'}</span></div>`).join('')}</div>
+      <p class="kr-not">${durumNot}</p>
+      <div class="kr-ayrac"></div>
+      <div class="og-uc">
+        <div><b>${num(O.kmM.yol)}</b><span>km · iş yolu</span></div>
+        <div><b>%${num(M.carEff * 100)}</b><span>şarj verimi</span></div>
+        <div><b>${num(O.model?.km ?? O.pr.reduce((t, p) => t + p.km, 0))}</b><span>öğrenilen km</span></div>
+      </div>
+      <p class="kr-not">${isitma ? `Soğukta her 1 °C için +${num(O.model.b, 2)} kWh/100 km (18 °C altı)` : 'Soğuğun etkisi henüz belirgin değil · farklı sıcaklıklarda sürüş biriktikçe ölçülecek'}</p>
+    </div>
+  </div>`;
+}
+
+function ogrenmeGrafik(el, M) {
+  const O = M.ogrenme, kap = el.querySelector('#og-ch');
+  if (!O || !kap) return;
+  const c = colors(), ax = axisStyle(c);
+  const noktalar = O.pr.filter((p) => p.T != null).map((p) => ({ value: [+p.T.toFixed(1), +p.c.toFixed(1)], km: p.km, t: p.t2 }));
+  const Ts = noktalar.map((n) => n.value[0]).concat(O.bugunT ?? []);
+  const x0 = Math.floor(Math.min(0, ...Ts) / 5) * 5, x1 = Math.ceil(Math.max(25, ...Ts) / 5) * 5;
+  const egri = O.model ? Array.from({ length: (x1 - x0) * 2 + 1 }, (_, i) => { const t = x0 + i / 2; return [t, +O.model.tahmin(t).toFixed(2)]; }) : [];
+  mount(kap, {
+    grid: { left: 34, right: 10, top: 12, bottom: 26 },
+    tooltip: { trigger: 'item', formatter: (p) => p.seriesIndex === 0
+      ? `<b>${num(p.data.km)} km sürüş</b><br>${num(p.value[0], 1)} °C · ${num(p.value[1], 1)} kWh/100 km`
+      : p.seriesIndex === 2 ? `<b>Bugün ${num(p.value[0], 0)} °C</b><br>beklenen ${num(p.value[1], 1)} kWh/100 km`
+        : `${num(p.value[0], 1)} °C → ${num(p.value[1], 1)} kWh/100 km` },
+    xAxis: { type: 'value', min: x0, max: x1, interval: 5, ...ax, splitLine: { show: false }, axisLabel: { ...ax.axisLabel, formatter: '{value}°' } },
+    yAxis: { type: 'value', scale: true, ...ax, axisLine: { show: false }, splitNumber: 3 },
+    series: [
+      { type: 'scatter', data: noktalar, symbolSize: (v, p) => Math.max(7, Math.min(22, Math.sqrt(p.data.km) * 1.4)),
+        itemStyle: { color: c.ev, opacity: 0.75, borderColor: 'rgba(255,255,255,.6)', borderWidth: 0.6, shadowBlur: 10, shadowColor: c.ev } },
+      { type: 'line', data: egri, showSymbol: false, smooth: true, lineStyle: { color: c.accent2 || c.ev, width: 2, type: [6, 4] }, z: 1 },
+      ...(O.bugun != null && O.bugunT != null ? [{ type: 'effectScatter', data: [[O.bugunT, +O.bugun.toFixed(2)]], symbolSize: 9,
+        rippleEffect: { scale: 2.6, brushType: 'stroke' }, itemStyle: { color: c.good }, z: 3 }] : []),
+    ],
+  });
+}
+
 function kararCard(M) {
   const k = M.karar;
   if (!k) return '';
@@ -282,13 +347,14 @@ export function renderTogg(el, M, app) {
         <i style="width:${M.evShare * 100}%;background:var(--ev)"></i><i style="flex:1;background:var(--home)"></i></div>
       <div class="legend" style="position:relative;z-index:1"><span><i style="background:var(--ev)"></i>Togg ${pct(M.evShare * 100)}</span><span><i style="background:var(--home)"></i>Evin geri kalanı</span></div>
       <div class="trio">
-        <div><b>${yak}${num(M.aracTuketim, 1)}</b><span>kWh/100 km</span><small class="tri-not">${M.per100Bat ? `Son ${num(M.per100Km)} km` : 'Trumore ort.'}</small></div>
+        <div><b>${yak}${num(M.aracTuketim, 1)}</b><span>kWh/100 km</span><small class="tri-not">${M.ogrenme.model ? `${num(M.ogrenme.bugunT ?? 18, 0)} °C · öğrenilen` : M.per100Bat ? `Son ${num(M.per100Km)} km` : 'Trumore ort.'}</small></div>
         <div><b>${yak}${num(tlPer100, 0)}</b><span>₺/100 km</span><small class="tri-not">Masraf · ${num(tlPer100 / 100, 2)} ₺/km</small></div>
         <div><b>≈ ${num(M.evProj)}</b><span>Yıl Sonu kWh</span><small class="tri-not">Beklenen Toplam</small></div>
       </div>
     </div>
     <div data-slot="charge">${chargeCard(M)}</div>
     ${kararCard(M)}
+    ${ogrenmeCard(M)}
     <div class="card">
       <div class="card-head"><h2>Aylık şarj</h2><span class="muted" style="font-size:12px;font-weight:700">kWh</span></div>
       <div class="chart short" id="cm"></div>
@@ -323,6 +389,7 @@ export function renderTogg(el, M, app) {
   const c = colors();
   const ax = axisStyle(c);
   const cats = AY_K.slice(0, M.mi + 1);
+  ogrenmeGrafik(el, M);
   mount(el.querySelector('#cm'), {
     grid: { left: 38, right: 6, top: 14, bottom: 24 },
     tooltip: { trigger: 'axis', axisPointer: { type: 'shadow', shadowStyle: { color: c.hi } },

@@ -328,12 +328,21 @@ class Collector:
         if live_out:
             self.fb.safe(self.fb.patch, "live", live_out)
 
+    def sor_mu(self) -> bool:
+        """Uygulama 'kendi hesaplıyor' moduna geçtiyse (settings/ogrenme) yüzde/km istenmez; her 5. şarjda istenir."""
+        o = self.fb.safe(self.fb.get, "settings/ogrenme") or {}
+        return o.get("mod") != "oto" or bool(o.get("sor"))
+
     def on_session_start(self, did, m, s):
         log.info("Şarj başladı: %s", s["id"])
         self.fb.safe(self.fb.put, f"sessions/{did}/{s['id']}", s)
-        self.ntfy.send(f"{m.get('name', 'Araç')} şarjı başladı",
-                       f"Saat {datetime.fromtimestamp(s['start']):%H:%M}. Dokun: başlangıç yüzdesi ve km'yi gir.",
-                       tags="electric_plug", priority=4, open_tab=f"togg/basla/{s['id']}", buton="Yüzde ve km gir")
+        saat = f"Saat {datetime.fromtimestamp(s['start']):%H:%M}."
+        if self.sor_mu():
+            self.ntfy.send(f"{m.get('name', 'Araç')} şarjı başladı", f"{saat} Dokun: başlangıç yüzdesi ve km'yi gir.",
+                           tags="electric_plug", priority=4, open_tab=f"togg/basla/{s['id']}", buton="Yüzde ve km gir")
+        else:
+            self.ntfy.send(f"{m.get('name', 'Araç')} şarjı başladı", f"{saat} Yüzde ve km otomatik hesaplanıyor.",
+                           tags="electric_plug", priority=3, open_tab="togg")
 
     def on_session_end(self, did, m, s):
         price, sktt = self.price_now()
@@ -355,9 +364,15 @@ class Collector:
         if m.get("bitti_bildirim", True):
             # Pi gücün kademeli düştüğünü gördüyse araç hedefine ulaştı
             title = f"{m.get('name', 'Araç')}: Araç Doldu" if s.get("full") else f"{m.get('name', 'Araç')} şarjı bitti"
-            msg += "" if s.get("full") else "\nDokun: bitiş yüzdesini gir."
-            self.ntfy.send(title, msg, tags="white_check_mark", priority=4, open_tab=f"togg/bitis/{s['id']}",
-                           buton="Tamam" if s.get("full") else "Yüzdeyi gir")
+            sor = self.sor_mu()
+            if s.get("full") or not sor:
+                self.ntfy.send(title, msg, tags="white_check_mark", priority=4,
+                               open_tab=f"togg/bitis/{s['id']}" if sor else "togg",
+                               buton="Tamam" if s.get("full") else "Uygulamayı aç")
+            else:
+                msg += "\nDokun: bitiş yüzdesini gir."
+                self.ntfy.send(title, msg, tags="white_check_mark", priority=4, open_tab=f"togg/bitis/{s['id']}",
+                               buton="Yüzdeyi gir")
 
     def on_job_resume(self, did, m, gap, end_s):
         """Bildirilen iş sürdü: bekleme kısa kalmış. Duraklamayı kapsayan kademeye çıkar ve kaydet."""

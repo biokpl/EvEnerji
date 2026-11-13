@@ -111,3 +111,10 @@ if __name__ == "__main__":
         if k.startswith("test_"):
             f(); n += 1
     print(f"{n} test OK")
+
+
+def test_oku_hava():
+    from tarife_kontrol import oku_hava
+    js = {"daily": {"time": ["2026-11-10", "2026-11-11"], "temperature_2m_mean": [11.34, None],
+                    "temperature_2m_min": [9.8, 11.4], "temperature_2m_max": [13.8, 17.1]}}
+    assert oku_hava(js) == {"2026-11-10": {"ort": 11.3, "min": 9.8, "max": 13.8}}

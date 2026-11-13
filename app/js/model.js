@@ -1,6 +1,7 @@
 // Ham veriden ekranların kullandığı özetleri çıkarır.
 import { UC_ZAMAN, ayMaliyeti, birimFiyat, kademeSiniri, dilim, gunlukButce, kalanGun, tarife, ucZamanKiyas, yilDurumu } from './tariff.js';
 import { iso } from './ui.js';
+import { kontrolSirasi, ogren, otoDoldur } from './ogrenme.js';
 
 const z12 = () => Array(12).fill(0);
 const sum = (a) => a.reduce((x, y) => x + y, 0);
@@ -232,11 +233,21 @@ export function build(raw) {
   for (const d of surusler.reverse()) { if (sonKm >= 120) break; sonKm += d.km; sonKwh += d.kwh; }
   const per100Bat = sonKm >= 60 && sonKwh > 0 ? (sonKwh / sonKm) * 100 : null;   // ölçülen (son sürüşler)
   const per100Km = sonKm;
-  const aracTuketim = per100Bat ?? (Number(car.tuketim_kwh_100) || 19);           // yoksa Ayarlar (Trumore)
+  // Öğrenen tüketim: sıcaklığa göre (ogrenme.js). Bugünün sıcaklığı için öğrenilen değer varsa o kullanılır.
+  const hava = raw.hava || {};
+  const yedekTuk = per100Bat ?? (Number(car.tuketim_kwh_100) || 19);
+  const ogrOpt = { cap, eff: car.eff, hedef: Number(car.hedef_yuzde) || 100, hava, yedek: yedekTuk };
+  const ogrenme = ogren({ ...ogrOpt, sessions: sirali, bugunT: hava[today]?.ort ?? null });
+  const aracTuketim = ogrenme.bugun ?? yedekTuk;                                  // yoksa son sürüşler / Ayarlar
   const per100 = per100Bat ? per100Bat / car.eff : null;                          // geriye uyum: prizden
   // Prizden çekilen kWh/100 km = araç tüketimi ÷ şarj verimi (maliyet hesabı için: şarj kaybı dahil)
   const per100Duvar = aracTuketim / car.eff;
-  const per100Tahmini = !per100Bat;
+  const per100Tahmini = !per100Bat && !ogrenme.model;
+  // Kendi hesaplama modu: girilmemiş yüzde/km öğrenilen modelle doldurulur (öğrenmeye katılmaz)
+  if (ogrenme.oto) {
+    otoDoldur(sirali, ogrenme, { ...ogrOpt, yedek: aracTuketim });
+    ogrenme.kontrol = kontrolSirasi(sirali);       // bu şarjda yine de sor (her 5. şarj sapma kontrolü)
+  }
   const kmOf = (duvarKwh) => ((duvarKwh * car.eff) / aracTuketim) * 100;          // bataryaya giren enerjiyle menzil
   const menzilOf = (soc) => ((soc / 100) * cap / aracTuketim) * 100;
 
@@ -324,6 +335,10 @@ export function build(raw) {
     const a = activeSession, v = socIn[a.id] || {};
     const w = a.dev.live?.w || 0;
     a.socStart = Number.isFinite(v.basla) ? v.basla : null;
+    if (a.socStart == null && ogrenme.oto) {
+      const k = sessions.find((x) => x.sid === a.id && x.socAuto);
+      if (k) { a.socStart = k.socStart; a.socAuto = true; }
+    }
     a.added = socAdd(a.kwh || 0);
     a.km = kmOf(a.kwh || 0);
     a.kmTahmini = !per100;
@@ -340,7 +355,7 @@ export function build(raw) {
   return {
     raw, now, y, mi, today, S, t, tNext, durum, projDurum, devices, enabled, home, evs, plugs, winderDev,
     homeMonths, projMonths, evMonths, evTlByMonth, ytd, ytdEst, rate, son30, proj, butce, evYtd, evShare, evProj, evTl, evAvgTl, noEvProj,
-    exceedDate, level, levelText, scenarios, nextYear, kademeAylari, sessions, per100, per100Km, per100Bat, aracTuketim, per100Duvar, per100Tahmini, menzilOf, histSarj: histSarjlar(y, cap / car.eff), karar, activeSession, covEnd, start, holeStart, holeEnd, estTotal, estMonths, nowDurum,
+    exceedDate, level, levelText, scenarios, nextYear, kademeAylari, sessions, per100, per100Km, per100Bat, aracTuketim, ogrenme, hava, carEff: car.eff, per100Duvar, per100Tahmini, menzilOf, histSarj: histSarjlar(y, cap / car.eff), karar, activeSession, covEnd, start, holeStart, holeEnd, estTotal, estMonths, nowDurum,
     priceNow: birimFiyat(t, projDurum, mi + 1), toggAyBirim,
     sarjTl: (sx) => (sx.kwh || 0) * toggAyBirim(new Date(sx.start * 1000).getMonth()),
     monthTl: projDurum.aylikTl[mi], monthKwh: projMonths[mi],

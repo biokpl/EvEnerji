@@ -162,6 +162,26 @@ def oku_po_lpg(sayfa: str, bolge: str = "ISTANBUL (AVRUPA)") -> float:
     raise ValueError(f"PO tablosunda {bolge} yok")
 
 
+HAVA_URL = ("https://api.open-meteo.com/v1/forecast?latitude=41.01&longitude=28.97"
+            "&daily=temperature_2m_mean,temperature_2m_min,temperature_2m_max"
+            "&past_days=92&forecast_days=2&timezone=Europe%2FIstanbul")
+
+
+def oku_hava(js: dict) -> dict[str, dict]:
+    """Open-Meteo günlük yanıtı → {'YYYY-MM-DD': {'ort','min','max'}} (eksik günler atlanır)."""
+    d = js.get("daily") or {}
+    sonuc = {}
+    for i, gun in enumerate(d.get("time") or []):
+        try:
+            ort, mn, mx = (d[k][i] for k in ("temperature_2m_mean", "temperature_2m_min", "temperature_2m_max"))
+        except (KeyError, IndexError):
+            continue
+        if ort is None:
+            continue
+        sonuc[gun] = {"ort": round(float(ort), 1), "min": round(float(mn), 1), "max": round(float(mx), 1)}
+    return sonuc
+
+
 def tl(x: float) -> str:
     return f"{x:.2f}".replace(".", ",")
 
@@ -331,6 +351,16 @@ class Kontrol:
             self.yaz("settings/car/lpg_guncel", {"tarih": bugun.isoformat(), "kaynak": "Petrol Ofisi · İstanbul Avrupa"})
         except Exception as e:
             print("  LPG fiyatı okunamadı:", e)
+        # 3b) İstanbul günlük sıcaklık (tüketim öğrenimi için): son 92 gün + bugün/yarın tahmini; geçmiş günler her
+        # çalışmada gerçekleşen değerle yeniden yazılır
+        try:
+            hava = oku_hava(requests.get(HAVA_URL, timeout=30).json())
+            if len(hava) < 5:
+                raise ValueError(f"yalnız {len(hava)} gün geldi")
+            self.yaz("hava", hava)
+            print(f"Hava: {len(hava)} gün yazıldı (bugün ort {(hava.get(bugun.isoformat()) or {}).get('ort')} °C)")
+        except Exception as e:
+            print("  Hava durumu okunamadı:", e)
         # 4) Şarj kararı (evde mi, DC mi?) — sonuç değişirse bildir
         try:
             self.karar_kontrol(bugun)

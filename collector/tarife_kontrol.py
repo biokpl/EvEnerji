@@ -163,13 +163,17 @@ def oku_po_lpg(sayfa: str, bolge: str = "ISTANBUL (AVRUPA)") -> float:
 
 
 HAVA_URL = ("https://api.open-meteo.com/v1/forecast?latitude=41.01&longitude=28.97"
-            "&daily=temperature_2m_mean,temperature_2m_min,temperature_2m_max"
-            "&past_days=92&forecast_days=2&timezone=Europe%2FIstanbul")
+            "&daily=temperature_2m_mean,temperature_2m_min,temperature_2m_max&hourly=temperature_2m"
+            "&past_days=92&forecast_days=8&timezone=Europe%2FIstanbul")
+IS_SAATLERI = {"sabah": "08:00", "aksam": "17:00"}      # iş yolu saatleri (araç bu saatlerde çalışıyor)
 
 
 def oku_hava(js: dict) -> dict[str, dict]:
-    """Open-Meteo günlük yanıtı → {'YYYY-MM-DD': {'ort','min','max'}} (eksik günler atlanır)."""
+    """Open-Meteo yanıtı → {'YYYY-MM-DD': {'ort','min','max','sabah','aksam'}} (eksik günler atlanır).
+    sabah/aksam: 08:00 ve 17:00 sıcaklığı (iş yolu saatleri)."""
     d = js.get("daily") or {}
+    saat = js.get("hourly") or {}
+    saatlik = dict(zip(saat.get("time") or [], saat.get("temperature_2m") or []))
     sonuc = {}
     for i, gun in enumerate(d.get("time") or []):
         try:
@@ -179,6 +183,10 @@ def oku_hava(js: dict) -> dict[str, dict]:
         if ort is None:
             continue
         sonuc[gun] = {"ort": round(float(ort), 1), "min": round(float(mn), 1), "max": round(float(mx), 1)}
+        for ad, hh in IS_SAATLERI.items():
+            v = saatlik.get(f"{gun}T{hh}")
+            if v is not None:
+                sonuc[gun][ad] = round(float(v), 1)
     return sonuc
 
 

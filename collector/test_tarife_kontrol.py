@@ -118,3 +118,11 @@ def test_oku_hava():
     js = {"daily": {"time": ["2026-11-10", "2026-11-11"], "temperature_2m_mean": [11.34, None],
                     "temperature_2m_min": [9.8, 11.4], "temperature_2m_max": [13.8, 17.1]}}
     assert oku_hava(js) == {"2026-11-10": {"ort": 11.3, "min": 9.8, "max": 13.8}}
+
+
+def test_oku_hava_sabah_aksam():
+    from tarife_kontrol import oku_hava
+    js = {"daily": {"time": ["2026-11-10"], "temperature_2m_mean": [11.3], "temperature_2m_min": [9.8],
+                    "temperature_2m_max": [13.8]},
+          "hourly": {"time": ["2026-11-10T08:00", "2026-11-10T17:00"], "temperature_2m": [9.94, 13.1]}}
+    assert oku_hava(js)["2026-11-10"] == {"ort": 11.3, "min": 9.8, "max": 13.8, "sabah": 9.9, "aksam": 13.1}

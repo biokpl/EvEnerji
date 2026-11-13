@@ -81,20 +81,39 @@ export function parcalar(sessions, { cap, eff, hedef, hava }) {
 // öğrenilir; az veride kullanıcının verdiği değerlere (20 km, ek ≈ 5 km/gün) çekilir.
 export const IS_SAATLERI = [8, 17];
 const YOL_KM = 20, EK_KM = 5, L_YOL = 20, L_EK = 5;
-export function yolSayisi(t1, t2) {
-  let n = 0;
+// t1..t2 arasındaki hafta içi iş yolları: [{ts, gun, ad: 'sabah'|'aksam'}]
+export function yolListesi(t1, t2) {
+  const out = [];
   const d = new Date(t1 * 1000); d.setHours(0, 0, 0, 0);
-  for (; d.getTime() / 1000 < t2; d.setDate(d.getDate() + 1)) {
+  for (; d.getTime() / 1000 < t2 && out.length < 400; d.setDate(d.getDate() + 1)) {
     const g = d.getDay();
     if (g === 0 || g === 6) continue;
-    for (const h of IS_SAATLERI) {
+    IS_SAATLERI.forEach((h, i) => {
       const t = new Date(d); t.setHours(h, 0, 0, 0);
       const ts = t.getTime() / 1000;
-      if (ts > t1 && ts < t2) n++;
-    }
+      if (ts > t1 && ts < t2) out.push({ ts, gun: gunKey(ts), ad: i ? 'aksam' : 'sabah' });
+    });
   }
-  return n;
+  return out;
 }
+export const yolSayisi = (t1, t2) => yolListesi(t1, t2).length;
+
+// Bir aralıkta aracın gördüğü sıcaklık: iş yolları kendi saatinin (08:00 / 17:00) sıcaklığıyla, ek yollar gün
+// ortalamasıyla; km payına göre ağırlıklı. Saatlik değer yoksa gün ortalaması.
+export function yolSicakligi(hava, t1, t2, kmM) {
+  const y = kmM?.yol ?? YOL_KM, e = kmM?.ek ?? EK_KM;
+  let top = 0, w = 0;
+  for (const l of yolListesi(t1, t2)) {
+    const h = hava[l.gun];
+    const T = h ? (h[l.ad] ?? h.ort) : null;
+    if (T != null) { top += y * T; w += y; }
+  }
+  const ort = sicaklik(hava, t1, t2);
+  const ek = e * Math.max(0, t2 - t1) / 86400;
+  if (ort != null && ek > 0) { top += ek * ort; w += ek; }
+  return w > 0 ? top / w : ort;
+}
+
 export function kmModeli(pr) {
   // Σ (km − y·L − e·D)² + L_YOL·(y − 20)² + L_EK·(e − 5)² en küçük (ridge, önsele doğru)
   let LL = L_YOL, LD = 0, DD = L_EK, LK = L_YOL * YOL_KM, DK = L_EK * EK_KM;
@@ -129,6 +148,8 @@ export function sinama(pr, yedek) {
 
 export function ogren({ sessions, cap, eff, hedef, hava, yedek, simdi = Date.now() / 1000, bugunT }) {
   const pr = parcalar(sessions, { cap, eff, hedef, hava });
+  const kmM0 = kmModeli(pr.filter((p) => simdi - p.t2 < 90 * 86400));
+  for (const p of pr) p.T = yolSicakligi(hava, p.t1, p.t2, kmM0) ?? p.T;   // iş yolu saatlerinin sıcaklığı
   const model = uydur(pr, simdi);
   const sin = sinama(pr, yedek);
   const son = sin.filter((s) => s.kmsiz != null).slice(-OTO_N);
@@ -147,7 +168,7 @@ export function ogren({ sessions, cap, eff, hedef, hava, yedek, simdi = Date.now
 // Öğrenmeye KATILMAZ (yalnız gösterim için); gerçek girişler hep önceliklidir.
 export function otoDoldur(sessions, O, { cap, eff, hedef, hava, yedek }) {
   const ekle = (s) => ((s.kwh || 0) * eff / cap) * 100;
-  const tuk = (t1, t2) => { const T = sicaklik(hava, t1, t2); return O.model ? O.model.tahmin(T) : yedek; };
+  const tuk = (t1, t2) => { const T = yolSicakligi(hava, t1, t2, O.kmM); return O.model ? O.model.tahmin(T) : yedek; };
   let A = null;                                                     // {soc, odo, t, oto}
   for (const s of sessions) {
     if (A && s.socStart == null) {
@@ -176,4 +197,76 @@ export function kontrolSirasi(sessions) {
     n++;
   }
   return n >= KONTROL_ARALIGI;
+}
+
+// ---- Araç şimdi: son şarjdan bu yana iş yolları düşülerek tahmini pil yüzdesi, menzil ve ileriye bakış
+const GUNLER = ['Pazar', 'Pazartesi', 'Salı', 'Çarşamba', 'Perşembe', 'Cuma', 'Cumartesi'];
+export function simdiDurum(sessions, O, { cap, eff, hedef, hava, yedek }, simdi = Date.now() / 1000, alt = 20) {
+  const ekle = (s) => ((s.kwh || 0) * eff / cap) * 100;
+  const son = [...sessions].reverse().find((s) => s.end);
+  if (!son || sessions.some((s) => !s.end)) return null;          // şarj sürüyorsa şarj kartı gösterir
+  const basSoc = son.socEnd ?? (son.full ? hedef : (son.socStart != null ? Math.min(100, son.socStart + ekle(son)) : null));
+  if (basSoc == null) return null;
+  const kmM = O.kmM;
+  const c = (T) => (O.model ? O.model.tahmin(T) : yedek);
+  const sicak = (gun, ad) => { const h = hava[gun]; return h ? (h[ad] ?? h.ort) : null; };
+  // Olaylar: iş yolları (yol başı km, kendi saatinin sıcaklığı) + her gün 13:00'te ek yol (gün ortalaması)
+  const olaylar = (t1, t2) => {
+    const ev = yolListesi(t1, t2).map((l) => ({ ts: l.ts, km: kmM.yol, T: sicak(l.gun, l.ad), ad: l.ad }));
+    const d = new Date(t1 * 1000); d.setHours(13, 0, 0, 0);
+    for (; d.getTime() / 1000 < t2; d.setDate(d.getDate() + 1)) {
+      const ts = d.getTime() / 1000;
+      if (ts > t1 && kmM.ek > 0) ev.push({ ts, km: kmM.ek, T: hava[gunKey(ts)]?.ort ?? null, ad: 'ek' });
+    }
+    return ev.sort((x, y) => x.ts - y.ts);
+  };
+  let soc = basSoc, km = 0, sonT = null;
+  for (const o of olaylar(son.end, simdi)) {
+    const T = o.T ?? sonT; sonT = T;
+    soc -= (o.km * c(T)) / cap; km += o.km;
+  }
+  soc = Math.max(0, soc);
+  // İleriye bakış (14 gün): ne zaman %alt altına iner, kaç iş günü yeter
+  let f = soc, altinda = null, isGunu = 0;
+  for (const o of olaylar(simdi, simdi + 14 * 86400)) {
+    const T = o.T ?? sonT; sonT = T ?? sonT;
+    f -= (o.km * c(T)) / cap;
+    if (f < alt) { altinda = o; break; }
+    if (o.ad === 'aksam') isGunu++;
+  }
+  const altinNot = altinda ? (() => {
+    const d = new Date(altinda.ts * 1000);
+    const bugun = gunKey(simdi) === gunKey(altinda.ts), yarin = gunKey(simdi + 86400) === gunKey(altinda.ts);
+    const g = bugun ? 'Bugün' : yarin ? 'Yarın' : GUNLER[d.getDay()];
+    if (bugun) return altinda.ad === 'sabah' ? 'Bu sabah' : altinda.ad === 'aksam' ? 'Bu akşam' : 'Bugün';
+    return `${g} ${altinda.ad === 'sabah' ? 'sabahı' : altinda.ad === 'aksam' ? 'akşamı' : 'gün içinde'}`;
+  })() : null;
+  // Yarın: sabah/akşam sıcaklığıyla beklenen tüketim
+  const yh = hava[gunKey(simdi + 86400)];
+  const yarin = yh ? { sabah: yh.sabah ?? yh.ort, aksam: yh.aksam ?? yh.ort } : null;
+  if (yarin) yarin.c = c((yarin.sabah + yarin.aksam) / 2);
+  const bh = hava[gunKey(simdi)];
+  const cSimdi = c(bh ? ((bh.sabah ?? bh.ort) + (bh.aksam ?? bh.ort)) / 2 : null);
+  const odo0 = son.odo || son.odoTahmin;
+  return {
+    soc, km, basSoc, son, odo: odo0 ? Math.round(odo0 + km) : null,
+    menzil: ((soc / 100) * cap / cSimdi) * 100, c: cSimdi, altinda, altinNot, isGunu, alt, yarin,
+    gunKm: kmM.haftaIci, gunKwh: (kmM.haftaIci * cSimdi) / 100 / eff,
+  };
+}
+
+// Bu ay gidilen ≈ km: şarjlardaki km okumaları + bugünkü tahmini km'den, ay başına doğrusal ara değer
+export function ayKm(sessions, simdiOdo, kmM, simdi = Date.now() / 1000) {
+  const p = sessions.filter((s) => s.odo).map((s) => ({ t: s.start, odo: s.odo }));
+  if (simdiOdo) p.push({ t: simdi, odo: simdiOdo });
+  if (!p.length) return null;
+  p.sort((a, b) => a.t - b.t);
+  const d = new Date(simdi * 1000);
+  const ay = new Date(d.getFullYear(), d.getMonth(), 1).getTime() / 1000;
+  const once = [...p].reverse().find((x) => x.t <= ay), sonra = p.find((x) => x.t > ay);
+  let basOdo;
+  if (once && sonra) basOdo = once.odo + (sonra.odo - once.odo) * (ay - once.t) / (sonra.t - once.t);
+  else if (sonra) basOdo = sonra.odo - kmM.tahmin(ay, sonra.t);
+  else return null;
+  return Math.max(0, p[p.length - 1].odo - basOdo);
 }

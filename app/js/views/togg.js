@@ -204,13 +204,45 @@ function ucCard(M) {
 }
 
 // Şarj kararı: gelecek yıl Togg evde mi (limit aşılır), DC'de mi (limit içinde kalınır)? Değerler canlı veriden.
+// Araç şimdi: son şarjdan bu yana iş yolları düşülerek tahmini pil, menzil ve ileriye bakış (şarj sürmüyorken)
+function aracSimdiCard(M) {
+  const A = M.aracSimdi;
+  if (!A) return '';
+  const renk = A.soc < A.alt ? 'var(--bad)' : A.soc < 40 ? 'var(--mid)' : 'var(--good)';
+  const tlGun = A.gunKwh * M.toggAyBirim(M.mi);
+  const yeter = A.altinda
+    ? `<b>${A.isGunu} iş günü</b><span>${A.altinNot} %${A.alt}'nin altına iner</span>`
+    : '<b>2 haftadan fazla</b><span>şarj gerekmiyor</span>';
+  return `
+  <div class="card karar simdi" style="--sc:${renk}">
+    <div class="kr-head">
+      <div><div class="kr-lbl">Araç şimdi · tahmini</div>
+        <div class="sm-buyuk"><b>≈ %${num(A.soc)}</b><span>≈ ${num(A.menzil)} km menzil</span></div></div>
+      <span class="kr-pill">${icon('battery')}Bugün ${num(A.c, 1)}</span>
+    </div>
+    <div class="sm-pil"><i style="width:${Math.max(2, Math.min(100, A.soc)).toFixed(1)}%"></i><b style="left:${A.alt}%"></b></div>
+    <p class="kr-not">Son şarj %${num(A.basSoc)} · o günden beri ≈ ${num(A.km)} km${A.odo ? ` · araç ≈ ${num(A.odo)} km` : ''}</p>
+    <div class="kr-cam">
+      <div class="sm-satir"><span class="kr-lbl">Yeter</span><div>${yeter}</div></div>
+      ${A.yarin ? `<div class="kr-ayrac"></div>
+      <div class="sm-satir"><span class="kr-lbl">Yarın</span><div><b>${num(A.yarin.c, 1)} kWh/100 km</b><span>08:00 ${num(A.yarin.sabah, 0)}° · 17:00 ${num(A.yarin.aksam, 0)}°</span></div></div>` : ''}
+      <div class="kr-ayrac"></div>
+      <div class="og-uc">
+        <div><b>≈ ${num(A.gunKm)}</b><span>km/iş günü</span></div>
+        <div><b>≈ ${num(tlGun)} ₺</b><span>iş günü maliyeti</span></div>
+        <div><b>${A.ayKm != null ? `≈ ${num(A.ayKm)}` : '–'}</b><span>km bu ay</span></div>
+      </div>
+    </div>
+  </div>`;
+}
+
 // Öğrenen tüketim kartı: sıcaklığa göre tüketim, kendini sınama (son 5 şarj), kendi hesaplama durumu
 function ogrenmeCard(M) {
   const O = M.ogrenme;
   if (!O) return '';
   const T = O.bugunT;
   const hataRenk = (h) => (h == null ? 'var(--line)' : h <= O.esik ? 'var(--good)' : h <= 2 * O.esik ? 'var(--mid)' : 'var(--bad)');
-  const kutular = Array.from({ length: O.hedefN }, (_, i) => O.son[O.son.length - O.hedefN + i] || null);
+  const kutular = Array.from({ length: O.hedefN }, (_, i) => O.son[i] || null);   // soldan dolar; boşlar sıradaki şarjlar
   const iyi = O.son.filter((x) => x.kmsiz <= O.esik).length;
   const isitma = O.model && O.model.xMax - O.model.xMin >= 4 && O.model.b >= 0.05;
   const durumNot = O.oto
@@ -352,6 +384,7 @@ export function renderTogg(el, M, app) {
         <div><b>≈ ${num(M.evProj)}</b><span>Yıl Sonu kWh</span><small class="tri-not">Beklenen Toplam</small></div>
       </div>
     </div>
+    ${aracSimdiCard(M)}
     <div data-slot="charge">${chargeCard(M)}</div>
     ${kararCard(M)}
     ${ogrenmeCard(M)}

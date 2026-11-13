@@ -155,11 +155,11 @@ function kmCard(M) {
         <div class="kmk-buyuk"><b>${yak}${num(ev, 2)}</b><span>₺/km</span></div></div>
       <span class="kr-pill">${icon('car')}LPG'den %${ucuz} ucuz</span>
     </div>
-    <p class="kr-not" style="margin-top:2px">Evde şarj · ort. ${num(M.evAvgTl, 2)} ₺/kWh · araç ${num(M.aracTuketim, 1)} kWh/100 km${M.ogrenme.model ? ` (${num(M.ogrenme.bugunT ?? 18, 0)} °C için öğrenilen)` : M.per100Bat ? ` (son ${num(M.per100Km)} km)` : ' (Trumore)'} · şarj kaybı dahil</p>
+    <p class="kr-not" style="margin-top:2px">Evde şarj · ort. ${num(M.evAvgTl, 2)} ₺/kWh · araç ${num(M.aracTuketim, 1)} kWh/100 km${M.ogrenme.model ? '' : M.per100Bat ? ` (son ${num(M.per100Km)} km)` : ' (Trumore)'} · şarj kaybı dahil</p>
     <div class="kr-bars">
-      ${satir('Togg · evde', ev, 'var(--ev)', true)}
+      ${satir('Togg · Evde', ev, 'var(--ev)', true)}
       ${satir(`Togg · DC (${num(dc, dc % 1 ? 2 : 0)} ₺)`, dcKm, 'var(--home)', false)}
-      ${satir("LPG'li araç", lpg, 'var(--mid)', true)}
+      ${satir("LPG'li Araç", lpg, 'var(--mid)', true)}
     </div>
     <div class="kr-cam">
       <div class="kr-lbl">LPG'ye göre tasarruf</div>

@@ -261,8 +261,8 @@ function ogrenmeGrafik(el, M) {
       { type: 'scatter', data: noktalar, symbolSize: (v, p) => Math.max(7, Math.min(22, Math.sqrt(p.data.km) * 1.4)),
         itemStyle: { color: c.ev, opacity: 0.75, borderColor: 'rgba(255,255,255,.6)', borderWidth: 0.6, shadowBlur: 10, shadowColor: c.ev } },
       { type: 'line', data: egri, showSymbol: false, smooth: true, lineStyle: { color: c.accent2 || c.ev, width: 2, type: [6, 4] }, z: 1 },
-      ...(O.bugun != null && O.bugunT != null ? [{ type: 'effectScatter', data: [[O.bugunT, +O.bugun.toFixed(2)]], symbolSize: 9,
-        rippleEffect: { scale: 2.6, brushType: 'stroke' }, itemStyle: { color: c.good }, z: 3 }] : []),
+      ...(O.bugun != null && O.bugunT != null ? [{ type: 'scatter', data: [[O.bugunT, +O.bugun.toFixed(2)]], symbolSize: 10,
+        itemStyle: { color: c.good, borderColor: 'rgba(255,255,255,.8)', borderWidth: 1, shadowBlur: 8, shadowColor: c.good }, z: 3 }] : []),
     ],
   });
 }

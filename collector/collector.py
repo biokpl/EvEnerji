@@ -347,7 +347,7 @@ class Collector:
                   "avg_w": round(s["kwh"] * 60000 / dur) if dur > 0 else 0})
         s.pop("last_w", None)
         log.info("Şarj bitti: %s %.2f kWh", s["id"], s["kwh"])
-        self.fb.safe(self.fb.put, f"sessions/{did}/{s['id']}", s)
+        self.fb.safe(self.fb.patch, f"sessions/{did}/{s['id']}", s)   # patch: kullanıcının girdiği km/not silinmesin
         h, mi = divmod(int(dur), 60)
         msg = f"{fmt_kwh(s['kwh'])} · {fmt_tl(s['tl'])} · {h} sa {mi} dk"
         if self.winder.get("online") and self.winder.get("state") == "acik":

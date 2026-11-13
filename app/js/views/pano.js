@@ -155,7 +155,7 @@ function kmCard(M) {
         <div class="kmk-buyuk"><b>${yak}${num(ev, 2)}</b><span>₺/km</span></div></div>
       <span class="kr-pill">${icon('car')}LPG'den %${ucuz} ucuz</span>
     </div>
-    <p class="kr-not" style="margin-top:2px">Evde şarj · ort. ${num(M.evAvgTl, 2)} ₺/kWh · ${yak}${num(M.per100Duvar, 1)} kWh/100 km</p>
+    <p class="kr-not" style="margin-top:2px">Evde şarj · ort. ${num(M.evAvgTl, 2)} ₺/kWh · araç ${num(M.aracTuketim, 1)} kWh/100 km${M.per100Bat ? ` (son ${num(M.per100Km)} km)` : ' (Trumore)'} · şarj kaybı dahil</p>
     <div class="kr-bars">
       ${satir('Togg · evde', ev, 'var(--ev)', true)}
       ${satir(`Togg · DC (${num(dc, dc % 1 ? 2 : 0)} ₺)`, dcKm, 'var(--home)', false)}
@@ -211,7 +211,7 @@ export function chargeCard(M) {
   const known = s.socNow != null;
   // Yüzde biliniyorsa: tahmini şarj durumu ve hedefe kalan süre; bilinmiyorsa girme düğmesi
   const socLine = known
-    ? `<div class="soc-line"><b>≈ %${num(s.socNow)}</b><span class="nw">${s.socNow >= s.target - 0.5 ? ` · Hedef %${num(s.target)} · Araç Doldu` : s.etaMin != null ? ` · Hedef %${num(s.target)} · ≈ ${dur(s.etaMin)} Kaldı` : ` · Hedef %${num(s.target)}`}</span>
+    ? `<div class="soc-line"><b>≈ %${num(s.socNow)}</b>${s.menzil ? `<span class="nw menz">· ${num(s.menzil)} km</span>` : ''}<span class="nw">${s.socNow >= s.target - 0.5 ? ` · Hedef %${num(s.target)} · Araç Doldu` : s.etaMin != null ? ` · Hedef %${num(s.target)} · ≈ ${dur(s.etaMin)} Kaldı` : ` · Hedef %${num(s.target)}`}</span>
         <button class="soc-edit" data-soc aria-label="Şarj yüzdesini düzelt">${icon('edit')}</button></div>`
     : `<button class="soc-ask" data-soc>${icon('plus')}Araçta Şu An Kaç %? Gir, Kalan Süreyi Hesaplayayım</button>`;
   // Akan ışık: kart 3 sn'de bir yeniden çizildiği için animasyonun evresi saate bağlanır, kesilmeden akar

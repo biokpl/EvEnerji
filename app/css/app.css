@@ -743,3 +743,4 @@ input.num, input[data-m] { caret-color: transparent; cursor: pointer; }
 .kmk-iki span { display: block; font-size: 11px; font-weight: 600; color: color-mix(in srgb, var(--muted) 80%, var(--text)); }
 .kmk-iki b { display: block; font-size: 17px; margin: 2px 0; }
 :root[data-theme="light"] .kmk-iki > div { background: rgba(255, 255, 255, .5); box-shadow: 0 0 0 .5px rgba(20, 35, 60, .08); }
+.soc-line .menz { color: var(--text); font-weight: 800; }   /* tahmini menzil */

@@ -209,35 +209,36 @@ export function build(raw) {
     s.socEnd = Number.isFinite(v.bitis) ? v.bitis : null;
   }
   // Gerçek şarj verimi: başlangıç ve bitişi girilmiş oturumlardan (duvar kWh → batarya kWh)
-  const effSamples = sessions
-    .filter((s) => s.socStart != null && s.socEnd != null && s.kwh > 1 && s.socEnd > s.socStart)
-    .map((s) => ((s.socEnd - s.socStart) / 100) * cap / s.kwh)
-    .filter((e) => e > 0.7 && e <= 1);
-  const median = (a) => { const b = [...a].sort((x, y) => x - y); const m = b.length >> 1; return b.length % 2 ? b[m] : (b[m - 1] + b[m]) / 2; };
-  car.learnedEff = effSamples.length ? median(effSamples) : null;
-  car.learnedN = effSamples.length;
+  // Enerjiye göre ağırlıklı: Σ bataryaya giren / Σ prizden çekilen (kısa şarjda %1'lik yuvarlama hatası büyük, ağırlığı az)
+  const effOturum = sessions.filter((s) => s.socStart != null && s.socEnd != null && s.kwh > 1 && s.socEnd > s.socStart)
+    .filter((s) => { const e = ((s.socEnd - s.socStart) / 100) * cap / s.kwh; return e > 0.7 && e <= 1; });
+  const effBat = sum(effOturum.map((s) => ((s.socEnd - s.socStart) / 100) * cap)), effDuvar = sum(effOturum.map((s) => s.kwh));
+  car.learnedEff = effDuvar > 5 ? effBat / effDuvar : null;
+  car.learnedN = effOturum.length;
   car.eff = car.learnedEff ?? car.efficiency;
-  // kWh/100 km (prizden): iki şarj arasındaki sürüşler. Önceki şarjın bitiş %'si − sonrakinin başlangıç %'si ve
-  // aradaki km (Trumore değerleri). Tek kısa yol yanıltıcı (%1 = 0,9 kWh); bu yüzden tüm yollar TOPLANIR,
-  // toplam 100 km'yi geçince kullanılır (kullanıcı günde 20–40 km gidiyor).
+  // Araç tüketimi (kWh/100 km, BATARYADAN — araç ekranı / Trumore gibi): iki şarj arası sürüşler; önceki şarjın
+  // bitiş %'si − sonrakinin başlangıç %'si ve aradaki km. Hava/mevsimle değiştiği için yalnız SON sürüşler
+  // (en yeniden geriye ~120 km dolana kadar) kullanılır; tek kısa yolun %1'lik yuvarlama hatası toplamda erir.
   const sirali = [...sessions].sort((a, b) => a.start - b.start);
-  let topKm = 0, topKwh = 0;
+  const surusler = [];
   for (let i = 1; i < sirali.length; i++) {
     const o = sirali[i - 1], n = sirali[i];
     const oSon = o.socEnd ?? (o.full ? Number(car.hedef_yuzde) || 100 : null);
     if (!o.odo || !n.odo || oSon == null || n.socStart == null) continue;
     const km = n.odo - o.odo, dus = oSon - n.socStart;
-    if (km > 0 && km < 3000 && dus >= 0) { topKm += km; topKwh += (dus / 100) * cap / car.eff; }
+    if (km > 0 && km < 3000 && dus >= 0) surusler.push({ km, kwh: (dus / 100) * cap });
   }
-  const per100 = topKm >= 100 && topKwh > 0 ? (topKwh / topKm) * 100 : null;
-  const per100Km = topKm;                                      // öğrenme için biriken km (Ayarlar/Togg'da gösterilebilir)
-  // Eklenen menzil: km girişlerinden öğrenilen duvar kWh/100 km varsa o; yoksa aracın menzil
-  // Ayarlar'daki araç tüketimi (Trumore ortalaması; 2026-11: 3108 km'de 19 kWh/100 km)
-  const bataryaTuketim = Number(car.tuketim_kwh_100) || 19;
-  // Prizden çekilen kWh/100 km: km girişlerinden öğrenilen; yoksa araç tüketimi ÷ şarj verimi (19 / 0,87 ≈ 21,8)
-  const per100Duvar = per100 ?? bataryaTuketim / car.eff;
-  const per100Tahmini = !per100;
-  const kmOf = (duvarKwh) => (duvarKwh / per100Duvar) * 100;
+  let sonKm = 0, sonKwh = 0;
+  for (const d of surusler.reverse()) { if (sonKm >= 120) break; sonKm += d.km; sonKwh += d.kwh; }
+  const per100Bat = sonKm >= 60 && sonKwh > 0 ? (sonKwh / sonKm) * 100 : null;   // ölçülen (son sürüşler)
+  const per100Km = sonKm;
+  const aracTuketim = per100Bat ?? (Number(car.tuketim_kwh_100) || 19);           // yoksa Ayarlar (Trumore)
+  const per100 = per100Bat ? per100Bat / car.eff : null;                          // geriye uyum: prizden
+  // Prizden çekilen kWh/100 km = araç tüketimi ÷ şarj verimi (maliyet hesabı için: şarj kaybı dahil)
+  const per100Duvar = aracTuketim / car.eff;
+  const per100Tahmini = !per100Bat;
+  const kmOf = (duvarKwh) => ((duvarKwh * car.eff) / aracTuketim) * 100;          // bataryaya giren enerjiyle menzil
+  const menzilOf = (soc) => ((soc / 100) * cap / aracTuketim) * 100;
 
   // ---- Şarj kararı: gelecek yıl Togg evde mi (limit aşılır, her şey son kaynak), DC'de mi (limit içinde kalınır)?
   // Togg: son 60 günün şarjı; ev toplamı: son iki tam ayın (fatura/sayaç) günlük ortalaması (yarım aylar ortalamayı bozmasın)
@@ -328,6 +329,7 @@ export function build(raw) {
     a.kmTahmini = !per100;
     if (a.socStart != null) {
       a.socNow = Math.min(100, a.socStart + a.added);
+      a.menzil = menzilOf(a.socNow);
       a.target = Math.max(a.socNow, Number(car.hedef_yuzde) || 100);
       const remainWall = ((a.target - a.socNow) / 100) * cap / car.eff;   // duvardan çekilecek kWh
       a.etaMin = w > 300 ? (remainWall / (w / 1000)) * 60 : null;
@@ -338,7 +340,7 @@ export function build(raw) {
   return {
     raw, now, y, mi, today, S, t, tNext, durum, projDurum, devices, enabled, home, evs, plugs, winderDev,
     homeMonths, projMonths, evMonths, evTlByMonth, ytd, ytdEst, rate, son30, proj, butce, evYtd, evShare, evProj, evTl, evAvgTl, noEvProj,
-    exceedDate, level, levelText, scenarios, nextYear, kademeAylari, sessions, per100, per100Km, per100Duvar, per100Tahmini, histSarj: histSarjlar(y, cap / car.eff), karar, activeSession, covEnd, start, holeStart, holeEnd, estTotal, estMonths, nowDurum,
+    exceedDate, level, levelText, scenarios, nextYear, kademeAylari, sessions, per100, per100Km, per100Bat, aracTuketim, per100Duvar, per100Tahmini, menzilOf, histSarj: histSarjlar(y, cap / car.eff), karar, activeSession, covEnd, start, holeStart, holeEnd, estTotal, estMonths, nowDurum,
     priceNow: birimFiyat(t, projDurum, mi + 1), toggAyBirim,
     sarjTl: (sx) => (sx.kwh || 0) * toggAyBirim(new Date(sx.start * 1000).getMonth()),
     monthTl: projDurum.aylikTl[mi], monthKwh: projMonths[mi],

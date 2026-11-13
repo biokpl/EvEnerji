@@ -282,7 +282,7 @@ export function renderTogg(el, M, app) {
         <i style="width:${M.evShare * 100}%;background:var(--ev)"></i><i style="flex:1;background:var(--home)"></i></div>
       <div class="legend" style="position:relative;z-index:1"><span><i style="background:var(--ev)"></i>Togg ${pct(M.evShare * 100)}</span><span><i style="background:var(--home)"></i>Evin geri kalanı</span></div>
       <div class="trio">
-        <div><b>${yak}${num(M.per100Duvar, 1)}</b><span>kWh/100 km</span><small class="tri-not">Çekilen Elektrik</small></div>
+        <div><b>${yak}${num(M.aracTuketim, 1)}</b><span>kWh/100 km</span><small class="tri-not">${M.per100Bat ? `Son ${num(M.per100Km)} km` : 'Trumore ort.'}</small></div>
         <div><b>${yak}${num(tlPer100, 0)}</b><span>₺/100 km</span><small class="tri-not">Masraf · ${num(tlPer100 / 100, 2)} ₺/km</small></div>
         <div><b>≈ ${num(M.evProj)}</b><span>Yıl Sonu kWh</span><small class="tri-not">Beklenen Toplam</small></div>
       </div>

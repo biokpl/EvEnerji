@@ -216,12 +216,14 @@ function aracSimdiCard(M) {
   return `
   <div class="card karar simdi" style="--sc:${renk}">
     <div class="kr-head">
-      <div><div class="kr-lbl">Araç şimdi · tahmini</div>
+      <div><div class="kr-lbl">Araç şimdi · ${A.sarjda ? 'şarjda' : 'tahmini'}</div>
         <div class="sm-buyuk"><b>≈ %${num(A.soc)}</b><span>≈ ${num(A.menzil)} km menzil</span></div></div>
       <span class="kr-pill">${icon('battery')}Bugün ${num(A.c, 1)}</span>
     </div>
     <div class="sm-pil"><i style="width:${Math.max(2, Math.min(100, A.soc)).toFixed(1)}%"></i><b style="left:${A.alt}%"></b></div>
-    <p class="kr-not">Son şarj %${num(A.basSoc)} · o günden beri ≈ ${num(A.km)} km${A.odo ? ` · araç ≈ ${num(A.odo)} km` : ''}</p>
+    <p class="kr-not">${A.sarjda
+      ? (A.cikis ? `Şarjda · ${A.cikis.not} ≈ %${num(A.cikis.soc)}${A.cikis.dolu ? ' (dolmuş olur)' : ''}` : 'Şarjda')
+      : `Son şarj %${num(A.basSoc)} · o günden beri ≈ ${num(A.km)} km`}${A.odo ? ` · araç ≈ ${num(A.odo)} km` : ''}</p>
     <div class="kr-cam">
       <div class="sm-satir"><span class="kr-lbl">Yeter</span><div>${yeter}</div></div>
       ${A.yarin ? `<div class="kr-ayrac"></div>

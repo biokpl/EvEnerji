@@ -250,8 +250,6 @@ export function build(raw) {
     otoDoldur(sirali, ogrenme, { ...ogrOpt, yedek: aracTuketim });
     ogrenme.kontrol = kontrolSirasi(sirali);       // bu şarjda yine de sor (her 5. şarj sapma kontrolü)
   }
-  const aracSimdi = simdiDurum(sirali, ogrenme, { ...ogrOpt, yedek: aracTuketim });
-  if (aracSimdi) aracSimdi.ayKm = ayKm(sirali, aracSimdi.odo, ogrenme.kmM);
   const kmOf = (duvarKwh) => ((duvarKwh * car.eff) / aracTuketim) * 100;          // bataryaya giren enerjiyle menzil
   const menzilOf = (soc) => ((soc / 100) * cap / aracTuketim) * 100;
 
@@ -355,6 +353,13 @@ export function build(raw) {
       a.remainKwh = remainWall;
     }
   }
+  // Araç şimdi: şarj sürüyorsa sabah çıkış tahmini, değilse son şarjdan bu yana düşülen yüzde
+  const aracSimdi = simdiDurum(sirali, ogrenme, { ...ogrOpt, yedek: aracTuketim }, Date.now() / 1000, 20,
+    activeSession && activeSession.socNow != null
+      ? { soc: activeSession.socNow, w: activeSession.kopuk ? 0 : (activeSession.dev.live?.w || 0), hedef: Number(car.hedef_yuzde) || 100,
+          odo: sirali.find((x) => x.sid === activeSession.id)?.odo || null }
+      : null);
+  if (aracSimdi) aracSimdi.ayKm = ayKm(sirali, aracSimdi.odo, ogrenme.kmM);
 
   return {
     raw, now, y, mi, today, S, t, tNext, durum, projDurum, devices, enabled, home, evs, plugs, winderDev,

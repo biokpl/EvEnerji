@@ -201,11 +201,13 @@ export function kontrolSirasi(sessions) {
 
 // ---- Araç şimdi: son şarjdan bu yana iş yolları düşülerek tahmini pil yüzdesi, menzil ve ileriye bakış
 const GUNLER = ['Pazar', 'Pazartesi', 'Salı', 'Çarşamba', 'Perşembe', 'Cuma', 'Cumartesi'];
-export function simdiDurum(sessions, O, { cap, eff, hedef, hava, yedek }, simdi = Date.now() / 1000, alt = 20) {
+export function simdiDurum(sessions, O, { cap, eff, hedef, hava, yedek }, simdi = Date.now() / 1000, alt = 20, aktif = null) {
   const ekle = (s) => ((s.kwh || 0) * eff / cap) * 100;
-  const son = [...sessions].reverse().find((s) => s.end);
-  if (!son || sessions.some((s) => !s.end)) return null;          // şarj sürüyorsa şarj kartı gösterir
-  const basSoc = son.socEnd ?? (son.full ? hedef : (son.socStart != null ? Math.min(100, son.socStart + ekle(son)) : null));
+  // aktif: şarj sürüyor {soc, w} → bir sonraki iş yoluna (08:00) kadar şarj devam eder, o yüzdeyle yola çıkılır
+  const son = aktif ? null : [...sessions].reverse().find((s) => s.end);
+  if (!aktif && (!son || sessions.some((s) => !s.end))) return null;
+  const basSoc = aktif ? aktif.soc
+    : son.socEnd ?? (son.full ? hedef : (son.socStart != null ? Math.min(100, son.socStart + ekle(son)) : null));
   if (basSoc == null) return null;
   const kmM = O.kmM;
   const c = (T) => (O.model ? O.model.tahmin(T) : yedek);
@@ -221,14 +223,25 @@ export function simdiDurum(sessions, O, { cap, eff, hedef, hava, yedek }, simdi 
     return ev.sort((x, y) => x.ts - y.ts);
   };
   let soc = basSoc, km = 0, sonT = null;
-  for (const o of olaylar(son.end, simdi)) {
+  let cikis = null;
+  const gunAdi = (ts) => (gunKey(simdi) === gunKey(ts) ? 'Bugün' : gunKey(simdi + 86400) === gunKey(ts) ? 'Yarın' : GUNLER[new Date(ts * 1000).getDay()]);
+  if (aktif) {                                                       // bir sonraki yola çıkışta beklenen yüzde
+    const ilk = olaylar(simdi, simdi + 8 * 86400)[0];
+    if (ilk) {
+      const saat = (ilk.ts - simdi) / 3600;
+      cikis = { ts: ilk.ts, soc: Math.min(Math.max(basSoc, aktif.hedef ?? hedef), basSoc + ((aktif.w / 1000) * saat * eff / cap) * 100) };
+      cikis.dolu = cikis.soc >= (aktif.hedef ?? hedef) - 0.5;
+      cikis.not = ilk.ad === 'ek' ? `${gunAdi(ilk.ts)} öğlene` : `${gunAdi(ilk.ts)} ${ilk.ad === 'sabah' ? '08:00' : '17:00'} çıkışta`;
+    }
+  }
+  for (const o of (aktif ? [] : olaylar(son.end, simdi))) {
     const T = o.T ?? sonT; sonT = T;
     soc -= (o.km * c(T)) / cap; km += o.km;
   }
   soc = Math.max(0, soc);
   // İleriye bakış (14 gün): ne zaman %alt altına iner, kaç iş günü yeter
-  let f = soc, altinda = null, isGunu = 0;
-  for (const o of olaylar(simdi, simdi + 14 * 86400)) {
+  let f = cikis ? cikis.soc : soc, altinda = null, isGunu = 0;
+  for (const o of olaylar(cikis ? cikis.ts - 1 : simdi, simdi + 14 * 86400)) {
     const T = o.T ?? sonT; sonT = T ?? sonT;
     f -= (o.km * c(T)) / cap;
     if (f < alt) { altinda = o; break; }
@@ -247,9 +260,9 @@ export function simdiDurum(sessions, O, { cap, eff, hedef, hava, yedek }, simdi 
   if (yarin) yarin.c = c((yarin.sabah + yarin.aksam) / 2);
   const bh = hava[gunKey(simdi)];
   const cSimdi = c(bh ? ((bh.sabah ?? bh.ort) + (bh.aksam ?? bh.ort)) / 2 : null);
-  const odo0 = son.odo || son.odoTahmin;
+  const odo0 = aktif ? aktif.odo : son.odo || son.odoTahmin;
   return {
-    soc, km, basSoc, son, odo: odo0 ? Math.round(odo0 + km) : null,
+    soc, km, basSoc, son, sarjda: !!aktif, cikis, odo: odo0 ? Math.round(odo0 + km) : null,
     menzil: ((soc / 100) * cap / cSimdi) * 100, c: cSimdi, altinda, altinNot, isGunu, alt, yarin,
     gunKm: kmM.haftaIci, gunKwh: (kmM.haftaIci * cSimdi) / 100 / eff,
   };

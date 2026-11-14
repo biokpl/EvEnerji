@@ -7,6 +7,7 @@ değiştirilir; probe.py ham değerleri gösterir.
 from __future__ import annotations
 
 import logging
+import threading
 import time
 
 import tinytuya
@@ -19,6 +20,9 @@ DEFAULT_DPS = {"switch": "1", "current": "18", "power": "19", "voltage": "20"}
 DEFAULT_SCALE = {"current": 0.001, "power": 0.1, "voltage": 0.1}
 BACKOFF_S = 15      # 6+ art arda hatada prizi bu aralıkla dene
 VERSIONS = (3.4, 3.5, 3.3)   # Tuya yerel protokol sürümleri
+ADRES_ARA_S = 120   # priz ağda yoksa (IP değişmiş olabilir) en sık bu aralıkla yayınından aranır
+# Prizler 6667/UDP yayını yapar; aynı anda tek arama (discover.py taraması da bu kilidi kullanır)
+TARAMA_KILIDI = threading.Lock()
 
 
 class TuyaPlug:
@@ -37,6 +41,7 @@ class TuyaPlug:
         self.skip_until = 0.0
         self.last_err = ""
         self.proto_bad_since: float | None = None   # time.monotonic()
+        self.son_arama = 0.0
 
     def _connect(self):
         t = self.t
@@ -95,9 +100,29 @@ class TuyaPlug:
             # "Network Error" = priz kapalı/ulaşılamıyor; o durumda servis yeniden başlatılmaz.
             if str(e).startswith("Network Error"):
                 self.proto_bad_since = None
+                # Modem IP'yi değiştirmiş olabilir: prizin yayınını dinleyip yeni adresi bul (arka planda)
+                if self.fails >= 6 and now - self.son_arama > ADRES_ARA_S:
+                    self.son_arama = now
+                    threading.Thread(target=self._adres_bul, daemon=True).start()
             elif self.proto_bad_since is None:
                 self.proto_bad_since = now
             return Reading(ok=False, err=str(e))
+
+    def _adres_bul(self) -> None:
+        if not TARAMA_KILIDI.acquire(blocking=False):
+            return
+        try:
+            r = tinytuya.find_device(self.t["dev_id"]) or {}
+            ip = r.get("ip")
+            if ip and ip != self.t.get("ip"):
+                log.warning("%s yeni adreste: %s -> %s", self.t["dev_id"], self.t.get("ip"), ip)
+                self.t["ip"] = ip
+                self.d = self._connect()
+                self.fails, self.skip_until = 0, 0.0
+        except Exception as e:
+            log.debug("%s adres araması: %s", self.t["dev_id"], e)
+        finally:
+            TARAMA_KILIDI.release()
 
     def _tazele(self) -> None:
         """Prizden güç/gerilim/akımı yeniden ölçmesini ister (yanıt beklenmez).

@@ -32,7 +32,13 @@ def sync(tc: dict, local_file: Path, known_ids: set[str]) -> dict:
     devs = cloud.getdevices(verbose=False)
     if isinstance(devs, dict) and devs.get("Error"):
         raise RuntimeError(devs)
-    scan = tinytuya.deviceScan(verbose=False, maxretry=8) or {}
+    try:
+        from providers.tuya_local import TARAMA_KILIDI
+    except ImportError:
+        import threading
+        TARAMA_KILIDI = threading.Lock()
+    with TARAMA_KILIDI:           # prizlerin adres aramasıyla aynı UDP kapısını paylaşır
+        scan = tinytuya.deviceScan(verbose=False, maxretry=8) or {}
     ips = {v.get("gwId") or v.get("id"): v for v in scan.values()}
 
     local = json.loads(local_file.read_text(encoding="utf-8")) if local_file.exists() else {}

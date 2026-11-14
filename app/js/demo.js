@@ -89,7 +89,7 @@ export function buildDemo(now = new Date()) {
       ev_salter: { name: 'Ev Şalteri', type: 'ana_sayac', provider: 'ewelink', icon: 'home', color: '#9b8cff', room: 'Sigorta kutusu', enabled: true, order: 0 },
       togg: { name: 'Togg T10X', type: 'ev_sarj', provider: 'tuya', icon: 'car', color: '#22d3d6', room: 'Balkon', enabled: true, order: 1, max_amp: 16 },
       camasir: { name: 'Çamaşır Makinesi', type: 'priz', provider: 'tuya', icon: 'wash', color: '#3b82f6', room: 'Banyo', enabled: true, order: 2 },
-      sarici: { name: 'Kablo Sarıcı', type: 'kablo_sarici', provider: 'esp32', icon: 'reel', color: '#22d3d6', room: 'Balkon', enabled: true, order: 3 },
+      sarici: { name: 'Kablo Çekici', type: 'kablo_sarici', provider: 'esp32', icon: 'reel', color: '#22d3d6', room: 'Balkon', enabled: true, order: 3 },
     },
     live: {
       ev_salter: { ok: true, on: true, w: 520 + evW, v: 228.4, a: (520 + evW) / 228.4, ts, today: days.ev_salter[iso(now)] || 0 },
@@ -105,7 +105,7 @@ export function buildDemo(now = new Date()) {
     },
     status: { ts, devices: 3, host: 'demo', ntfy: 'EvEnerji-demo' },
     discovered: { gunsan_priz_2: { name: 'Günsan Priz 2', product: 'Günsan Akıllı Priz 16A', category: 'cz', provider: 'tuya' } },
-    winder: { state: { online: true, state: active ? 'acik' : 'sarili', turns: active ? 0 : 13, lock: !active, ts } },
+    winder: { state: { online: true, state: active ? 'acik' : 'sarili', d: active ? 'ASAGIDA' : 'PARK', t: '', mm: active ? 4200 : 0, inis: 4200, bilinir: true, hata: '', ts } },
     _active: active,
   };
 }

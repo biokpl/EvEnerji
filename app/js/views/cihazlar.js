@@ -21,7 +21,7 @@ store.subscribe((kind) => {
   }
 });
 
-const TYPES = { ev_sarj: 'Araç şarjı', priz: 'Priz', ana_sayac: 'Ana sayaç', kablo_sarici: 'Kablo sarıcı' };
+const TYPES = { ev_sarj: 'Araç şarjı', priz: 'Priz', ana_sayac: 'Ana sayaç', kablo_sarici: 'Kablo çekici' };
 // 17 hazır renk + sonda "özel renk" düğmesi (6 sütunlu ızgarada 3 tam satır)
 const COLORS = [
   '#22d3d6', '#38bdf8', '#3b82f6', '#6366f1', '#9b8cff', '#d946ef',
@@ -40,7 +40,7 @@ function devState(M, d) {
   let sub;
   if (d.type === 'kablo_sarici') {
     const w = M.winder;
-    sub = w?.online ? `Durum: <b>${esc(w.state)}</b>` : 'Henüz bağlı değil';
+    sub = w?.online && w.ts > 1.7e9 && Date.now() / 1000 - w.ts < 300 ? `<b>${esc(w.t || w.state)}</b>${w.bilinir ? ` · ${num(Math.max(0, w.mm || 0) / 1000, 2)} m aşağıda` : ''}` : 'Bağlı değil';
   } else if (offline) {
     sub = `Çevrimdışı${L.ts ? ' · ' + ago(L.ts) : ''}`;
   } else {

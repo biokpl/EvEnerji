@@ -6,7 +6,7 @@ import { renderPano, updatePano } from './views/pano.js';
 import { hizliKayitGerek, openHizliKayit, openSocSheet, renderTogg, updateTogg } from './views/togg.js';
 import { renderEv, updateEv } from './views/ev.js';
 import { renderCihazlar, updateCihazlar } from './views/cihazlar.js';
-import { renderSarici } from './views/sarici.js';
+import { renderSarici, updateSarici } from './views/sarici.js';
 import { renderAyarlar } from './views/ayarlar.js';
 import { initKeypad } from './keypad.js';
 import { cikisYap, girisYap, oturum } from './auth.js';
@@ -17,7 +17,7 @@ const VIEWS = {
   togg: { title: 'Togg T10X', render: renderTogg, update: updateTogg },
   ev: { title: 'Ev', render: renderEv, update: updateEv },
   cihazlar: { title: 'Cihazlar', render: renderCihazlar, update: updateCihazlar, live: 'render' },
-  sarici: { title: 'Kablo Sarıcı', render: renderSarici, live: 'render' },
+  sarici: { title: 'Kablo Çekici', render: renderSarici, update: updateSarici, live: 'render' },
   ayarlar: { title: 'Ayarlar', render: renderAyarlar },
 };
 

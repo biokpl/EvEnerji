@@ -142,6 +142,27 @@ def test_sarj_surerken_sarici_calismaz():
     assert c.fb.data["command_results"]["k"]["ok"] is False
 
 
+def test_kablo_cekici_komutlari():
+    c, plug = make()
+    c.fb.data["commands"] = {"k": sign("sarici", "asagi:200")}
+    c.run_commands()
+    assert c.fb.data["winder"]["cmd"]["c"] == "asagi" and c.fb.data["winder"]["cmd"]["v"] == 200.0
+    c.fb.data["commands"] = {"k2": sign("sarici", "sar")}          # eski ad -> topla
+    c.run_commands()
+    assert c.fb.data["winder"]["cmd"]["c"] == "topla"
+    c.fb.data["commands"] = {"k3": sign("sarici", "rm:1")}
+    c.run_commands()
+    assert c.fb.data["command_results"]["k3"]["ok"] is False
+
+
+def test_sarj_surerken_dur_calisir():
+    c, plug = make()
+    c.live["togg"] = Reading(ok=True, on=True, w=2200.0)
+    c.fb.data["commands"] = {"k": sign("sarici", "dur")}
+    c.run_commands()
+    assert c.fb.data["winder"]["cmd"]["c"] == "dur"
+
+
 if __name__ == "__main__":
     import sys
     fails = 0

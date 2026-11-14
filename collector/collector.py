@@ -15,7 +15,7 @@ Firebase düzeni (base_path altında):
   sessions/{id}/{oturum}  araç şarj oturumları
   settings/...        tarife, faturalar, uyarı eşikleri (uygulama yazar)
   commands/{push}     imzalı komutlar (Pi uygular ve siler)
-  winder/state|cmd    kablo sarıcı (ESP32) durumu ve komutu
+  winder/state|cmd    kablo çekici (ESP32-C3) durumu ve komutu {c, v, ts}
   discovered/{id}     Tuya bulutunda bulunan ama henüz eklenmemiş prizler
   status              servis kalp atışı
 """
@@ -27,6 +27,7 @@ import json
 import logging
 import os
 import queue
+import re
 import secrets
 import signal
 import subprocess
@@ -54,6 +55,9 @@ logging.basicConfig(level=logging.INFO, format="%(asctime)s %(name)s %(levelname
 log = logging.getLogger("collector")
 
 WINDER_BLOCKS_CHARGE = {"sarili", "sariyor", "aciliyor", "hata"}
+# Kablo çekici komutları (ESP32 winder/cmd {c, v, ts} okur); hareket ettirenler şarj sürerken reddedilir
+WINDER_CMDS = {"indir", "topla", "dur", "asagi", "yukari", "inis", "burasi_park"}
+WINDER_MOVES = {"indir", "topla", "asagi", "yukari"}
 OTO_KAPAT_W = 40          # iş bittikten sonra bu gücün altındaysa priz kapatılabilir (Bambu bekleme ~15 W)
 LAN_PORT = 8099           # ev ağı "prizi aç" kapısı (yalnız açar, asla kapatmaz)
 
@@ -630,15 +634,18 @@ class Collector:
             return {"ok": True, "msg": "Pi kapanıyor; ışığı sönünce fişi çekebilirsin" if action == "kapat"
                     else "Pi yeniden başlıyor (~1 dk)"}
         if did == "sarici":
-            if action not in ("sar", "ac", "dur", "kalibre"):
+            # Kablo çekici (ESP32-C3) komutları; değerli olanlar "ad:değer" (asagi:200 mm, inis:3.5 m)
+            ad, _, deger = action.partition(":")
+            ad = {"sar": "topla", "ac": "indir"}.get(ad, ad)          # eski uygulama sürümleri
+            if ad not in WINDER_CMDS or (deger and not re.fullmatch(r"\d{1,5}(\.\d{1,3})?", deger)):
                 return {"msg": "Geçersiz sarıcı komutu"}
-            if action in ("sar", "ac"):
+            if ad in WINDER_MOVES:
                 for cid, m in self.meta.items():
                     lv = self.live.get(cid)
                     if m.get("type") == "ev_sarj" and lv and (lv.w or 0) > 50:
                         return {"msg": "Şarj sürüyor; önce şarjı bitir."}
-            self.fb.put("winder/cmd", {"action": action, "ts": int(time.time() * 1000)})
-            return {"ok": True, "msg": "Sarıcıya iletildi"}
+            self.fb.put("winder/cmd", {"c": ad, "v": float(deger or 0), "ts": int(time.time() * 1000)})
+            return {"ok": True, "msg": "Kablo çekiciye iletildi"}
         m = self.meta.get(did)
         prov = self.providers.get(did)
         if not m or not prov:

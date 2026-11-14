@@ -1,13 +1,18 @@
-// Kablo sarıcı: durum, sar/aç/durdur, şarjla kilit kuralı
-import { ago, alertBox, icon, toast } from '../ui.js';
+// Kablo çekici (ESP32-C3, Kablo Sarıcı projesi): durum, indir/topla/dur, ince ayar, şarjla kilit kuralı.
+// Cihaz winder/state yazar ({online, state, d, t, mm, inis, bilinir, hata, ts}); komutlar Pi'ye imzalı gider,
+// Pi şarj kilidini denetleyip winder/cmd'ye yazar.
+import { ago, alertBox, esc, icon, num, toast } from '../ui.js';
 
 const STATES = {
-  sarili: { t: 'Kablo sarılı', cls: 'good', ic: 'lock' },
-  acik: { t: 'Kablo açık', cls: 'mid', ic: 'plug' },
-  sariyor: { t: 'Sarılıyor…', cls: 'mid', ic: 'up' },
-  aciliyor: { t: 'Açılıyor…', cls: 'mid', ic: 'downArrow' },
+  sarili: { t: 'Park: soket yuvada', cls: 'good', ic: 'lock' },
+  acik: { t: 'Kablo aşağıda', cls: 'mid', ic: 'plug' },
+  sariyor: { t: 'Toplanıyor…', cls: 'mid', ic: 'up' },
+  aciliyor: { t: 'İniyor…', cls: 'mid', ic: 'downArrow' },
+  durdu: { t: 'Durduruldu', cls: 'mid', ic: 'stop' },
+  bilinmiyor: { t: 'Konum bilinmiyor: önce Topla', cls: 'mid', ic: 'alert' },
   hata: { t: 'Hata', cls: 'bad', ic: 'alert' },
 };
+const MOVING = ['sariyor', 'aciliyor'];
 
 // Type 2 (Mennekes) şarj fişi: siyah gövde, mavi ayrıntılar. Yerel eksende kablo soldan girer,
 // ağız sağda. Fiş aşağı bakacak şekilde (rotate 90) kullanılır; ağız yüzü alttan hafif görünen bir elips,
@@ -65,43 +70,89 @@ function reel(state) {
 }
 export { reel };
 
+const isOnline = (w) => !!(w?.online && w.ts > 1.7e9 && Date.now() / 1000 - w.ts < 300);
+const metre = (w) => Math.max(0, w?.mm || 0) / 1000;
+const inisM = (w) => (w?.inis || 0) / 1000;
+const doluluk = (w) => (w.bilinir && inisM(w) ? Math.min(100, (metre(w) / inisM(w)) * 100) : 0);
+// Bu imza değişmedikçe ekran yeniden çizilmez; yalnız metre/çubuk/zaman güncellenir
+const sig = (M) => { const w = M.winder; return JSON.stringify([isOnline(w), w?.state, w?.hata, w?.bilinir, M.evW > 50]); };
+let drawn = '';
+
+function infoLine(w) {
+  return `${w.bilinir ? `${num(metre(w), 2)} m aşağıda` : 'konum bilinmiyor'} · iniş ${num(inisM(w), 2)} m · ${ago(w.ts)}`;
+}
+
 export function renderSarici(el, M, app) {
-  const w = M.winder;
-  const online = w?.online && (!w.ts || Date.now() / 1000 - w.ts < 300);
-  const st = STATES[w?.state] || { t: 'Bağlı değil', cls: 'mid', ic: 'wifi' };
+  const w = M.winder || {};
+  const online = isOnline(w);
+  const st = STATES[w.state] || { t: w.t || 'Bilinmiyor', cls: 'mid', ic: 'reel' };
   const charging = M.evW > 50;
-  const moving = ['sariyor', 'aciliyor'].includes(w?.state);
+  const moving = online && MOVING.includes(w.state);
+  const offMove = !online || charging || moving;
+  drawn = sig(M);
   el.innerHTML = `
     <div class="card hero">
       <div class="reel-stage">${reel(online ? w.state : 'sarili')}</div>
-      <div class="state-pill"><span class="badge ${online ? st.cls : 'mid'}">${icon(online ? st.ic : 'wifi')}${online ? st.t : 'Henüz bağlı değil'}</span>
-        ${online ? `<div class="muted" style="font-size:12px;margin-top:6px;font-weight:600">${w.turns != null ? `${w.turns} tur sarılı · ` : ''}park kilidi ${w.lock ? 'kapalı' : 'açık'}${w.ts ? ' · ' + ago(w.ts) : ''}</div>` : ''}</div>
-      <div class="btn-grid" style="position:relative;z-index:1">
-        <button class="btn ghost" data-a="ac" ${!online || charging || moving || w.state === 'acik' ? 'disabled' : ''}>${icon('downArrow')}Aç</button>
-        <button class="btn danger" data-a="dur" ${!online || !moving ? 'disabled' : ''}>${icon('stop')}Durdur</button>
-        <button class="btn primary" data-a="sar" ${!online || charging || moving || w.state === 'sarili' ? 'disabled' : ''}>${icon('up')}Sar</button>
+      <div class="state-pill"><span class="badge ${online ? st.cls : 'mid'}">${icon(online ? st.ic : 'wifi')}${online ? st.t : 'Bağlı değil'}</span>
+        ${online ? `<div class="muted" id="kc-bilgi" style="font-size:12px;margin-top:6px;font-weight:600">${infoLine(w)}</div>
+        <div class="progress" style="max-width:260px;margin:10px auto 0"><i id="kc-cubuk" style="width:${doluluk(w)}%"></i></div>` : ''}</div>
+      ${online && w.hata ? `<div style="position:relative;z-index:1;margin-top:12px">${alertBox('warn', 'alert', 'Hata', esc(w.hata))}</div>` : ''}
+      <div class="btn-grid" style="position:relative;z-index:1;margin-top:14px">
+        <button class="btn ghost" data-a="indir" ${offMove || w.state === 'acik' ? 'disabled' : ''}>${icon('downArrow')}İndir</button>
+        <button class="btn danger" data-a="dur" ${!moving ? 'disabled' : ''}>${icon('stop')}Dur</button>
+        <button class="btn primary" data-a="topla" ${offMove || w.state === 'sarili' ? 'disabled' : ''}>${icon('up')}Topla</button>
       </div>
     </div>
+    ${online ? `<div class="card"><h2>İnce ayar</h2>
+      <div class="btn-grid" style="grid-template-columns:1fr 1fr">
+        <button class="btn ghost" data-a="asagi:200" ${offMove ? 'disabled' : ''}>${icon('downArrow')}20 cm sal</button>
+        <button class="btn ghost" data-a="yukari:200" ${offMove ? 'disabled' : ''}>${icon('up')}20 cm topla</button>
+      </div>
+      <div class="field" style="margin-top:6px"><label>İniş boyu (m)<small>Soket şarj ağzına rahat yetişsin, fazlası yerde kalmasın.</small></label>
+        <span style="display:flex;gap:8px;align-items:center"><input class="input num" id="kc-inis" inputmode="decimal" placeholder="${num(inisM(w), 2)}" aria-label="İniş boyu (m)">
+        <button class="btn sm ghost" id="kc-kaydet">Kaydet</button></span></div>
+      <div class="field"><label>Burası park<small>Soket şu an park kılıfındaysa konumu sıfırlar.</small></label>
+        <button class="btn sm ghost" data-a="burasi_park" ${moving ? 'disabled' : ''}>${icon('lock')}Sıfırla</button></div>
+    </div>` : ''}
     <div class="card">
       <h2>Güvenlik kuralları</h2>
       <div class="alerts">
-        ${alertBox(charging ? 'warn' : 'ok', 'bolt', charging ? 'Şarj sürüyor' : 'Şarj yok', charging ? 'Şarj bitmeden sarıcı çalışmaz.' : 'Sarıcı komut alabilir.')}
-        ${alertBox('info', 'lock', 'Sarılıyken şarj açılmaz', 'Kablo sarılı ya da hareket halindeyken Togg prizi uzaktan açılamaz.')}
-        ${alertBox('info', 'bell', 'Şarj bitince', 'Pi "şarj bitti" bildirimi gönderir; kablo açıksa buradan tek dokunuşla sarabilirsin.')}
+        ${alertBox(charging ? 'warn' : 'ok', 'bolt', charging ? 'Şarj sürüyor' : 'Şarj yok', charging ? 'Şarj bitmeden kablo indirilip toplanamaz (Dur her zaman çalışır).' : 'Kablo çekici komut alabilir.')}
+        ${alertBox('info', 'lock', 'Parktayken şarj açılmaz', 'Soket yuvadayken ya da kablo hareket halindeyken Togg prizi uzaktan açılamaz.')}
+        ${alertBox('info', 'bell', 'Şarj bitince', 'Pi "şarj bitti" bildirimi gönderir; kablo aşağıdaysa buradan tek dokunuşla toplayabilirsin.')}
       </div>
     </div>
-    ${online ? `<div class="card"><h2>Bakım</h2><p class="hint">İlk kurulumda ve dişli/tambur değişince park turunu yeniden ölçer.</p>
-      <button class="btn ghost" data-a="kalibre" ${charging || moving ? 'disabled' : ''}>${icon('reel')}Kalibrasyon sarımı</button></div>` : `
-    <div class="card"><h2>Bağlantı</h2><p class="hint">Motorlu sarıcının ESP32-S3 kartı Wi-Fi'ye bağlanınca durumunu buraya yazar:
-      <b>winder/state</b> (durum, tur, kilit) ve komutları <b>winder/cmd</b>'den okur. Elektronik aşaması bitince otomatik görünür.</p></div>`}`;
+    ${online ? '' : `<div class="card"><h2>Bağlantı</h2><p class="hint">Kablo çekicinin ESP32 kartı Wi-Fi'ye bağlanınca durumunu buraya yazar.
+      ${w.ts > 1.7e9 ? `Son haber: ${ago(w.ts)}.` : 'Henüz haber gelmedi.'} Kart açık ve Wi-Fi'ye bağlıysa birkaç saniye içinde görünür.</p></div>`}`;
 
-  el.querySelectorAll('[data-a]').forEach((b) => b.addEventListener('click', async () => {
+  const send = async (b, action) => {
     b.disabled = true;
     try {
-      const r = await app.store.command('sarici', b.dataset.a);
+      const r = await app.store.command('sarici', action);
       toast(r.msg || (r.ok ? 'Gönderildi' : 'Başarısız'));
       if (r.needKey) app.go('ayarlar');
     } catch { toast('Komut gönderilemedi'); }
     app.refresh();
+  };
+  el.querySelectorAll('[data-a]').forEach((b) => b.addEventListener('click', () => {
+    const a = b.dataset.a;
+    if (a === 'indir' && !confirm('Kablo inecek. Altında kimse yok, araç üstü boş mu?')) return;
+    if (a === 'burasi_park' && !confirm('Soket şu an park kılıfında mı? Konum sıfırlanacak.')) return;
+    send(b, a);
   }));
+  el.querySelector('#kc-kaydet')?.addEventListener('click', (e) => {
+    const m = parseFloat(String(el.querySelector('#kc-inis').value).replace(',', '.'));
+    if (!(m >= 0.5 && m <= 5.6)) { toast('İniş boyu 0,5–5,6 m arası olmalı'); return; }
+    send(e.currentTarget, `inis:${m.toFixed(2)}`);
+  });
+}
+
+// Canlı veri: durum aynıysa yalnız metre, çubuk ve "kaç sn önce" güncellenir
+export function updateSarici(el, M) {
+  if (sig(M) !== drawn) return false;
+  const w = M.winder;
+  if (!isOnline(w)) return true;
+  const b = el.querySelector('#kc-bilgi'); if (b) b.textContent = infoLine(w);
+  const c = el.querySelector('#kc-cubuk'); if (c) c.style.width = `${doluluk(w)}%`;
+  return true;
 }

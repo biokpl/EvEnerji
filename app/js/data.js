@@ -211,15 +211,23 @@ async function demoCommand(st, device, action) {
   const raw = st.raw;
   if (device === 'sarici') {
     const w = raw.winder.state;
-    if ((action === 'sar' || action === 'ac') && (raw.live.togg?.w || 0) > 50) return { ok: false, msg: 'Şarj sürüyor; önce şarjı bitir.' };
-    if (action === 'dur') { w.state = w.prev || 'acik'; st.emit('live'); return { ok: true, msg: 'Durduruldu' }; }
-    if (action === 'kalibre') return { ok: true, msg: 'Kalibrasyon sarımı başlatıldı' };
-    w.prev = action === 'sar' ? 'acik' : 'sarili';
-    w.state = action === 'sar' ? 'sariyor' : 'aciliyor';
-    w.lock = false;
+    const [ad, deger] = action.split(':');
+    if (['indir', 'topla', 'asagi', 'yukari'].includes(ad) && (raw.live.togg?.w || 0) > 50) return { ok: false, msg: 'Şarj sürüyor; önce şarjı bitir.' };
+    if (ad === 'dur') { clearInterval(w._t); w.state = 'durdu'; w.ts = Date.now() / 1000; st.emit('live'); return { ok: true, msg: 'Kablo çekiciye iletildi' }; }
+    if (ad === 'inis') { w.inis = Math.round(parseFloat(deger) * 1000); st.emit('live'); return { ok: true, msg: 'Kablo çekiciye iletildi' }; }
+    if (ad === 'burasi_park') { w.mm = 0; w.state = 'sarili'; w.bilinir = true; st.emit('live'); return { ok: true, msg: 'Kablo çekiciye iletildi' }; }
+    const asagi = ad === 'indir' || ad === 'asagi';
+    const hedef = ad === 'indir' ? w.inis : ad === 'topla' ? 0 : Math.max(0, w.mm + (asagi ? 1 : -1) * parseFloat(deger || 0));
+    w.state = asagi ? 'aciliyor' : 'sariyor';
+    clearInterval(w._t);
+    w._t = setInterval(() => {
+      w.mm += Math.sign(hedef - w.mm) * Math.min(Math.abs(hedef - w.mm), 300);
+      w.ts = Date.now() / 1000;
+      if (w.mm === hedef) { clearInterval(w._t); w.state = w.mm === 0 ? 'sarili' : w.mm >= w.inis ? 'acik' : 'durdu'; }
+      st.emit('live');
+    }, 500);
     st.emit('live');
-    setTimeout(() => { w.state = action === 'sar' ? 'sarili' : 'acik'; w.lock = action === 'sar'; w.turns = action === 'sar' ? 13 : 0; st.emit('live'); }, 6000);
-    return { ok: true, msg: action === 'sar' ? 'Sarma başladı' : 'Açma başladı' };
+    return { ok: true, msg: 'Kablo çekiciye iletildi' };
   }
   const L = raw.live[device];
   if (!L) return { ok: false, msg: 'Cihaz çevrimdışı' };

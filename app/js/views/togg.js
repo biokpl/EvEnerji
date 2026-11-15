@@ -268,7 +268,7 @@ function ogrenmeCard(M) {
       <div class="og-uc">
         <div><b>${num(O.kmM.yol)}</b><span>km · iş yolu</span></div>
         <div><b>%${num(M.carEff * 100)}</b><span>şarj verimi</span></div>
-        <div><b>${num(O.model?.km ?? O.pr.reduce((t, p) => t + p.km, 0))}</b><span>öğrenilen km</span></div>
+        <div><b>${O.model ? `${num(O.model.s, 1)} kWh` : '–'}</b><span>bekleme/gün</span></div>
       </div>
       <p class="kr-not">${isitma ? `Soğukta her 1 °C için +${num(O.model.b, 2)} kWh/100 km (18 °C altı)` : 'Soğuğun etkisi henüz belirgin değil · farklı sıcaklıklarda sürüş biriktikçe ölçülecek'}</p>
     </div>
@@ -279,7 +279,8 @@ function ogrenmeGrafik(el, M) {
   const O = M.ogrenme, kap = el.querySelector('#og-ch');
   if (!O || !kap) return;
   const c = colors(), ax = axisStyle(c);
-  const noktalar = O.pr.filter((p) => p.T != null).map((p) => ({ value: [+p.T.toFixed(1), +p.c.toFixed(1)], km: p.km, t: p.t2 }));
+  // noktalar beklemesiz yol tüketimi (bekleme kaybı düşülmüş), eğriyle aynı ölçek
+  const noktalar = O.pr.filter((p) => p.T != null).map((p) => ({ value: [+p.T.toFixed(1), +(O.model ? O.model.yolC(p) : p.c).toFixed(1)], km: p.km, t: p.t2 }));
   const Ts = noktalar.map((n) => n.value[0]).concat(O.bugunT ?? []);
   const x0 = Math.floor(Math.min(0, ...Ts) / 5) * 5, x1 = Math.ceil(Math.max(25, ...Ts) / 5) * 5;
   const egri = O.model ? Array.from({ length: (x1 - x0) * 2 + 1 }, (_, i) => { const t = x0 + i / 2; return [t, +O.model.tahmin(t).toFixed(2)]; }) : [];

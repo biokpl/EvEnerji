@@ -2,7 +2,10 @@
 // kendini sınar (her yeni şarjda "bu kez %X ile gelmeliydi" tahmini, gerçek girişle kıyas) ve tahminleri
 // yeterince tutunca yüzde/km sormayı bırakıp kendisi hesaplar.
 //
-// Model: araç tüketimi (kWh/100 km, bataryadan) = a + b · max(0, KONFOR − sıcaklık)
+// Model: iki şarj arası pilden giden enerji = yol tüketimi × km + bekleme kaybı × gün
+//   yol tüketimi (kWh/100 km) = a + b · max(0, KONFOR − sıcaklık)   (Trumore'daki gibi saf sürüş)
+//   bekleme kaybı s (kWh/gün): park halinde uyanık sistemler, ön ısıtma, 12 V akü
+//   s önsel ≈0,5 kWh/gün; farklı bekleme süreli sürüşler biriktikçe kendi değerini bulur.
 //   b: soğukta ısıtma yükü. Az veride b önsel değere (EV'lerde tipik ≈0,35) çekilir; veri çoğaldıkça ve
 //   farklı sıcaklıklar biriktikçe kendi değerini bulur. Ağırlık: km (kısa yolun %1 yuvarlama hatası büyük) ×
 //   yenilik (yarı ömür 120 gün; araç/lastik/sürüş alışkanlığı zamanla değişir).
@@ -11,6 +14,8 @@ export const KONFOR = 18;          // °C; üstünde ısıtma yükü yok sayıl�
 const B_ONSEL = 0.35;              // kWh/100 km / °C
 const LAMBDA = 300;                // önselin ağırlığı (≈300 km'lik 1 °C yayılımlı veri)
 const YARI_OMUR_GUN = 120;
+const S_ONSEL = 0.5;               // kWh/gün bekleme kaybı önseli
+const LAMBDA_S = 300;
 const OTO_HATA = 3;                // son 5 sınamanın km'siz ort. hatası bunun altındaysa (puan) kendi hesaplar
 const OTO_N = 5;
 const KONTROL_ARALIGI = 5;         // kendi hesaplarken her 5. şarjda bir yine sorar (sapma kontrolü)
@@ -29,25 +34,45 @@ export function sicaklik(hava, t1, t2) {
   return n ? top / n : null;
 }
 
-// Ağırlıklı en küçük kareler, b önsele doğru düzenlenmiş; b ∈ [0, 1,2]
+// Ağırlıklı en küçük kareler: c = a + b·x + s·z  (x = ısıtma derecesi, z = bekleme günü × 100 / km)
+// b ve s önsellerine doğru düzenlenmiş (ridge); b ∈ [0, 1,2], s ∈ [0, 3]
+const zOf = (o) => (o.gun * 100) / o.km;
+function coz3(A, v) {                      // 3×3 Gauss eleme
+  const M = A.map((r, i) => [...r, v[i]]);
+  for (let i = 0; i < 3; i++) {
+    let m = i; for (let k = i + 1; k < 3; k++) if (Math.abs(M[k][i]) > Math.abs(M[m][i])) m = k;
+    [M[i], M[m]] = [M[m], M[i]];
+    for (let k = i + 1; k < 3; k++) { const f = M[k][i] / M[i][i]; for (let j = i; j < 4; j++) M[k][j] -= f * M[i][j]; }
+  }
+  const x = [0, 0, 0];
+  for (let i = 2; i >= 0; i--) { let t = M[i][3]; for (let j = i + 1; j < 3; j++) t -= M[i][j] * x[j]; x[i] = t / M[i][i]; }
+  return x;
+}
 export function uydur(ornekler, simdi) {
   const veri = ornekler.filter((o) => o.T != null);
-  const km = veri.reduce((s, o) => s + o.km, 0);
+  const km = veri.reduce((t, o) => t + o.km, 0);
   if (km < 60) return null;
-  let W = 0, Wx = 0, Wxx = 0, Wy = 0, Wxy = 0;
+  const S = [[0, 0, 0], [0, 0, 0], [0, 0, 0]], v = [0, 0, 0];
+  let W = 0;
+  const satir = (o) => [1, Math.max(0, KONFOR - o.T), zOf(o)];
   for (const o of veri) {
     const w = o.km * Math.pow(0.5, Math.max(0, simdi - o.t2) / 86400 / YARI_OMUR_GUN);
-    const x = Math.max(0, KONFOR - o.T), y = o.c;
-    W += w; Wx += w * x; Wxx += w * x * x; Wy += w * y; Wxy += w * x * y;
+    const f = satir(o); W += w;
+    for (let i = 0; i < 3; i++) { v[i] += w * f[i] * o.c; for (let j = 0; j < 3; j++) S[i][j] += w * f[i] * f[j]; }
   }
-  const lam = LAMBDA * (W / km);        // önsel, yenilik ağırlığıyla aynı ölçekte
-  const det = W * (Wxx + lam) - Wx * Wx;
-  let b = (W * (Wxy + lam * B_ONSEL) - Wx * Wy) / det;
-  b = Math.min(1.2, Math.max(0, b));
-  const a = (Wy - b * Wx) / W;
+  const olc = W / km;                     // önseller yenilik ağırlığıyla aynı ölçekte
+  S[1][1] += LAMBDA * olc; v[1] += LAMBDA * olc * B_ONSEL;
+  S[2][2] += LAMBDA_S * olc; v[2] += LAMBDA_S * olc * S_ONSEL;
+  let [a, b, sb] = coz3(S, v);
+  if (b < 0 || b > 1.2 || sb < 0 || sb > 3) {       // sınır dışı: kırp, a'yı yeniden hesapla
+    b = Math.min(1.2, Math.max(0, b)); sb = Math.min(3, Math.max(0, sb));
+    let t = 0; for (const o of veri) { const w = o.km; const f = satir(o); t += w * (o.c - b * f[1] - sb * f[2]); }
+    a = t / veri.reduce((x, o) => x + o.km, 0);
+  }
   const xler = veri.map((o) => Math.max(0, KONFOR - o.T));
-  return { a, b, km, n: veri.length, xMin: Math.min(...xler), xMax: Math.max(...xler),
-    tahmin: (T) => a + b * Math.max(0, KONFOR - (T ?? KONFOR)) };
+  return { a, b, s: sb, km, n: veri.length, xMin: Math.min(...xler), xMax: Math.max(...xler),
+    tahmin: (T) => a + b * Math.max(0, KONFOR - (T ?? KONFOR)),            // yol tüketimi kWh/100 km
+    yolC: (o) => o.c - sb * zOf(o) };                                       // bir parçanın beklemesiz tüketimi
 }
 
 // Sürüş parçaları: bilinen bir yüzde noktasından (şarj bitişi) bir sonraki başlangıç yüzdesi + km girilmiş
@@ -137,7 +162,8 @@ export function sinama(pr, yedek) {
     const m = uydur(once, p.t2);
     const c = m ? m.tahmin(p.T) : yedek;
     const kmM = kmModeli(once.filter((o) => p.t2 - o.t2 < 90 * 86400));
-    const tahDus = (km) => (km * c) / p.cap;                         // km × kWh/100km → batarya yüzdesi
+    const bek = m ? m.s : 0;
+    const tahDus = (km) => (km * c + 100 * bek * p.gun) / p.cap;      // yol + bekleme → batarya yüzdesi
     const kmli = Math.abs(tahDus(p.km) - p.dus);
     const kmTah = kmM.tahmin(p.t1, p.t2);
     const kmsiz = Math.abs(tahDus(kmTah) - p.dus);
@@ -173,7 +199,8 @@ export function otoDoldur(sessions, O, { cap, eff, hedef, hava, yedek }) {
   for (const s of sessions) {
     if (A && s.socStart == null) {
       const km = s.odo && A.odo ? s.odo - A.odo : O.kmM.tahmin(A.t, s.start);
-      s.socStart = Math.max(0, Math.round(A.soc - (km * tuk(A.t, s.start) / 100) / cap * 100));
+      const bek = (O.model?.s || 0) * Math.max(0, s.start - A.t) / 86400;              // kWh
+      s.socStart = Math.max(0, Math.round(A.soc - ((km * tuk(A.t, s.start) / 100) + bek) / cap * 100));
       s.socAuto = true;
       if (!s.odo && A.odo) { s.odoTahmin = Math.round(A.odo + km); }
     }
@@ -234,16 +261,18 @@ export function simdiDurum(sessions, O, { cap, eff, hedef, hava, yedek }, simdi 
       cikis.not = ilk.ad === 'ek' ? `${gunAdi(ilk.ts)} öğlene` : `${gunAdi(ilk.ts)} ${ilk.ad === 'sabah' ? '08:00' : '17:00'} çıkışta`;
     }
   }
+  const bekYuzde = (gun) => ((O.model?.s || 0) * gun / cap) * 100;   // bekleme kaybı (% / gün)
   for (const o of (aktif ? [] : olaylar(son.end, simdi))) {
     const T = o.T ?? sonT; sonT = T;
     soc -= (o.km * c(T)) / cap; km += o.km;
   }
+  if (!aktif) soc -= bekYuzde((simdi - son.end) / 86400);
   soc = Math.max(0, soc);
   // İleriye bakış (14 gün): ne zaman %alt altına iner, kaç iş günü yeter
-  let f = cikis ? cikis.soc : soc, altinda = null, isGunu = 0;
+  let f = cikis ? cikis.soc : soc, altinda = null, isGunu = 0, onceki = cikis ? cikis.ts : simdi;
   for (const o of olaylar(cikis ? cikis.ts - 1 : simdi, simdi + 14 * 86400)) {
     const T = o.T ?? sonT; sonT = T ?? sonT;
-    f -= (o.km * c(T)) / cap;
+    f -= (o.km * c(T)) / cap + bekYuzde(Math.max(0, o.ts - onceki) / 86400); onceki = o.ts;
     if (f < alt) { altinda = o; break; }
     if (o.ad === 'aksam') isGunu++;
   }
@@ -264,7 +293,7 @@ export function simdiDurum(sessions, O, { cap, eff, hedef, hava, yedek }, simdi 
   return {
     soc, km, basSoc, son, sarjda: !!aktif, cikis, odo: odo0 ? Math.round(odo0 + km) : null,
     menzil: ((soc / 100) * cap / cSimdi) * 100, c: cSimdi, altinda, altinNot, isGunu, alt, yarin,
-    gunKm: kmM.haftaIci, gunKwh: (kmM.haftaIci * cSimdi) / 100 / eff,
+    gunKm: kmM.haftaIci, gunKwh: ((kmM.haftaIci * cSimdi) / 100 + (O.model?.s || 0)) / eff, bekleme: O.model?.s ?? null,
   };
 }
 

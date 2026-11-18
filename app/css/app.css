@@ -702,6 +702,39 @@ input.num, input[data-m] { caret-color: transparent; cursor: pointer; }
 .sm-satir div span { display: block; font-size: 11.5px; font-weight: 700; color: color-mix(in srgb, var(--muted) 80%, var(--text)); margin-top: 1px; }
 :root[data-theme="light"] .sm-pil { background: rgba(20, 35, 60, .07); }
 
+/* Togg > Sürüş karnesi, kumbara, yolculuk */
+.karne .kr-pill { color: var(--pc); background: color-mix(in srgb, var(--pc) 14%, rgba(255, 255, 255, .04)); box-shadow: 0 0 0 .35px color-mix(in srgb, var(--pc) 50%, transparent); }
+.kn-cubuk { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); gap: 8px; height: 74px; margin-top: 10px; align-items: end; }
+.kn-cubuk div { height: 100%; display: flex; flex-direction: column; justify-content: flex-end; align-items: center; }
+.kn-cubuk i { display: block; width: 100%; max-width: 34px; border-radius: 8px 8px 4px 4px;
+  background: linear-gradient(180deg, color-mix(in srgb, var(--c) 60%, transparent), color-mix(in srgb, var(--c) 22%, transparent));
+  box-shadow: 0 0 0 .5px color-mix(in srgb, var(--c) 85%, white), inset 0 1px 0 rgba(255, 255, 255, .4); }
+.kn-cubuk span { font-size: 10.5px; font-weight: 800; margin-top: 4px; color: var(--muted); font-variant-numeric: tabular-nums; }
+.kn-tutar { display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; margin: 6px 0 8px; }
+.kn-tutar b { font-size: 24px; font-weight: 800; letter-spacing: -.02em; color: var(--good); font-variant-numeric: tabular-nums; }
+.kn-tutar span { font-size: 12px; font-weight: 700; color: var(--muted); }
+.kn-hedef { border: 0; background: none; color: var(--muted); cursor: pointer; padding: 2px; }
+.kn-hedef svg { width: 15px; height: 15px; }
+.yp-sonuc { margin-top: 12px; }
+.yp-ana { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
+.yp-ana span { font-size: 13px; font-weight: 700; }
+.yp-ana b { font-size: 28px; font-weight: 800; color: var(--ev); font-variant-numeric: tabular-nums; }
+
+/* Togg > Bakım ve evrak takvimi */
+.tk-duzen { border: 0; cursor: pointer; font: inherit; font-size: 13px; font-weight: 800; }
+.tk-liste { padding: 6px 13px; }
+.tk-satir { display: flex; align-items: center; gap: 11px; padding: 9px 0; }
+.tk-satir + .tk-satir { border-top: 1px solid rgba(255, 255, 255, .07); }
+.tk-satir i { flex: none; width: 32px; height: 32px; border-radius: 10px; display: grid; place-items: center; color: var(--tc);
+  background: linear-gradient(160deg, color-mix(in srgb, var(--tc) 30%, transparent), color-mix(in srgb, var(--tc) 10%, transparent));
+  box-shadow: 0 0 0 .5px color-mix(in srgb, var(--tc) 70%, transparent), inset 0 1px 0 rgba(255, 255, 255, .3); }
+.tk-satir i svg { width: 16px; height: 16px; }
+.tk-satir div { flex: 1; min-width: 0; }
+.tk-satir b { display: block; font-size: 14px; font-weight: 800; }
+.tk-satir span { display: block; font-size: 11.5px; font-weight: 600; color: color-mix(in srgb, var(--muted) 80%, var(--text)); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.tk-satir em { flex: none; font-style: normal; font-size: 13px; font-weight: 800; color: var(--tc); font-variant-numeric: tabular-nums; }
+:root[data-theme="light"] .tk-satir + .tk-satir { border-top-color: rgba(20, 35, 60, .08); }
+
 /* Togg > Öğrenen tüketim kartı (şarj kararı kartının cam stili) */
 .ogren .kr-title small { font-size: 13px; font-weight: 700; color: var(--muted); letter-spacing: 0; }
 .og-grafik { height: 170px; margin: 8px -4px 0; }

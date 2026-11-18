@@ -3,6 +3,7 @@ import { build } from './model.js';
 import { disposeAll, setQuiet } from './charts.js';
 import { closeSheet, hydrateIcons, icon, sheetOpen, toast } from './ui.js';
 import { renderPano, updatePano } from './views/pano.js';
+import { takvim, takvimTahmin } from './takvim.js';
 import { hizliKayitGerek, openHizliKayit, openSocSheet, renderTogg, updateTogg } from './views/togg.js';
 import { renderEv, updateEv } from './views/ev.js';
 import { renderCihazlar, updateCihazlar } from './views/cihazlar.js';
@@ -144,6 +145,14 @@ function refresh({ keepScroll = true, silent = false, force = false } = {}) {
   if (keepScroll) window.scrollTo(0, y);
   setTimeout(kayitSor, 400);
   ogrenmeYaz();
+  takvimYaz();
+}
+
+// Tahmini bakım tarihini Pi'ye bildir (hatırlatma için; değişince)
+function takvimYaz() {
+  if (!M || store.mode !== 'live') return;
+  const t = takvimTahmin(takvim(M));
+  if (t.bakim && t.bakim !== M.S.car?.takvim_tahmin?.bakim) store.patch('settings/car/takvim_tahmin', t).catch(() => {});
 }
 
 // Öğrenme durumunu Pi'ye bildir (değişince): kendi hesaplama modunda Pi bildirimde yüzde/km istemez

@@ -2,6 +2,8 @@
 import { axisStyle, colors, mount } from '../charts.js';
 import { AYLAR, AY_K, GUN_K, closeSheet, dur, esc, hm, icon, kwh, num, openSheet, pct, tl, toast, watt } from '../ui.js';
 import { chargeCard } from './pano.js';
+import { BAKIM_AY, BAKIM_KM, takvim } from '../takvim.js';
+import { OTOYOL_KATSAYI, SEHIRLER, planla, yolHavasi } from '../yolculuk.js';
 
 let showAll = false;
 
@@ -238,6 +240,177 @@ function aracSimdiCard(M) {
   </div>`;
 }
 
+// Yolculuk planlayıcı kartı (kısa) + hesaplama penceresi
+function yolculukCard() {
+  return `
+  <div class="card karar yolk dc">
+    <div class="kr-head">
+      <div><div class="kr-lbl">Yolculuk planla</div>
+        <div class="kr-title">Uzun yola mı çıkıyorsun?</div></div>
+      <button class="kr-pill tk-duzen" id="yol-ac">${icon('trend')}Planla</button>
+    </div>
+    <p class="kr-not">Varış yerinin hava tahmini ve senin tüketiminle: kaç yüzdeye şarj etmeli, yolda DC gerekir mi, masraf ne tutar.</p>
+  </div>`;
+}
+
+function openYolculuk(M) {
+  const yarin = new Date(Date.now() + 864e5);
+  const gun0 = `${yarin.getFullYear()}-${String(yarin.getMonth() + 1).padStart(2, '0')}-${String(yarin.getDate()).padStart(2, '0')}`;
+  openSheet(`
+    <h3>Yolculuk planla</h3>
+    <div class="sh-sub">Mesafeler İstanbul Avrupa yakasından karayoluyla yaklaşık</div>
+    <div class="field"><div><label for="yp-s">Nereye</label></div>
+      <select class="input" id="yp-s">${SEHIRLER.map(([ad, km], i) => `<option value="${i}"${ad === 'Bursa' ? ' selected' : ''}>${ad} · ≈ ${km} km</option>`).join('')}<option value="-1">Başka (km gir)</option></select></div>
+    <div class="field" id="yp-kmf" style="display:none"><div><label for="yp-km">Tek yön km</label></div><input class="input num" id="yp-km" inputmode="numeric" placeholder="km"></div>
+    <div class="field"><div><label for="yp-t">Gidiş günü</label></div><input class="input" type="date" id="yp-t" value="${gun0}"></div>
+    <div class="field"><div><label for="yp-y">Yol</label></div>
+      <select class="input" id="yp-y"><option value="2">Gidiş-dönüş (orada şarj yok)</option><option value="1">Tek yön</option></select></div>
+    <div id="yp-sonuc" class="kr-cam yp-sonuc"><p class="kr-not" style="margin:0">Hesaplanıyor…</p></div>
+    <div class="btn-row" style="margin-top:14px"><button class="btn ghost" id="cancel">Kapat</button></div>`, (sh) => {
+    sh.querySelector('#cancel').onclick = () => closeSheet();
+    const hesap = async () => {
+      const i = Number(sh.querySelector('#yp-s').value);
+      sh.querySelector('#yp-kmf').style.display = i === -1 ? '' : 'none';
+      const sehir = i >= 0 ? SEHIRLER[i] : null;
+      const km = sehir ? sehir[1] : parseInt(String(sh.querySelector('#yp-km').value).replace(/\D/g, ''), 10);
+      const out = sh.querySelector('#yp-sonuc');
+      if (!(km > 0)) { out.innerHTML = '<p class="kr-not" style="margin:0">Tek yön km gir</p>'; return; }
+      const gun = sh.querySelector('#yp-t').value || gun0;
+      out.innerHTML = '<p class="kr-not" style="margin:0">Hava tahmini alınıyor…</p>';
+      const T = await yolHavasi(sehir ? sehir[2] : 41.01, sehir ? sehir[3] : 28.97, gun);
+      const P = planla({ km, gidisDonus: sh.querySelector('#yp-y').value === '2', T: T ?? M.ogrenme?.bugunT, M });
+      const d = new Date(`${gun}T12:00:00`);
+      const g = new Date(d.getTime() - 864e5).toLocaleDateString('tr-TR', { weekday: 'long' });
+      const once = g.charAt(0).toLocaleUpperCase('tr-TR') + g.slice(1);
+      out.innerHTML = `
+        <div class="yp-ana"><span>${once} akşamı şarj et</span><b>%${num(P.basla)}</b></div>
+        <div class="kr-ayrac"></div>
+        <div class="kr-row"><span>${T != null ? `${num(T, 0)} °C · ` : ''}otoyol tüketimi</span><b>≈ ${num(P.c, 1)} kWh/100 km</b></div>
+        <div class="kr-row"><span>Toplam ${num(P.topKm)} km</span><b>≈ ${num(P.kwh, 1)} kWh</b></div>
+        <div class="kr-row"><span>Yolda DC şarj</span><b style="color:${P.dcDurak ? 'var(--mid)' : 'var(--good)'}">${P.dcDurak ? `${P.dcDurak} durak · ≈ ${num(P.dcKwh)} kWh` : 'Gerek yok'}</b></div>
+        <div class="kr-row"><span>Varışta pil</span><b>≈ %${num(P.varis)}</b></div>
+        ${P.donus != null ? `<div class="kr-row"><span>Eve dönüşte</span><b style="color:${P.donus < 15 ? 'var(--mid)' : 'inherit'}">≈ %${num(P.donus)}</b></div>` : ''}
+        <div class="kr-ayrac"></div>
+        <div class="kr-row"><span>Masraf${P.dcDurak ? ' (ev + DC)' : ''}</span><b class="kmk-yesil" style="font-size:17px">≈ ${num(P.tl)} ₺</b></div>
+        <div class="kr-row"><span>LPG'li araçla</span><b>≈ ${num(P.lpgTl)} ₺</b></div>
+        <p class="kr-not">Otoyol hızında tüketim şehir içine göre ≈ %${Math.round((OTOYOL_KATSAYI - 1) * 100)} fazla alındı · varışta en az %15 yedek</p>`;
+    };
+    for (const id of ['#yp-s', '#yp-t', '#yp-y']) sh.querySelector(id).addEventListener('change', hesap);
+    sh.querySelector('#yp-km').addEventListener('change', hesap);
+    hesap();
+  });
+}
+
+// Sürüş karnesi (her şarj arası sürüş, havaya göre beklenenle kıyas) + LPG'ye göre tasarruf kumbarası
+function karneCard(M) {
+  const O = M.ogrenme;
+  const c = M.car, lpgTl = Number(c.lpg_tl) || 50.7, lpgL = Number(c.lpg_l100) || 10;
+  const parca = (O?.model ? O.pr.filter((p) => p.T != null && p.km >= 30) : []).slice(-6);
+  const birim = M.toggAyBirim(M.mi) / (M.carEff || 0.87);                       // bataryaya giren 1 kWh'in ₺'si
+  const kart = parca.map((p) => {
+    const bek = O.model.tahmin(p.T), ger = O.model.yolC(p);
+    return { p, puan: (bek / ger) * 100, tl: ((bek - ger) / 100) * p.km * birim };
+  });
+  const son = kart[kart.length - 1];
+  // Kumbara: bu yıl LPG'li araca göre biriken (km kartıyla aynı hesap)
+  const ev = M.evAvgTl > 0 ? (M.per100Duvar * M.evAvgTl) / 100 : null, lpg = (lpgL * lpgTl) / 100;
+  const kmYil = M.per100Duvar > 0 ? (M.evYtd / M.per100Duvar) * 100 : 0;
+  const biriken = ev != null ? kmYil * (lpg - ev) : null;
+  const K = c.kumbara || {};
+  const hedef = Number(K.tutar) || 0;
+  const oran = hedef && biriken != null ? Math.min(100, (biriken / hedef) * 100) : null;
+  if (!son && biriken == null) return '';
+  return `
+  <div class="card karar karne evde">
+    <div class="kr-head">
+      <div><div class="kr-lbl">Sürüş karnesi</div>
+        <div class="kr-title">${son ? (son.puan >= 100 ? `Beklenenden %${num(son.puan - 100)} verimli` : `Beklenenden %${num(100 - son.puan)} fazla`) : 'Sürüş bekleniyor'}</div></div>
+      ${son ? `<span class="kr-pill" style="--pc:${son.puan >= 100 ? 'var(--good)' : 'var(--mid)'}">${son.tl >= 0 ? '+' : '−'}${num(Math.abs(son.tl))} ₺</span>` : ''}
+    </div>
+    ${son ? `<p class="kr-not">Son sürüş ${num(son.p.km)} km · ${num(son.p.T, 0)} °C'de beklenen ${num(O.model.tahmin(son.p.T), 1)}, gerçekleşen ${num(O.model.yolC(son.p), 1)} kWh/100 km</p>
+    <div class="kn-cubuk">${kart.map((k) => `<div title="${num(k.p.km)} km"><i style="height:${Math.max(8, Math.min(100, 50 + (k.puan - 100) * 2.5)).toFixed(0)}%;--c:${k.puan >= 100 ? 'var(--good)' : 'var(--mid)'}"></i><span>${num(k.puan)}</span></div>`).join('')}</div>` : ''}
+    ${biriken != null ? `<div class="kr-cam">
+      <div class="kr-row" style="margin-top:0"><span class="kr-lbl">Tasarruf kumbarası · ${M.y}</span><button class="kn-hedef" id="kn-hedef">${icon('edit')}</button></div>
+      <div class="kn-tutar"><b>≈ ${num(biriken)} ₺</b><span>LPG'li araca göre cebinde kaldı</span></div>
+      ${hedef ? `<div class="kr-bar"><i style="width:${oran.toFixed(1)}%;background:var(--good)"></i></div>
+      <p class="kr-not">${esc(K.ad || 'Hedef')}: ${num(hedef)} ₺ · %${num(oran)}${oran >= 100 ? ' · hedefe ulaştın' : ` · ≈ ${num(hedef - biriken)} ₺ kaldı`}</p>`
+      : '<p class="kr-not">Bir hedef koy (örneğin kışlık lastik); ilerlemesini burada izle.</p>'}
+    </div>` : ''}
+  </div>`;
+}
+
+function openKumbara(M, app) {
+  const K = M.car.kumbara || {};
+  openSheet(`
+    <h3>Kumbara hedefi</h3>
+    <div class="field"><div><label for="kb-ad">Hedef</label></div><input class="input" id="kb-ad" value="${esc(K.ad || '')}" placeholder="Kışlık lastik"></div>
+    <div class="field"><div><label for="kb-t">Tutar (₺)</label></div><input class="input num" id="kb-t" inputmode="numeric" value="${K.tutar || ''}" placeholder="₺"></div>
+    <div class="btn-row" style="margin-top:14px"><button class="btn ghost" id="cancel">Vazgeç</button><button class="btn primary" id="save">${icon('check')}Kaydet</button></div>`, (sh) => {
+    sh.querySelector('#cancel').onclick = () => closeSheet();
+    sh.querySelector('#save').onclick = async () => {
+      const t = parseInt(String(sh.querySelector('#kb-t').value).replace(/\D/g, ''), 10);
+      try {
+        await app.store.patch('settings/car/kumbara', { ad: sh.querySelector('#kb-ad').value.trim() || null, tutar: t > 0 ? t : null });
+        closeSheet(); toast('Kaydedildi');
+      } catch { toast('Kaydedilemedi'); }
+    };
+  });
+}
+
+// Bakım ve evrak takvimi
+function takvimCard(M) {
+  const L = takvim(M);
+  const renk = (k) => (k <= 7 ? 'var(--bad)' : k <= 30 ? 'var(--mid)' : 'var(--good)');
+  const kalan = (k) => (k < 0 ? `${-k} gün geçti` : k === 0 ? 'Bugün' : k < 60 ? `${k} gün` : k < 365 ? `${Math.round(k / 30)} ay` : `${(k / 365).toFixed(1).replace('.', ',')} yıl`);
+  const eksik = ['muayene', 'kasko', 'trafik'].filter((k) => !L.some((x) => x.id === k)).length;
+  return `
+  <div class="card karar takvim evde">
+    <div class="kr-head">
+      <div><div class="kr-lbl">Bakım ve evrak</div>
+        <div class="kr-title">${L[0] ? `${L[0].ad} · ${kalan(L[0].kalan)}` : 'Takvim'}</div></div>
+      <button class="kr-pill tk-duzen" id="tk-duzen">${icon('edit')}Düzenle</button>
+    </div>
+    <div class="kr-cam tk-liste">
+      ${L.map((x) => `<div class="tk-satir" style="--tc:${renk(x.kalan)}">
+        <i>${icon(x.ikon)}</i>
+        <div><b>${x.ad}</b><span>${x.tahmini ? '≈ ' : ''}${x.tarih.toLocaleDateString('tr-TR', { day: 'numeric', month: 'short', year: 'numeric' })}${x.not ? ` · ${esc(x.not)}` : ''}</span></div>
+        <em>${x.tahmini ? '≈ ' : ''}${kalan(x.kalan)}</em></div>`).join('')}
+      ${eksik ? `<p class="kr-not">${eksik === 3 ? 'Muayene, kasko ve trafik sigortası tarihlerini' : 'Eksik tarihleri'} Düzenle'den gir; yaklaşınca hatırlatılır.</p>` : ''}
+    </div>
+  </div>`;
+}
+
+function openTakvim(M, app) {
+  const T = M.S.car?.takvim || {};
+  const alan = (id, ad, alt, tip = 'date', ph = '') => `<div class="field"><div><label for="tk-${id}">${ad}</label>${alt ? `<small>${alt}</small>` : ''}</div>
+    <input class="input${tip === 'date' ? '' : ' num'}" ${tip === 'date' ? 'type="date"' : 'inputmode="numeric"'} id="tk-${id}" value="${esc(String(T[id] ?? ''))}" placeholder="${ph}"></div>`;
+  openSheet(`
+    <h3>Bakım ve evrak</h3>
+    <div class="sh-sub">Yaklaşınca 30, 7 ve 1 gün önce hatırlatılır</div>
+    ${alan('bakim_km', 'Son bakım km', 'Hiç bakım yapılmadıysa boş bırak', 'num', 'km')}
+    ${alan('bakim_tarih', 'Son bakım tarihi', 'Yoksa teslim tarihi')}
+    ${alan('bakim_aralik_km', 'Bakım aralığı (km)', 'Servis kitapçığındaki değer', 'num', String(BAKIM_KM))}
+    ${alan('bakim_aralik_ay', 'Bakım aralığı (ay)', '', 'num', String(BAKIM_AY))}
+    ${alan('muayene', 'Muayene tarihi', 'Yeni araçta ilk muayene 3 yıl sonra')}
+    ${alan('kasko', 'Kasko bitişi', '')}
+    ${alan('trafik', 'Trafik sigortası bitişi', '')}
+    <div class="btn-row" style="margin-top:14px">
+      <button class="btn ghost" id="cancel">Vazgeç</button>
+      <button class="btn primary" id="save">${icon('check')}Kaydet</button>
+    </div>`, (sh) => {
+    sh.querySelector('#cancel').onclick = () => closeSheet();
+    sh.querySelector('#save').onclick = async () => {
+      const v = {};
+      for (const id of ['bakim_tarih', 'muayene', 'kasko', 'trafik']) v[id] = sh.querySelector(`#tk-${id}`).value || null;
+      for (const id of ['bakim_km', 'bakim_aralik_km', 'bakim_aralik_ay']) {
+        const n = parseInt(String(sh.querySelector(`#tk-${id}`).value).replace(/\D/g, ''), 10);
+        v[id] = Number.isFinite(n) && n > 0 ? n : null;
+      }
+      try { await app.store.patch('settings/car/takvim', v); closeSheet(); toast('Kaydedildi'); } catch { toast('Kaydedilemedi'); }
+    };
+  });
+}
+
 // Öğrenen tüketim kartı: sıcaklığa göre tüketim, kendini sınama (son 5 şarj), kendi hesaplama durumu
 function ogrenmeCard(M) {
   const O = M.ogrenme;
@@ -391,6 +564,9 @@ export function renderTogg(el, M, app) {
     <div data-slot="charge">${chargeCard(M)}</div>
     ${kararCard(M)}
     ${ogrenmeCard(M)}
+    ${karneCard(M)}
+    ${yolculukCard()}
+    ${takvimCard(M)}
     <div class="card">
       <div class="card-head"><h2>Aylık şarj</h2><span class="muted" style="font-size:12px;font-weight:700">kWh</span></div>
       <div class="chart short" id="cm"></div>
@@ -421,6 +597,9 @@ export function renderTogg(el, M, app) {
     if (s) openSession(M, s, app);
   }));
   el.querySelector('#more')?.addEventListener('click', () => { showAll = !showAll; app.refresh(); });
+  el.querySelector('#tk-duzen')?.addEventListener('click', () => openTakvim(M, app));
+  el.querySelector('#yol-ac')?.addEventListener('click', () => openYolculuk(M));
+  el.querySelector('#kn-hedef')?.addEventListener('click', () => openKumbara(M, app));
 
   const c = colors();
   const ax = axisStyle(c);

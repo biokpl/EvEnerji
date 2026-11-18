@@ -190,6 +190,70 @@ def oku_hava(js: dict) -> dict[str, dict]:
     return sonuc
 
 
+# Dolu / fırtına uyarısı (Open-Meteo WMO kodları: 96, 99 = dolulu gök gürültülü fırtına)
+UYARI_URL = ("https://api.open-meteo.com/v1/forecast?latitude=41.01&longitude=28.97"
+             "&daily=weather_code,wind_gusts_10m_max&forecast_days=2&timezone=Europe%2FIstanbul")
+DOLU_KODLARI = {96, 99}
+FIRTINA_KMH = 75
+
+
+def hava_uyarilari(js: dict) -> list[tuple[str, str]]:
+    """Open-Meteo günlük yanıtı → [(gün, 'dolu'|'firtina'), ...]"""
+    d = js.get("daily") or {}
+    out = []
+    for i, gun in enumerate(d.get("time") or []):
+        kod = (d.get("weather_code") or [None] * 9)[i]
+        ruzgar = (d.get("wind_gusts_10m_max") or [None] * 9)[i]
+        if kod in DOLU_KODLARI:
+            out.append((gun, "dolu"))
+        elif ruzgar is not None and ruzgar >= FIRTINA_KMH:
+            out.append((gun, "firtina"))
+    return out
+
+
+# DC şarj fiyatı: Trugo fiyat sayfası ("DC cihazlar için 1 kWh ücreti 12,00 TL - 14,98 TL")
+TRUGO_FIYAT = "https://trugo.com.tr/price"
+
+
+def oku_trugo(sayfa: str) -> tuple[float, float]:
+    """(indirimli, indirimsiz) DC ₺/kWh"""
+    import html as _h
+    t = re.sub(r"<script.*?</script>", " ", sayfa, flags=re.S)
+    t = _h.unescape(re.sub(r"\s+", " ", re.sub(r"<[^>]+>", " ", t)))
+    m = re.search(r"DC\s*cihazlar\s*i\w*\s*1\s*kWh\s*\w+\s*([0-9]+,[0-9]{2})\s*TL\s*-\s*([0-9]+,[0-9]{2})\s*TL", t, re.I)
+    if not m:
+        raise ValueError("DC fiyatı sayfada bulunamadı")
+    a, b = (float(x.replace(",", ".")) for x in m.groups())
+    if not (5 < a <= b < 40):
+        raise ValueError(f"DC fiyatı olağan dışı: {a} – {b}")
+    return a, b
+
+
+TAKVIM_ADLAR = {"bakim": "Bakım", "muayene": "Muayene", "kasko": "Kasko", "trafik": "Trafik sigortası", "mtv": "MTV"}
+HATIRLAT_GUN = (30, 7, 1)
+
+
+def takvim_hatirlatmalari(tk: dict, tahmin: dict, bugun: date) -> list[tuple[str, str, int]]:
+    """[(kimlik, tarih, kalan gün)] — yalnız 30 / 7 / 1 gün kalanlar"""
+    tarihler = {k: tk.get(k) for k in ("muayene", "kasko", "trafik")}
+    tarihler["bakim"] = (tahmin or {}).get("bakim")
+    for d in (date(bugun.year, 1, 31), date(bugun.year, 7, 31), date(bugun.year + 1, 1, 31)):
+        if d >= bugun:
+            tarihler["mtv"] = d.isoformat()
+            break
+    out = []
+    for k, t in tarihler.items():
+        if not t:
+            continue
+        try:
+            kalan = (date.fromisoformat(t) - bugun).days
+        except ValueError:
+            continue
+        if kalan in HATIRLAT_GUN:
+            out.append((k, t, kalan))
+    return out
+
+
 def tl(x: float) -> str:
     return f"{x:.2f}".replace(".", ",")
 
@@ -211,10 +275,10 @@ class Kontrol:
         else:
             self.fb.patch(yol, veri)
 
-    def bildir(self, baslik: str, mesaj: str, **kw):
+    def bildir(self, baslik: str, mesaj: str, tab: str = "ayarlar", **kw):
         print(f"  BİLDİRİM: {baslik} — {mesaj}")
         if not self.kuru:
-            self.ntfy.send(baslik, mesaj, open_tab="ayarlar", **kw)
+            self.ntfy.send(baslik, mesaj, open_tab=tab, **kw)
 
     def uyar(self, neden: str):
         """Okunamadı ya da çelişki: hiçbir şey değiştirme, haftada en fazla bir kez haber ver."""
@@ -369,6 +433,53 @@ class Kontrol:
             print(f"Hava: {len(hava)} gün yazıldı (bugün ort {(hava.get(bugun.isoformat()) or {}).get('ort')} °C)")
         except Exception as e:
             print("  Hava durumu okunamadı:", e)
+        # 3c) Dolu / fırtına uyarısı: bugün ve yarın; her gün-tür için bir kez
+        try:
+            gonderildi = set(self.durum.get("hava_uyari") or [])
+            for gun, tur in hava_uyarilari(requests.get(UYARI_URL, timeout=30).json()):
+                anahtar = f"{gun}/{tur}"
+                if anahtar in gonderildi:
+                    continue
+                ne = "bugün" if gun == bugun.isoformat() else "yarın"
+                if tur == "dolu":
+                    self.bildir("Dolu uyarısı..!!", f"İstanbul'da {ne} dolu riski var. Togg'u kapalı otoparka çek.",
+                                tags="cloud_with_lightning_and_rain", priority=4, tab="togg")
+                else:
+                    self.bildir("Fırtına uyarısı..!!", f"İstanbul'da {ne} {FIRTINA_KMH} km/sa üstü rüzgâr bekleniyor. "
+                                "Togg'u ağaç ve tabela altına park etme.", tags="dash", priority=4, tab="togg")
+                gonderildi.add(anahtar)
+            self.durum["hava_uyari"] = sorted(k for k in gonderildi if k[:10] >= (bugun - timedelta(days=7)).isoformat())
+        except Exception as e:
+            print("  Dolu/fırtına tahmini okunamadı:", e)
+        # 3d) DC şarj fiyatı (Trugo): değişince sessizce güncellenir; karar değişirse 4) haber verir
+        try:
+            ind, tam = oku_trugo(requests.get(TRUGO_FIYAT, headers=UA, timeout=30).text)
+            car = self.fb.get("settings/car") or {}
+            eski = (float(car.get("public_tl") or 0), float(car.get("public_tl_tam") or 0))
+            print(f"Trugo DC: {ind} – {tam} ₺/kWh (eski {eski[0]} – {eski[1]})")
+            if abs(ind - eski[0]) > 0.005 or abs(tam - eski[1]) > 0.005:
+                self.yaz("settings/car", {"public_tl": ind, "public_tl_tam": tam})
+            self.yaz("settings/car/dc_guncel", {"tarih": bugun.isoformat(), "kaynak": "Trugo"})
+        except Exception as e:
+            print("  DC şarj fiyatı okunamadı:", e)
+        # 3e) Bakım ve evrak hatırlatmaları (30 / 7 / 1 gün kala, her biri bir kez)
+        try:
+            car = self.fb.get("settings/car") or {}
+            gonderildi = set(self.durum.get("takvim_uyari") or [])
+            for k, t, kalan in takvim_hatirlatmalari(car.get("takvim") or {}, car.get("takvim_tahmin") or {}, bugun):
+                anahtar = f"{k}/{t}/{kalan}"
+                if anahtar in gonderildi:
+                    continue
+                ad = TAKVIM_ADLAR[k]
+                ne = "yarın" if kalan == 1 else f"{kalan} gün sonra"
+                tarih_tr = date.fromisoformat(t).strftime("%d.%m.%Y")
+                ek = " (km'ye göre tahmini)" if k == "bakim" else ""
+                self.bildir(f"{ad} yaklaşıyor", f"Togg {ad.lower()} {ne}: {tarih_tr}{ek}",
+                            tags="calendar", priority=4 if kalan <= 7 else 3, tab="togg")
+                gonderildi.add(anahtar)
+            self.durum["takvim_uyari"] = sorted(gonderildi)[-60:]
+        except Exception as e:
+            print("  Takvim hatırlatması yapılamadı:", e)
         # 4) Şarj kararı (evde mi, DC mi?) — sonuç değişirse bildir
         try:
             self.karar_kontrol(bugun)

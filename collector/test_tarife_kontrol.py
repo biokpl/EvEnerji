@@ -126,3 +126,26 @@ def test_oku_hava_sabah_aksam():
                     "temperature_2m_max": [13.8]},
           "hourly": {"time": ["2026-11-10T08:00", "2026-11-10T17:00"], "temperature_2m": [9.94, 13.1]}}
     assert oku_hava(js)["2026-11-10"] == {"ort": 11.3, "min": 9.8, "max": 13.8, "sabah": 9.9, "aksam": 13.1}
+
+
+def test_hava_uyarilari():
+    from tarife_kontrol import hava_uyarilari
+    js = {"daily": {"time": ["2026-11-18", "2026-11-19", "2026-11-20"], "weather_code": [80, 96, 95],
+                    "wind_gusts_10m_max": [50, 40, 80]}}
+    assert hava_uyarilari(js) == [("2026-11-19", "dolu"), ("2026-11-20", "firtina")]
+
+
+def test_oku_trugo():
+    from tarife_kontrol import oku_trugo
+    sayfa = '<p>DC \ncihazlar i&ccedil;in</p><span>1 kWh &uuml;creti</span><p class="x">12,00 TL - 14,98 TL</p><p>AC cihazlar için 1 kWh ücreti 9,95 TL</p>'
+    assert oku_trugo(sayfa) == (12.0, 14.98)
+
+
+def test_takvim_hatirlatmalari():
+    from tarife_kontrol import takvim_hatirlatmalari
+    from datetime import date
+    b = date(2026, 11, 18)
+    r = takvim_hatirlatmalari({"kasko": "2026-12-18", "trafik": "2026-11-25", "muayene": "2029-01-01"},
+                              {"bakim": "2026-11-19"}, b)
+    assert sorted(r) == [("bakim", "2026-11-19", 1), ("kasko", "2026-12-18", 30), ("trafik", "2026-11-25", 7)]
+    assert takvim_hatirlatmalari({}, {}, date(2027, 1, 24)) == [("mtv", "2027-01-31", 7)]

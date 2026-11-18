@@ -1,6 +1,6 @@
 // Togg bakım ve evrak takvimi: bakım (km + süre, öğrenilen günlük km ile tarihe çevrilir), muayene, kasko,
 // trafik sigortası, MTV (Ocak / Temmuz sonu). Ayarlar: settings/car/takvim
-export const BAKIM_KM = 15000, BAKIM_AY = 12;
+export const BAKIM_KM = 40000, BAKIM_AY = 24;   // Togg T10X: 2 yılda bir ya da 40.000 km'de bir (hangisi önce)
 
 const gun = 86400e3;
 const tarih = (s) => (s ? new Date(`${s}T12:00:00`) : null);

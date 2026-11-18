@@ -388,7 +388,7 @@ function openTakvim(M, app) {
     <h3>Bakım ve evrak</h3>
     <div class="sh-sub">Yaklaşınca 30, 7 ve 1 gün önce hatırlatılır</div>
     ${alan('bakim_km', 'Son bakım km', 'Hiç bakım yapılmadıysa boş bırak', 'num', 'km')}
-    ${alan('bakim_tarih', 'Son bakım tarihi', 'Yoksa teslim tarihi')}
+    ${alan('bakim_tarih', 'Son bakım tarihi', 'Hiç bakım yapılmadıysa aracın teslim tarihi (ilk bakım 2. yılda)')}
     ${alan('bakim_aralik_km', 'Bakım aralığı (km)', 'Servis kitapçığındaki değer', 'num', String(BAKIM_KM))}
     ${alan('bakim_aralik_ay', 'Bakım aralığı (ay)', '', 'num', String(BAKIM_AY))}
     ${alan('muayene', 'Muayene tarihi', 'Yeni araçta ilk muayene 3 yıl sonra')}

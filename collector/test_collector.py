@@ -330,3 +330,11 @@ def test_onceki_yil_kendiliginden_hesaplanir():
     c.settings["tariff"]["2026"]["onceki_yil_kwh"] = 4200
     assert c.tariff(2026).onceki_yil_kwh == 4200            # elle girilen öncelikli
     assert c.tariff(2025).onceki_yil_kwh is None            # 2024 verisi yok
+
+
+def test_bildirim_yuku():
+    from notify import Notifier
+    n = Notifier(None, "https://x.io/app/")
+    p = n.payload("Şarj bitti", "12 kWh", tags="white_check_mark", priority=4, open_tab="togg/bitis/1", etiket="togg-1")
+    assert p["title"] == "✅ Şarj bitti" and p["url"] == "https://x.io/app/#togg/bitis/1" and p["tag"] == "togg-1"
+    assert p["oncelik"] == 4 and p["buton"] == "Uygulamayı aç"

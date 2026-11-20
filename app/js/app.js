@@ -4,6 +4,7 @@ import { disposeAll, setQuiet } from './charts.js';
 import { closeSheet, hydrateIcons, icon, sheetOpen, toast } from './ui.js';
 import { renderPano, updatePano } from './views/pano.js';
 import { takvim, takvimTahmin } from './takvim.js';
+import { bildirimTazele } from './push.js';
 import { hizliKayitGerek, openHizliKayit, openSocSheet, renderTogg, updateTogg } from './views/togg.js';
 import { renderEv, updateEv } from './views/ev.js';
 import { renderCihazlar, updateCihazlar } from './views/cihazlar.js';
@@ -146,7 +147,9 @@ function refresh({ keepScroll = true, silent = false, force = false } = {}) {
   setTimeout(kayitSor, 400);
   ogrenmeYaz();
   takvimYaz();
+  if (!bildirimTazelendi && store.mode === 'live') { bildirimTazelendi = true; bildirimTazele(store); }
 }
+let bildirimTazelendi = false;
 
 // Tahmini bakım tarihini Pi'ye bildir (hatırlatma için; değişince)
 function takvimYaz() {
@@ -265,4 +268,7 @@ setInterval(() => refresh({ silent: true }), 5 * 60 * 1000);
 
 if ('serviceWorker' in navigator && location.protocol !== 'file:') {
   navigator.serviceWorker.register('sw.js').catch(() => {});
+  navigator.serviceWorker.addEventListener('message', (e) => {
+    if (e.data?.tip === 'git' && e.data.url) { const h = new URL(e.data.url).hash; if (h) location.hash = h; }
+  });
 }

@@ -4,7 +4,7 @@ Döngü (poll_seconds, varsayılan 3 sn; prizler aynı anda okunur):
   - kayıtlı her cihazı okur, enerjiyi biriktirir, araç şarj oturumlarını ayırır
   - canlı değerleri Firebase'e yazar; dakikada bir saat/gün/ay toplamlarını yazar
   - uygulamadan gelen imzalı komutları uygular (priz aç/kapa, kablo sarıcı)
-  - limit / şarj / güvenlik bildirimlerini ntfy ile gönderir
+  - limit / şarj / güvenlik bildirimlerini uygulama içi bildirimle (Web Push) gönderir
 
 Firebase düzeni (base_path altında):
   devices/{id}        uygulamanın düzenlediği meta (ad, tür, oda, ikon, renk, enabled)
@@ -125,7 +125,7 @@ class Collector:
             sys.exit(f"{CFG_FILE} yok: config.example.json'u kopyalayıp doldur.")
         self.fb = FB(self.cfg["firebase_url"], self.cfg.get("base_path", ""),
                      self.cfg.get("firebase_secret", ""))
-        self.ntfy = Notifier(self.cfg.get("ntfy_topic", ""), self.cfg.get("app_url", ""))
+        self.ntfy = Notifier(self.fb, self.cfg.get("app_url", ""))       # adı eski; artık uygulama içi bildirim
         self.poll = float(self.cfg.get("poll_seconds", 3))
         self.pool = ThreadPoolExecutor(max_workers=8, thread_name_prefix="oku")
         self.flush_every = float(self.cfg.get("flush_seconds", 60))
@@ -343,10 +343,11 @@ class Collector:
         saat = f"Saat {datetime.fromtimestamp(s['start']):%H:%M}."
         if self.sor_mu():
             self.ntfy.send(f"{m.get('name', 'Araç')} şarjı başladı", f"{saat} Dokun: başlangıç yüzdesi ve km'yi gir.",
-                           tags="electric_plug", priority=4, open_tab=f"togg/basla/{s['id']}", buton="Yüzde ve km gir")
+                           tags="electric_plug", priority=4, open_tab=f"togg/basla/{s['id']}", buton="Yüzde ve km gir",
+                           etiket=f"togg-{s['id']}")
         else:
             self.ntfy.send(f"{m.get('name', 'Araç')} şarjı başladı", f"{saat} Yüzde ve km otomatik hesaplanıyor.",
-                           tags="electric_plug", priority=3, open_tab="togg")
+                           tags="electric_plug", priority=3, open_tab="togg", etiket=f"togg-{s['id']}")
 
     def on_session_end(self, did, m, s):
         price, sktt = self.price_now()
@@ -370,12 +371,13 @@ class Collector:
             title = f"{m.get('name', 'Araç')}: Araç Doldu" if s.get("full") else f"{m.get('name', 'Araç')} şarjı bitti"
             sor = self.sor_mu()
             if s.get("full") or not sor:
-                self.ntfy.send(title, msg, tags="white_check_mark", priority=4,
+                self.ntfy.send(title, msg, tags="white_check_mark", priority=4, etiket=f"togg-{s['id']}",
                                open_tab=f"togg/bitis/{s['id']}" if sor else "togg",
                                buton="Tamam" if s.get("full") else "Uygulamayı aç")
             else:
                 msg += "\nDokun: bitiş yüzdesini gir."
                 self.ntfy.send(title, msg, tags="white_check_mark", priority=4, open_tab=f"togg/bitis/{s['id']}",
+                               etiket=f"togg-{s['id']}",
                                buton="Yüzdeyi gir")
 
     def on_job_resume(self, did, m, gap, end_s):
@@ -546,7 +548,6 @@ class Collector:
                 upd[f"sessions/{did}/{a['id']}/kwh"] = round(a["kwh"], 3)
                 upd[f"sessions/{did}/{a['id']}/peak_w"] = a["peak_w"]
         upd["status"] = {"ts": int(now), "devices": len(self.providers),
-                         "ntfy": self.cfg.get("ntfy_topic", ""),
                          "host": os.uname().nodename if hasattr(os, "uname") else "pc"}
         self.fb.safe(self.fb.patch, "", upd)
         save_json(STATE_FILE, self.state)
@@ -623,6 +624,12 @@ class Collector:
             self.fb.safe(self.fb.delete, f"commands/{key}")
 
     def execute(self, did: str, action: str) -> dict:
+        if did == "bildirim":
+            if action != "test":
+                return {"msg": "Geçersiz bildirim komutu"}
+            ok = self.ntfy.send("Bildirimler çalışıyor", "Ev Enerji bildirimleri bu telefona doğrudan gelecek.",
+                                tags="bell", priority=3, open_tab="ayarlar", etiket="test")
+            return {"ok": ok, "msg": "Test bildirimi gönderildi" if ok else "Gönderilemedi: bu telefon kayıtlı değil ya da Pi'de anahtar yok"}
         if did == "pi":
             # Güvenli kapatma / yeniden başlatma (Pi 3'te düğme yok; fişi çekmek SD kartı bozabilir)
             if action not in ("kapat", "yeniden"):

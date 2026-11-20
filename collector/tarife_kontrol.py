@@ -265,7 +265,7 @@ class Kontrol:
         from notify import Notifier
         self.cfg = load_json(CFG_FILE, {})
         self.fb = FB(self.cfg["firebase_url"], self.cfg.get("base_path", ""), self.cfg.get("firebase_secret", ""))
-        self.ntfy = Notifier(self.cfg.get("ntfy_topic", ""), self.cfg.get("app_url", ""))
+        self.ntfy = Notifier(self.fb, self.cfg.get("app_url", ""))
         self.kuru = kuru
         self.durum = self.fb.get("settings/tarife_oto") or {}
 

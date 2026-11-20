@@ -1,8 +1,8 @@
 // Çevrimdışı önbellek (yalnız uygulama dosyaları; Firebase verisi önbelleğe alınmaz).
-const CACHE = 'evenerji-v92';
+const CACHE = 'evenerji-v93';
 const ASSETS = [
   './', './index.html', './manifest.json', './css/app.css', './vendor/echarts.min.js',
-  './js/app.js', './js/data.js', './js/demo.js', './js/model.js', './js/ogrenme.js', './js/takvim.js', './js/yolculuk.js', './js/tariff.js', './js/ui.js', './js/charts.js', './js/keypad.js', './js/auth.js',
+  './js/app.js', './js/data.js', './js/demo.js', './js/model.js', './js/ogrenme.js', './js/push.js', './js/takvim.js', './js/yolculuk.js', './js/tariff.js', './js/ui.js', './js/charts.js', './js/keypad.js', './js/auth.js',
   './js/views/pano.js', './js/views/togg.js', './js/views/ev.js', './js/views/cihazlar.js', './js/views/sarici.js', './js/views/ayarlar.js',
   './img/t10x.webp', './icons/icon-192.png', './icons/icon-512.png',
 ];
@@ -47,4 +47,31 @@ self.addEventListener('fetch', (e) => {
     if (hit) { e.waitUntil(ag.then(() => {}, () => {})); return hit; }
     return ag.catch(() => caches.match('./index.html'));
   }));
+});
+
+// ---- Uygulama içi bildirim (Pi'den Web Push)
+self.addEventListener('push', (e) => {
+  let d = {};
+  try { d = e.data ? e.data.json() : {}; } catch { d = { title: 'Ev Enerji', body: e.data ? e.data.text() : '' }; }
+  const url = new URL(d.url || './', self.registration.scope).href;
+  e.waitUntil(self.registration.showNotification(d.title || 'Ev Enerji', {
+    body: d.body || '', tag: d.tag, renotify: true, timestamp: d.ts || Date.now(),
+    icon: 'icons/icon-192.png', badge: 'icons/icon-192.png', lang: 'tr',
+    requireInteraction: (d.oncelik || 3) >= 5,
+    data: { url }, actions: d.buton ? [{ action: 'ac', title: d.buton }] : [],
+  }));
+});
+self.addEventListener('notificationclick', (e) => {
+  e.notification.close();
+  const url = e.notification.data?.url || self.registration.scope;
+  e.waitUntil((async () => {
+    const pencereler = await self.clients.matchAll({ type: 'window', includeUncontrolled: true });
+    const w = pencereler.find((c) => c.url.startsWith(self.registration.scope));
+    if (w) {
+      await w.focus();
+      try { await w.navigate(url); } catch { w.postMessage({ tip: 'git', url }); }
+      return;
+    }
+    await self.clients.openWindow(url);
+  })());
 });

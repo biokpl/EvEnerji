@@ -2,6 +2,7 @@
 import { AY_K, downloadFile, esc, icon, num, toast } from '../ui.js';
 import { yasalLimit } from '../tariff.js';
 import { cikisYap, girisYap, oturum } from '../auth.js';
+import { bildirimAc, bildirimDurumu } from '../push.js';
 
 let yearSel = null;
 // Tuş takımında yalnız nokta var: nokta her zaman ondalık ("3.238" = 3,238). Eski virgüllü değer de okunur.
@@ -74,7 +75,13 @@ export function renderAyarlar(el, M, app) {
 
     <div class="card">
       <h2>Bildirimler</h2>
-      <p class="hint">Pi, limit eşiklerinde, şarj başlayıp bitince, cihazlar işini bitirince ve uzun süre yüksek akımda <b>ntfy</b> ile telefona bildirim gönderir.</p>
+      <p class="hint">Pi; limit eşiklerinde, şarj başlayıp bitince, cihazlar işini bitirince ve uzun süre yüksek akımda bildirimi doğrudan bu uygulamaya gönderir.</p>
+      <div class="bd-kutu" id="bd-kutu">
+        <div class="field"><div><label>Bu telefon</label><small id="bd-durum">Kontrol ediliyor…</small></div>
+          <button class="btn primary sm" id="bd-ac" style="width:auto;display:none">${icon('bell')}İzin ver</button>
+          <button class="btn ghost sm" id="bd-test" style="width:auto;display:none">Test gönder</button></div>
+        ${Object.keys(M.S.push || {}).length ? `<p class="chart-note" style="margin:0 0 6px">Kayıtlı cihaz: ${Object.values(M.S.push).map((x) => esc(x.ad || 'Cihaz')).join(', ')}</p>` : ''}
+      </div>
       ${M.plugs.length ? `<div class="notif-list">${M.plugs.map((d) => `
         <div class="field"><div><label>${esc(d.name)}</label><small>${d.type === 'ev_sarj'
           ? 'Şarj bitince; araç dolduysa "Araç Doldu".'
@@ -83,7 +90,6 @@ export function renderAyarlar(el, M, app) {
           <button class="switch ${d.bitti_bildirim !== false ? 'on' : ''}" data-nt="${esc(d.id)}" aria-label="${esc(d.name)} bildirimi"></button></div></div>`).join('')}
         <p class="chart-note" style="margin:2px 0 8px">Süre: cihaz bu kadar beklemede kalınca "bitti" sayılır. Erken bildirim olursa (cihaz işe devam ederse) süre kendiliğinden uzatılır.</p></div>` : ''}
       <div class="field"><div><label for="es">Limit eşikleri (%)</label></div><input class="input" id="es" value="${esc(esik)}" style="width:130px;text-align:right"></div>
-      ${M.raw.status?.ntfy ? `<div class="field"><div><label>ntfy konusu</label><small>ntfy uygulamasında bu konuya abone ol.</small></div><a class="btn ghost sm" href="https://ntfy.sh/${encodeURIComponent(M.raw.status.ntfy)}" target="_blank" rel="noopener">${esc(M.raw.status.ntfy)}</a></div>` : ''}
       <button class="btn ghost" id="saveA" style="margin-top:12px">${icon('check')}Kaydet</button>
     </div>
 
@@ -202,6 +208,24 @@ export function renderAyarlar(el, M, app) {
       } catch { toast('Komut gönderilemedi'); }
       b.disabled = false;
     });
+  });
+  // Uygulama içi bildirim: bu telefonun durumu, izin ve test
+  const bdGoster = async () => {
+    const d = await bildirimDurumu(), yaz = $('#bd-durum'), ac = $('#bd-ac'), test = $('#bd-test');
+    if (!yaz) return;
+    yaz.textContent = { acik: 'Bildirimler açık', kapali: 'Bildirimler kapalı', reddedildi: 'Engellendi: telefon ayarlarından izin ver', yok: 'Bu tarayıcı desteklemiyor' }[d];
+    ac.style.display = d === 'kapali' ? '' : 'none'; test.style.display = d === 'acik' ? '' : 'none';
+  };
+  bdGoster();
+  $('#bd-ac') && ($('#bd-ac').onclick = async () => {
+    try { await bildirimAc(st); toast('Bildirimler açıldı'); } catch (e) { toast(e.message, 4000); }
+    bdGoster();
+  });
+  $('#bd-test') && ($('#bd-test').onclick = async () => {
+    $('#bd-test').disabled = true;
+    try { const r = await st.command('bildirim', 'test'); toast(r.msg || (r.ok ? 'Gönderildi' : 'Başarısız'), 4500); if (r.needKey) $('#key')?.focus(); }
+    catch { toast('Komut gönderilemedi'); }
+    $('#bd-test').disabled = false;
   });
   $('#gGiris2') && ($('#gGiris2').onclick = async () => { try { await girisYap(); } catch (e) { toast(`Giriş yapılamadı: ${e.code || e.message}`, 4000); } });
   $('#gCikis') && ($('#gCikis').onclick = async () => { await cikisYap(); });

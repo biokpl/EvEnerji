@@ -26,6 +26,7 @@ TARAMA_KILIDI = threading.Lock()
 
 
 class TuyaPlug:
+    son_arama = 0.0          # son adres arama zamanı (sınıf düzeyinde varsayılan; __init__ da kurar)
     can_switch = True
 
     def __init__(self, dev_id: str, local: dict):

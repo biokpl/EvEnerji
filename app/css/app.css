@@ -854,3 +854,105 @@ input.num, input[data-m] { caret-color: transparent; cursor: pointer; }
 .kmk-iki b { display: block; font-size: 17px; margin: 2px 0; }
 :root[data-theme="light"] .kmk-iki > div { background: rgba(255, 255, 255, .5); box-shadow: 0 0 0 .5px rgba(20, 35, 60, .08); }
 .soc-line .menz { color: var(--text); font-weight: 800; }   /* tahmini menzil */
+
+/* ============ Beyaz tema · "porselen cam" ============
+   Renkli ama yumuşak bir zemin (camın arkasında kırılacak bir şey olsun), buzlu beyaz cam kartlar, ince beyaz
+   ışık kenarı + katmanlı yumuşak gölge; renkler beyaz üstünde okunacak kadar doygun. */
+:root[data-theme="light"] {
+  --bg: #e9eff7;
+  --card: rgba(255, 255, 255, 0.58);
+  --card-solid: #fbfcfe;
+  --card-hi: rgba(15, 30, 60, 0.055);
+  --line: rgba(15, 30, 60, 0.07);
+  --text: #0c1a2e;
+  --muted: #55627a;
+  --faint: #9aa5b8;
+  --accent: #0891a6;
+  --ev: #0891a6;
+  --home: #6a55e6;
+  --good: #079669;
+  --mid: #d27a04;
+  --bad: #e0244a;
+  --shadow: 0 1px 2px rgba(15, 30, 60, 0.05), 0 14px 34px -10px rgba(15, 30, 60, 0.16);
+  --glow1: rgba(8, 175, 190, 0.30);
+  --glow2: rgba(120, 100, 240, 0.24);
+}
+:root[data-theme="light"] body::before {
+  background:
+    radial-gradient(560px 420px at -5% -5%, var(--glow1), transparent 70%),
+    radial-gradient(520px 420px at 110% 22%, var(--glow2), transparent 70%),
+    radial-gradient(480px 380px at 15% 62%, rgba(255, 190, 120, 0.20), transparent 70%),
+    radial-gradient(620px 520px at 85% 110%, var(--glow1), transparent 70%),
+    linear-gradient(180deg, #eef3fa, #e6ecf6);
+}
+:root[data-theme="light"] .card {
+  background: linear-gradient(160deg, rgba(255, 255, 255, 0.78), rgba(255, 255, 255, 0.52));
+  border: 1px solid rgba(255, 255, 255, 0.85);
+  box-shadow: var(--shadow), inset 0 1px 0 rgba(255, 255, 255, 0.95), inset 0 0 0 0.5px rgba(15, 30, 60, 0.04);
+  backdrop-filter: blur(22px) saturate(1.7); -webkit-backdrop-filter: blur(22px) saturate(1.7);
+}
+/* kart arkasındaki renk ışımaları beyazda daha belirgin */
+:root[data-theme="light"] .karar::after { opacity: 1.0; filter: saturate(1.35); }
+/* iç cam paneller: hafif buzlu, üstte ışık çizgisi */
+:root[data-theme="light"] .kr-cam {
+  background: linear-gradient(160deg, rgba(255, 255, 255, 0.82), rgba(255, 255, 255, 0.48));
+  box-shadow: 0 6px 18px -8px rgba(15, 30, 60, 0.14), inset 0 1px 0 #fff, inset 0 0 0 0.5px rgba(15, 30, 60, 0.06);
+}
+:root[data-theme="light"] .kr-cam::before { opacity: .55; }
+/* hap düğmeler: beyaz cam üstünde renkli yazı ve renkli kıl çizgisi */
+:root[data-theme="light"] .kr-pill {
+  background: linear-gradient(160deg, rgba(255, 255, 255, 0.95), color-mix(in srgb, currentColor 10%, rgba(255, 255, 255, 0.7)));
+  box-shadow: 0 4px 12px -4px color-mix(in srgb, currentColor 45%, transparent), inset 0 0 0 0.75px color-mix(in srgb, currentColor 45%, transparent), inset 0 1px 0 #fff;
+}
+/* ana kart ve üçlü kutular */
+:root[data-theme="light"] .trio div, :root[data-theme="light"] .hero.isilti .trio div, :root[data-theme="light"] .hero.isilti .flow-strip {
+  background: linear-gradient(160deg, rgba(255, 255, 255, 0.85), rgba(255, 255, 255, 0.5));
+  box-shadow: 0 6px 16px -8px rgba(15, 30, 60, 0.16), inset 0 1px 0 #fff, inset 0 0 0 0.5px rgba(15, 30, 60, 0.06);
+}
+/* ay kutuları (limit yolu) ve sınama kutuları: beyazda pastel değil, canlı cam */
+:root[data-theme="light"] .kr-aylar i, :root[data-theme="light"] .og-kutu i:not(.bos) {
+  background: linear-gradient(160deg, color-mix(in srgb, var(--c) 96%, white), color-mix(in srgb, var(--c) 72%, white));
+  box-shadow: 0 0 0 .5px color-mix(in srgb, var(--c) 80%, black 10%), 0 8px 12px -5px color-mix(in srgb, var(--c) 70%, transparent), inset 0 1px 0 rgba(255, 255, 255, .7);
+}
+/* takvim satır ikon halkaları ve şerit */
+:root[data-theme="light"] .tk-halka .iz { stroke: rgba(15, 30, 60, 0.08); fill: color-mix(in srgb, var(--tc) 12%, white); }
+:root[data-theme="light"] .tk-nokta { box-shadow: 0 0 0 2.5px #fff, 0 6px 14px -4px var(--tc), inset 0 1px 0 rgba(255, 255, 255, .5); }
+/* alt sekme: buzlu beyaz şerit; seçili sekme beyaz cam hap */
+:root[data-theme="light"] .nav::before { backdrop-filter: blur(14px) saturate(1.5); -webkit-backdrop-filter: blur(14px) saturate(1.5); }
+:root[data-theme="light"] .nav button.on {
+  background: linear-gradient(160deg, #fff, rgba(255, 255, 255, 0.7));
+  box-shadow: 0 6px 16px -6px rgba(15, 30, 60, 0.22), inset 0 0 0 0.5px rgba(15, 30, 60, 0.06);
+}
+/* alt pencere: beyaz cam */
+:root[data-theme="light"] .sheet { background: rgba(251, 252, 254, 0.92); backdrop-filter: blur(24px) saturate(1.6); -webkit-backdrop-filter: blur(24px) saturate(1.6); box-shadow: 0 -20px 60px rgba(15, 30, 60, 0.18); }
+:root[data-theme="light"] .sheet-bg { background: rgba(15, 30, 60, 0.25); }
+
+:root[data-theme="light"] .tk-cipler span { background: rgba(15, 30, 60, 0.05); box-shadow: inset 0 0 0 .5px rgba(15, 30, 60, .08); color: var(--muted); }
+:root[data-theme="light"] .tk-kalem + .tk-kalem { border-top-color: rgba(15, 30, 60, .07); }
+:root[data-theme="light"] .tk-aylar span, :root[data-theme="light"] .kr-aylar span { color: #6b7790; }
+
+/* Bakım ve evrak: her kalemin kendi rengi; aciliyet (30 / 7 gün) yalnız kalan gün rakamında ve şeritte halkayla */
+.tk-sag b { color: var(--text); }
+.tk-kalem.yakin .tk-sag b, .tk-kalem.yakin .tk-sag small { color: var(--uc); }
+.tk-nokta.yakin { box-shadow: 0 0 0 2px var(--card), 0 0 0 4px var(--uc), 0 6px 14px -4px var(--tc), inset 0 1px 0 rgba(255, 255, 255, .5); }
+:root[data-theme="light"] .tk-nokta.yakin { box-shadow: 0 0 0 2.5px #fff, 0 0 0 4.5px var(--uc), 0 6px 14px -4px var(--tc), inset 0 1px 0 rgba(255, 255, 255, .5); }
+
+
+/* Takvim ikonları: uyumlu renk ailesi, beyaz ikon degrade köşeli kutucukta; dönem ilerlemesi kutucuğu saran
+   köşeli çerçeve (üst ortadan saat yönünde dolar) */
+:root { --tk-bakim: #5b84f5; --tk-muayene: #3aa99f; --tk-kasko: #a974e6; --tk-trafik: #d9a03f; --tk-mtv: #8c97ab; }
+:root[data-theme="light"] { --tk-bakim: #3461d6; --tk-muayene: #1a8a7f; --tk-kasko: #8443c2; --tk-trafik: #b7791f; --tk-mtv: #5f6b82; }
+.tk-ikon > svg:last-child { width: 30px; height: 30px; padding: 6px; border-radius: 9px; color: #fff; box-sizing: border-box;
+  background: linear-gradient(150deg, color-mix(in srgb, var(--tc) 80%, white), var(--tc) 55%, color-mix(in srgb, var(--tc) 80%, black));
+  box-shadow: 0 4px 10px -3px color-mix(in srgb, var(--tc) 70%, transparent), inset 0 1px 0 rgba(255, 255, 255, .35); }
+.tk-halka path { fill: none; stroke-width: 2.6; stroke-linejoin: round; }
+.tk-halka .iz { stroke: rgba(255, 255, 255, .09); }
+.tk-halka .dolu { stroke: var(--tc); stroke-linecap: round; filter: drop-shadow(0 0 3px color-mix(in srgb, var(--tc) 55%, transparent)); }
+:root[data-theme="light"] .tk-halka .iz { stroke: rgba(15, 30, 60, .09); fill: color-mix(in srgb, var(--tc) 9%, transparent); }
+.tk-nokta { border-radius: 9px; background: linear-gradient(150deg, color-mix(in srgb, var(--tc) 80%, white), var(--tc) 55%, color-mix(in srgb, var(--tc) 80%, black)); }
+/* İlerleme çerçevesi hafif ışık saçsın */
+.tk-halka { overflow: visible; }
+.tk-halka .dolu { stroke: color-mix(in srgb, var(--tc) 80%, white); stroke-width: 2.8;
+  filter: drop-shadow(0 0 2px color-mix(in srgb, var(--tc) 90%, transparent)) drop-shadow(0 0 6px color-mix(in srgb, var(--tc) 65%, transparent)); }
+:root[data-theme="light"] .tk-halka .dolu { stroke: var(--tc);
+  filter: drop-shadow(0 0 2px color-mix(in srgb, var(--tc) 70%, transparent)) drop-shadow(0 0 5px color-mix(in srgb, var(--tc) 45%, transparent)); }

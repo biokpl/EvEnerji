@@ -372,24 +372,23 @@ function takvimCard(M) {
   const konum = (d) => ((d - bas) / (son - bas)) * 100;
   const aylar = Array.from({ length: 12 }, (_, i) => new Date(bas.getFullYear(), bas.getMonth() + i, 1));
   const yakin = L.filter((x) => x.tarih < son), uzak = L.length - yakin.length;
-  const halka = (x) => {
-    const r = 19, c = 2 * Math.PI * r;
-    return `<svg class="tk-halka" viewBox="0 0 46 46"><circle cx="23" cy="23" r="${r}" class="iz"/>
-      <circle cx="23" cy="23" r="${r}" class="dolu" stroke-dasharray="${(c * x.oran).toFixed(1)} ${c.toFixed(1)}" transform="rotate(-90 23 23)"/></svg>`;
-  };
+  // Kutucuğu saran köşeli çerçeve: üst ortadan saat yönünde, dönemin geçen kısmı kadar dolar
+  const CERCEVE = 'M23 3.5H30A12.5 12.5 0 0 1 42.5 16V30A12.5 12.5 0 0 1 30 42.5H16A12.5 12.5 0 0 1 3.5 30V16A12.5 12.5 0 0 1 16 3.5Z';
+  const halka = (x) => `<svg class="tk-halka" viewBox="0 0 46 46"><path d="${CERCEVE}" class="iz" pathLength="100"/>
+      <path d="${CERCEVE}" class="dolu" pathLength="100" stroke-dasharray="${(x.oran * 100).toFixed(1)} 100"/></svg>`;
   return `
   <div class="card karar takvim evde">
     <div class="kr-head">
       <div><div class="kr-lbl">Bakım ve evrak</div>
         <div class="kr-title">${ilk ? `Sıradaki: ${ilk.kisa || ilk.ad}` : 'Takvim'}</div>
-        ${ilk ? `<div class="tk-alt" style="color:${tkRenk(ilk.kalan)}">${ilk.tahmini ? '≈ ' : ''}${tkKalan(ilk.kalan).join(' ')} · ${tkTarih(ilk.tarih, 'long')}</div>` : ''}</div>
+        ${ilk ? `<div class="tk-alt" style="color:${ilk.kalan <= 30 ? tkRenk(ilk.kalan) : `var(--tk-${ilk.ikon})`}">${ilk.tahmini ? '≈ ' : ''}${tkKalan(ilk.kalan).join(' ')} · ${tkTarih(ilk.tarih, 'long')}</div>` : ''}</div>
       <button class="kr-pill tk-duzen" id="tk-duzen">${icon('edit')}Düzenle</button>
     </div>
     <div class="tk-serit">
       <div class="tk-cizgi"><b style="left:${konum(bugun).toFixed(1)}%"></b>
         ${Object.values(yakin.reduce((g, x) => { const k = x.tarih.toDateString(); (g[k] ||= []).push(x); return g; }, {})).map((grup) => {
           const x = grup[0];
-          return `<i class="tk-nokta" data-tk="${x.id}" style="left:${konum(x.tarih).toFixed(1)}%;--tc:${tkRenk(x.kalan)}" title="${esc(grup.map((g) => g.kisa || g.ad).join(' · '))}">${tkIkon(x.ikon)}${grup.length > 1 ? `<em>${grup.length}</em>` : ''}</i>`;
+          return `<i class="tk-nokta${x.kalan <= 30 ? ' yakin' : ''}" data-tk="${x.id}" style="left:${konum(x.tarih).toFixed(1)}%;--tc:var(--tk-${x.ikon});--uc:${tkRenk(x.kalan)}" title="${esc(grup.map((g) => g.kisa || g.ad).join(' · '))}">${tkIkon(x.ikon)}${grup.length > 1 ? `<em>${grup.length}</em>` : ''}</i>`;
         }).join('')}</div>
       <div class="tk-aylar">${aylar.map((d) => `<span>${AY_K[d.getMonth()].slice(0, 3)}</span>`).join('')}</div>
       ${uzak ? `<div class="tk-uzak">+${uzak} kalem 12 aydan sonra ›</div>` : ''}
@@ -398,7 +397,7 @@ function takvimCard(M) {
       ${L.map((x) => {
         const [n, b] = tkKalan(x.kalan);
         const acik = tkAcik === x.id;
-        return `<div class="tk-kalem${acik ? ' acik' : ''}" style="--tc:${tkRenk(x.kalan)}" data-tk="${x.id}">
+        return `<div class="tk-kalem${acik ? ' acik' : ''}${x.kalan <= 30 ? ' yakin' : ''}" style="--tc:var(--tk-${x.ikon});--uc:${tkRenk(x.kalan)}" data-tk="${x.id}">
         <button class="tk-satir" data-tk-ac="${x.id}" aria-expanded="${acik}">
           <span class="tk-ikon">${halka(x)}${tkIkon(x.ikon)}</span>
           <span class="tk-orta"><b>${x.ad}</b><small>${x.tahmini ? '≈ ' : ''}${tkTarih(x.tarih)}${x.not ? ` · ${esc(x.not)}` : ''}</small></span>

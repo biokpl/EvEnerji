@@ -1,11 +1,12 @@
 // Yolculuk planlayıcı: varış yerinin hava tahmini + öğrenilen tüketim ile kaç yüzdeye şarj etmeli, yolda DC
 // gerekir mi, masraf ve LPG'li araçla fark. Mesafeler İstanbul Avrupa yakasından karayoluyla yaklaşıktır.
 export const SEHIRLER = [
+  ['Antalya', 700, 36.90, 30.71], ['Adana', 940, 37.00, 35.32],
   ['Şile', 75, 41.18, 29.61], ['Ağva', 100, 41.14, 29.85], ['İzmit', 100, 40.77, 29.92], ['Yalova', 105, 40.65, 29.27],
   ['Tekirdağ', 135, 40.98, 27.51], ['Sakarya', 150, 40.78, 30.40], ['Bursa', 155, 40.19, 29.06],
   ['Kırklareli', 210, 41.73, 27.22], ['Edirne', 235, 41.68, 26.56], ['Bolu', 260, 40.74, 31.61],
   ['Balıkesir', 260, 39.65, 27.88], ['Çanakkale', 320, 40.15, 26.41], ['Eskişehir', 320, 39.78, 30.52],
-  ['Ankara', 450, 39.93, 32.86], ['İzmir', 470, 38.42, 27.14], ['Bodrum', 690, 37.03, 27.43], ['Antalya', 700, 36.90, 30.71],
+  ['Ankara', 450, 39.93, 32.86], ['İzmir', 470, 38.42, 27.14], ['Bodrum', 690, 37.03, 27.43],
 ];
 export const OTOYOL_KATSAYI = 1.2;     // 110–120 km/sa'te tüketim şehir/karma sürüşe göre ≈ %20 fazla
 const YEDEK = 15;                      // varışta en az %15 kalsın

@@ -260,11 +260,11 @@ function openYolculuk(M) {
     <h3>Yolculuk planla</h3>
     <div class="sh-sub">Mesafeler İstanbul Avrupa yakasından karayoluyla yaklaşık</div>
     <div class="field"><div><label for="yp-s">Nereye</label></div>
-      <select class="input" id="yp-s">${SEHIRLER.map(([ad, km], i) => `<option value="${i}"${ad === 'Bursa' ? ' selected' : ''}>${ad} · ≈ ${km} km</option>`).join('')}<option value="-1">Başka (km gir)</option></select></div>
+      <select class="input" id="yp-s">${SEHIRLER.map(([ad, km], i) => `<option value="${i}"${i === 0 ? ' selected' : ''}>${ad} · ≈ ${km} km</option>`).join('')}<option value="-1">Başka (km gir)</option></select></div>
     <div class="field" id="yp-kmf" style="display:none"><div><label for="yp-km">Tek yön km</label></div><input class="input num" id="yp-km" inputmode="numeric" placeholder="km"></div>
     <div class="field"><div><label for="yp-t">Gidiş günü</label></div><input class="input" type="date" id="yp-t" value="${gun0}"></div>
     <div class="field"><div><label for="yp-y">Yol</label></div>
-      <select class="input" id="yp-y"><option value="2">Gidiş-dönüş (orada şarj yok)</option><option value="1">Tek yön</option></select></div>
+      <select class="input" id="yp-y"><option value="1" selected>Tek yön</option><option value="2">Gidiş-dönüş (orada şarj yok)</option></select></div>
     <div id="yp-sonuc" class="kr-cam yp-sonuc"><p class="kr-not" style="margin:0">Hesaplanıyor…</p></div>
     <div class="btn-row" style="margin-top:14px"><button class="btn ghost" id="cancel">Kapat</button></div>`, (sh) => {
     sh.querySelector('#cancel').onclick = () => closeSheet();

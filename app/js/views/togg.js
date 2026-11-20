@@ -2,7 +2,7 @@
 import { axisStyle, colors, mount } from '../charts.js';
 import { AYLAR, AY_K, GUN_K, closeSheet, dur, esc, hm, icon, kwh, num, openSheet, pct, tl, toast, watt } from '../ui.js';
 import { chargeCard } from './pano.js';
-import { BAKIM_AY, BAKIM_KM, takvim } from '../takvim.js';
+import { BAKIM_AY, BAKIM_KM, takvim, tkIkon } from '../takvim.js';
 import { OTOYOL_KATSAYI, SEHIRLER, planla, yolHavasi } from '../yolculuk.js';
 
 let showAll = false;
@@ -357,27 +357,96 @@ function openKumbara(M, app) {
   });
 }
 
-// Bakım ve evrak takvimi
+// Bakım ve evrak takvimi: 12 aylık zaman şeridi + dönem halkalı satırlar; dokununca ayrıntı ve tek dokunuşla yenileme
+let tkAcik = null;
+const tkRenk = (k) => (k <= 7 ? 'var(--bad)' : k <= 30 ? 'var(--mid)' : 'var(--good)');
+const tkKalan = (k) => (k < 0 ? [String(-k), 'gün geçti'] : k === 0 ? ['Bugün', ''] : k < 60 ? [String(k), 'gün']
+  : k < 365 ? [String(Math.round(k / 30)), 'ay'] : [(k / 365).toFixed(1).replace('.', ','), 'yıl']);
+const tkTarih = (d, ay = 'short') => d.toLocaleDateString('tr-TR', { day: 'numeric', month: ay, year: 'numeric' });
+
 function takvimCard(M) {
   const L = takvim(M);
-  const renk = (k) => (k <= 7 ? 'var(--bad)' : k <= 30 ? 'var(--mid)' : 'var(--good)');
-  const kalan = (k) => (k < 0 ? `${-k} gün geçti` : k === 0 ? 'Bugün' : k < 60 ? `${k} gün` : k < 365 ? `${Math.round(k / 30)} ay` : `${(k / 365).toFixed(1).replace('.', ',')} yıl`);
-  const eksik = ['muayene', 'kasko', 'trafik'].filter((k) => !L.some((x) => x.id === k)).length;
+  const ilk = L[0];
+  // Zaman şeridi: bu aydan itibaren 12 ay; 12 ay içindeki kalemler işaretlenir
+  const bugun = new Date(), bas = new Date(bugun.getFullYear(), bugun.getMonth(), 1), son = new Date(bas.getFullYear(), bas.getMonth() + 12, 1);
+  const konum = (d) => ((d - bas) / (son - bas)) * 100;
+  const aylar = Array.from({ length: 12 }, (_, i) => new Date(bas.getFullYear(), bas.getMonth() + i, 1));
+  const yakin = L.filter((x) => x.tarih < son), uzak = L.length - yakin.length;
+  const halka = (x) => {
+    const r = 19, c = 2 * Math.PI * r;
+    return `<svg class="tk-halka" viewBox="0 0 46 46"><circle cx="23" cy="23" r="${r}" class="iz"/>
+      <circle cx="23" cy="23" r="${r}" class="dolu" stroke-dasharray="${(c * x.oran).toFixed(1)} ${c.toFixed(1)}" transform="rotate(-90 23 23)"/></svg>`;
+  };
   return `
   <div class="card karar takvim evde">
     <div class="kr-head">
       <div><div class="kr-lbl">Bakım ve evrak</div>
-        <div class="kr-title">${L[0] ? `${L[0].ad} · ${kalan(L[0].kalan)}` : 'Takvim'}</div></div>
+        <div class="kr-title">${ilk ? `Sıradaki: ${ilk.kisa || ilk.ad}` : 'Takvim'}</div>
+        ${ilk ? `<div class="tk-alt" style="color:${tkRenk(ilk.kalan)}">${ilk.tahmini ? '≈ ' : ''}${tkKalan(ilk.kalan).join(' ')} · ${tkTarih(ilk.tarih, 'long')}</div>` : ''}</div>
       <button class="kr-pill tk-duzen" id="tk-duzen">${icon('edit')}Düzenle</button>
     </div>
+    <div class="tk-serit">
+      <div class="tk-cizgi"><b style="left:${konum(bugun).toFixed(1)}%"></b>
+        ${Object.values(yakin.reduce((g, x) => { const k = x.tarih.toDateString(); (g[k] ||= []).push(x); return g; }, {})).map((grup) => {
+          const x = grup[0];
+          return `<i class="tk-nokta" data-tk="${x.id}" style="left:${konum(x.tarih).toFixed(1)}%;--tc:${tkRenk(x.kalan)}" title="${esc(grup.map((g) => g.kisa || g.ad).join(' · '))}">${tkIkon(x.ikon)}${grup.length > 1 ? `<em>${grup.length}</em>` : ''}</i>`;
+        }).join('')}</div>
+      <div class="tk-aylar">${aylar.map((d) => `<span>${AY_K[d.getMonth()].slice(0, 3)}</span>`).join('')}</div>
+      ${uzak ? `<div class="tk-uzak">+${uzak} kalem 12 aydan sonra ›</div>` : ''}
+    </div>
     <div class="kr-cam tk-liste">
-      ${L.map((x) => `<div class="tk-satir" style="--tc:${renk(x.kalan)}">
-        <i>${icon(x.ikon)}</i>
-        <div><b>${x.ad}</b><span>${x.tahmini ? '≈ ' : ''}${x.tarih.toLocaleDateString('tr-TR', { day: 'numeric', month: 'short', year: 'numeric' })}${x.not ? ` · ${esc(x.not)}` : ''}</span></div>
-        <em>${x.tahmini ? '≈ ' : ''}${kalan(x.kalan)}</em></div>`).join('')}
-      ${eksik ? `<p class="kr-not">${eksik === 3 ? 'Muayene, kasko ve trafik sigortası tarihlerini' : 'Eksik tarihleri'} Düzenle'den gir; yaklaşınca hatırlatılır.</p>` : ''}
+      ${L.map((x) => {
+        const [n, b] = tkKalan(x.kalan);
+        const acik = tkAcik === x.id;
+        return `<div class="tk-kalem${acik ? ' acik' : ''}" style="--tc:${tkRenk(x.kalan)}" data-tk="${x.id}">
+        <button class="tk-satir" data-tk-ac="${x.id}" aria-expanded="${acik}">
+          <span class="tk-ikon">${halka(x)}${tkIkon(x.ikon)}</span>
+          <span class="tk-orta"><b>${x.ad}</b><small>${x.tahmini ? '≈ ' : ''}${tkTarih(x.tarih)}${x.not ? ` · ${esc(x.not)}` : ''}</small></span>
+          <span class="tk-sag"><b>${x.tahmini ? '≈' : ''}${n}</b><small>${b}</small></span>
+        </button>
+        <div class="tk-detay">
+          <div class="tk-donem"><span>${tkTarih(x.bas)}</span><span>%${Math.round(x.oran * 100)} geçti</span><span>${tkTarih(x.tarih)}</span></div>
+          <div class="tk-bar"><i style="width:${(x.oran * 100).toFixed(1)}%"></i></div>
+          <div class="tk-cipler"><span>${icon('clock')}${esc(x.donem)}</span><span>${icon('bell')}30 · 7 · 1 gün önce</span></div>
+          ${x.eylem ? `<button class="tk-eylem" data-tk-eylem="${x.id}">${icon('check')}<span>${x.eylem.etiket}</span></button>` : ''}
+        </div>
+      </div>`;
+      }).join('')}
     </div>
   </div>`;
+}
+
+function takvimEtkilesim(el, M, app) {
+  const kart = el.querySelector('.takvim');
+  if (!kart) return;
+  const ac = (id) => {
+    tkAcik = tkAcik === id ? null : id;
+    kart.querySelectorAll('.tk-kalem').forEach((k) => {
+      const a = k.dataset.tk === tkAcik;
+      k.classList.toggle('acik', a);
+      k.querySelector('.tk-satir').setAttribute('aria-expanded', a);
+    });
+  };
+  kart.querySelectorAll('[data-tk-ac]').forEach((b) => b.addEventListener('click', () => ac(b.dataset.tkAc)));
+  kart.querySelectorAll('.tk-nokta').forEach((b) => b.addEventListener('click', () => {
+    if (tkAcik !== b.dataset.tk) ac(b.dataset.tk);
+    kart.querySelector(`.tk-kalem[data-tk="${b.dataset.tk}"]`)?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  }));
+  // İki dokunuşla onay: ilkinde soru, ikincisinde kayıt (4 sn içinde)
+  kart.querySelectorAll('[data-tk-eylem]').forEach((b) => b.addEventListener('click', async () => {
+    const x = takvim(M).find((k) => k.id === b.dataset.tkEylem);
+    if (!x?.eylem) return;
+    if (!b.classList.contains('onay')) {
+      b.classList.add('onay');
+      b.querySelector('span').textContent = `${x.eylem.onay} Tekrar dokun`;
+      setTimeout(() => { if (b.isConnected) { b.classList.remove('onay'); b.querySelector('span').textContent = x.eylem.etiket; } }, 4000);
+      return;
+    }
+    try {
+      await app.store.patch('settings/car/takvim', x.eylem.yama(M.S.car?.takvim || {}));
+      toast('Kaydedildi');
+    } catch { toast('Kaydedilemedi'); }
+  }));
 }
 
 function openTakvim(M, app) {
@@ -388,7 +457,8 @@ function openTakvim(M, app) {
     <h3>Bakım ve evrak</h3>
     <div class="sh-sub">Yaklaşınca 30, 7 ve 1 gün önce hatırlatılır</div>
     ${alan('bakim_km', 'Son bakım km', 'Hiç bakım yapılmadıysa boş bırak', 'num', 'km')}
-    ${alan('bakim_tarih', 'Son bakım tarihi', 'Hiç bakım yapılmadıysa aracın teslim tarihi (ilk bakım 2. yılda)')}
+    ${alan('tescil', 'Tescil tarihi', 'İlk bakım ve ilk muayene buna göre')}
+    ${alan('bakim_tarih', 'Son bakım tarihi', 'Hiç bakım yapılmadıysa tescil tarihi')}
     ${alan('bakim_aralik_km', 'Bakım aralığı (km)', 'Servis kitapçığındaki değer', 'num', String(BAKIM_KM))}
     ${alan('bakim_aralik_ay', 'Bakım aralığı (ay)', '', 'num', String(BAKIM_AY))}
     ${alan('muayene', 'Muayene tarihi', 'Yeni araçta ilk muayene 3 yıl sonra')}
@@ -401,7 +471,7 @@ function openTakvim(M, app) {
     sh.querySelector('#cancel').onclick = () => closeSheet();
     sh.querySelector('#save').onclick = async () => {
       const v = {};
-      for (const id of ['bakim_tarih', 'muayene', 'kasko', 'trafik']) v[id] = sh.querySelector(`#tk-${id}`).value || null;
+      for (const id of ['tescil', 'bakim_tarih', 'muayene', 'kasko', 'trafik']) v[id] = sh.querySelector(`#tk-${id}`).value || null;
       for (const id of ['bakim_km', 'bakim_aralik_km', 'bakim_aralik_ay']) {
         const n = parseInt(String(sh.querySelector(`#tk-${id}`).value).replace(/\D/g, ''), 10);
         v[id] = Number.isFinite(n) && n > 0 ? n : null;
@@ -598,6 +668,7 @@ export function renderTogg(el, M, app) {
   }));
   el.querySelector('#more')?.addEventListener('click', () => { showAll = !showAll; app.refresh(); });
   el.querySelector('#tk-duzen')?.addEventListener('click', () => openTakvim(M, app));
+  takvimEtkilesim(el, M, app);
   el.querySelector('#yol-ac')?.addEventListener('click', () => openYolculuk(M));
   el.querySelector('#kn-hedef')?.addEventListener('click', () => openKumbara(M, app));
 

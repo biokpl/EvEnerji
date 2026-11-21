@@ -320,7 +320,7 @@ function openYolculuk(M) {
           <div><b>${P.dcDurak ? `${P.molaDk} dk` : 'Yok'}</b><span>${P.dcDurak ? `${P.dcDurak} DC molası` : 'DC molası'}</span></div>
           <div class="yesil"><b>${num(P.tl)} ₺</b><span>Toplam Masraf</span></div>
           <div class="yp-ikili"><b>${num(P.evTl)} ₺ / ${num(P.dcTl)} ₺</b><span>Ev / DC fiyatı</span></div>
-          <div><b>${num(P.lpgTl)} ₺</b><span>LPG'li araçla</span></div>
+          <div class="lpg"><b>${num(P.lpgTl)} ₺</b><span>LPG'li araçla</span></div>
         </div>
         <p class="kr-not yp-not" data-son>Tüketimin ${num(P.temel, 1)} → ${hiz[0]} km/sa'te ${num(P.c, 1)} · durağa %${YEDEK} ile (${num(P.yedekKm)} km yedek) · DC ${num(dc, 2)} ₺, 150 kW</p>`;
     };

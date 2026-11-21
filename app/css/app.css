@@ -1010,3 +1010,4 @@ input.num, input[data-m] { caret-color: transparent; cursor: pointer; }
 
 .yp-sonuc { min-height: 318px; }   /* açılırken yükseklik sabit kalsın */
 .yp-izgara .yp-ikili b { font-size: 12.5px; letter-spacing: -.02em; }
+.yp-izgara .lpg b { color: var(--mid); }   /* LPG: km başı maliyet kartındaki LPG rengiyle aynı */

@@ -3,7 +3,7 @@ import { axisStyle, colors, mount } from '../charts.js';
 import { AYLAR, AY_K, GUN_K, closeSheet, dur, esc, hm, icon, kwh, num, openSheet, pct, tl, toast, watt } from '../ui.js';
 import { chargeCard } from './pano.js';
 import { BAKIM_AY, BAKIM_KM, takvim, tkIkon } from '../takvim.js';
-import { HIZLAR, SEHIRLER, YEDEK, planla, yolHavasi } from '../yolculuk.js';
+import { HIZLAR, IL, TATIL, YEDEK, planla, yerKoord, yolHavasi, yolMesafesi } from '../yolculuk.js';
 
 let showAll = false;
 
@@ -253,35 +253,56 @@ function yolculukCard() {
   </div>`;
 }
 
+// Yer listesi: önce Antalya ve Adana (nereye), sonra 81 il alfabetik, sonra tatil yerleri; en sonda elle km
+const yerSecenek = (secili, ozel = false) => {
+  const opt = (ad) => `<option${ad === secili ? ' selected' : ''}>${ad}</option>`;
+  const iller = IL.map(([ad]) => ad);
+  return `${ozel ? `<optgroup label="Sık">${['Antalya', 'Adana'].map(opt).join('')}</optgroup>` : ''}
+    <optgroup label="İller">${iller.filter((x) => !ozel || !['Antalya', 'Adana'].includes(x)).map(opt).join('')}</optgroup>
+    <optgroup label="Tatil yerleri">${TATIL.map(([ad]) => opt(ad)).join('')}</optgroup>
+    ${ozel ? '<option value="-1">Başka (km gir)…</option>' : ''}`;
+};
+
 function openYolculuk(M) {
   const yarin = new Date(Date.now() + 864e5);
   const gun0 = `${yarin.getFullYear()}-${String(yarin.getMonth() + 1).padStart(2, '0')}-${String(yarin.getDate()).padStart(2, '0')}`;
   let yol = 1;                                                     // 1 tek yön, 2 gidiş-dönüş
+  let dcTur = 'ind';                                               // DC: indirimli (kampanyalı istasyon) / indirimsiz
   openSheet(`
     <div class="yp-bas"><h3>Yolculuk planla</h3><button class="yp-kapat" id="cancel" aria-label="Kapat">✕</button></div>
     <div class="yp-giris">
-      <label class="yp-g"><span>Nereye</span><select class="input" id="yp-s">${SEHIRLER.map(([ad, km], i) => `<option value="${i}"${i === 0 ? ' selected' : ''}>${ad} · ${km} km</option>`).join('')}<option value="-1">Başka…</option></select></label>
+      <label class="yp-g"><span>Nereden</span><select class="input" id="yp-n">${yerSecenek('İstanbul')}</select></label>
+      <label class="yp-g"><span>Nereye</span><select class="input" id="yp-s">${yerSecenek('Antalya', true)}</select></label>
       <div class="yp-g"><span>Çıkış</span><div class="yp-tarih"><input class="input" type="date" id="yp-t" value="${gun0}">
         <select class="input" id="yp-saat">${Array.from({ length: 38 }, (_, i) => { const h = 4 + Math.floor(i / 2), m = i % 2 ? '30' : '00'; const v = `${String(h).padStart(2, '0')}:${m}`; return `<option${v === '08:00' ? ' selected' : ''}>${v}</option>`; }).join('')}</select></div></div>
       <div class="yp-g"><span>Yol</span><div class="yp-seg" id="yp-y"><button data-y="1" class="on">Tek yön</button><button data-y="2">Gidiş-dönüş</button></div></div>
       <label class="yp-g"><span>Otoyol hızı</span><select class="input" id="yp-h">${HIZLAR.map(([h], i) => `<option value="${i}"${h === 120 ? ' selected' : ''}>${h} km/sa</option>`).join('')}</select></label>
+      <div class="yp-g"><span>DC fiyatı (Trugo)</span><div class="yp-seg" id="yp-dc"><button data-dc="ind" class="on">${num(Number(M.car.public_tl) || 12, 2)} ₺</button><button data-dc="tam">${num(Number(M.car.public_tl_tam) || 14.98, 2)} ₺</button></div></div>
       <label class="yp-g yp-tam" id="yp-kmf" style="display:none"><span>Tek yön km</span><input class="input num" id="yp-km" inputmode="numeric" placeholder="km"></label>
     </div>
     <div id="yp-sonuc" class="kr-cam yp-sonuc"><p class="kr-not" style="margin:0">Hesaplanıyor…</p></div>`, (sh) => {
     sh.querySelector('#cancel').onclick = () => closeSheet();
     const hesap = async () => {
-      const i = Number(sh.querySelector('#yp-s').value);
-      sh.querySelector('#yp-kmf').style.display = i === -1 ? '' : 'none';
-      const sehir = i >= 0 ? SEHIRLER[i] : null;
-      const km = sehir ? sehir[1] : parseInt(String(sh.querySelector('#yp-km').value).replace(/\D/g, ''), 10);
+      const nereden = sh.querySelector('#yp-n').value, nereye = sh.querySelector('#yp-s').value;
+      const elle = nereye === '-1';
+      sh.querySelector('#yp-kmf').style.display = elle ? '' : 'none';
       const out = sh.querySelector('#yp-sonuc');
+      let km, mesafeNot = '';
+      if (elle) km = parseInt(String(sh.querySelector('#yp-km').value).replace(/\D/g, ''), 10);
+      else if (nereden === nereye) { out.innerHTML = '<p class="kr-not" style="margin:0">Nereden ve nereye aynı</p>'; return; }
+      else {
+        if (!out.dataset.dolu) out.innerHTML = '<p class="kr-not" style="margin:0">Yol hesaplanıyor…</p>';
+        const m = await yolMesafesi(nereden, nereye);
+        km = m?.km; mesafeNot = m?.kaynak === 'tahmini' ? ' (tahmini)' : '';
+      }
       if (!(km > 0)) { out.innerHTML = '<p class="kr-not" style="margin:0">Tek yön km gir</p>'; return; }
+      const kalkis = yerKoord(nereden) || [41.01, 28.97], varisK = elle ? kalkis : yerKoord(nereye);
       const gun = sh.querySelector('#yp-t').value || gun0;
       const hiz = HIZLAR[Number(sh.querySelector('#yp-h').value)];
       if (!out.dataset.dolu) out.innerHTML = '<p class="kr-not" style="margin:0">Hava tahmini alınıyor…</p>';
-      const T = await yolHavasi(sehir ? sehir[2] : 41.01, sehir ? sehir[3] : 28.97, gun);
-      const P = planla({ km, gidisDonus: yol === 2, T: T ?? M.ogrenme?.bugunT, M, katsayi: hiz[1], lpgKatsayi: hiz[2] });
-      const hedefAd = sehir ? sehir[0] : 'Varış';
+      const T = await yolHavasi(varisK[0], varisK[1], gun, kalkis[0], kalkis[1]);
+      const P = planla({ km, gidisDonus: yol === 2, T: T ?? M.ogrenme?.bugunT, M, katsayi: hiz[1], lpgKatsayi: hiz[2], dcFiyat: dcTur === 'tam' ? (Number(M.car.public_tl_tam) || 14.98) : (Number(M.car.public_tl) || 12) });
+      const hedefAd = elle ? 'Varış' : nereye;
       // Şarj: şu anki yüzdeden çıkış yüzdesine; en geç ne zaman takılmalı (çıkış 08:00)
       const A = M.activeSession?.socNow != null ? { soc: M.activeSession.socNow } : M.aracSimdi ? { soc: M.aracSimdi.soc } : null;
       const cap = Number(M.car.battery_kwh) || 88.5;
@@ -310,17 +331,17 @@ function openYolculuk(M) {
       // Rota şeridi: başlangıç, DC durakları, (dönüş noktası), varış
       const pos = (k) => Math.min(100, Math.max(0, (k / P.topKm) * 100));
       const noktalar = [
-        { k: 0, ust: `İstanbul ${hm2(cikis)}`, alt: `%${num(P.basla)}`, tur: 'bas' },
+        { k: 0, ad: nereden, ust: hm2(cikis), alt: `%${num(P.basla)}`, tur: 'bas' },
         ...P.duraklar.map((d, j) => ({ k: d.km, ust: d.km < km ? hm2(saatAt(d.km)) : '', alt: `%${d.son}<em>${d.dk}′</em>`, tur: 'dc', no: j + 1 })),   // varış saati · çıkış % · mola dk
-        ...(yol === 2 ? [{ k: km, ust: `${hedefAd} ${hm2(varisT)}`, alt: P.varis != null ? `%${num(P.varis)}` : '', tur: 'don' }] : []),
-        { k: P.topKm, ust: yol === 2 ? 'Ev' : `${hedefAd} ${hm2(varisT)}`, alt: `%${num(yol === 2 ? P.donus : P.varis)}`, tur: 'son' },
+        ...(yol === 2 ? [{ k: km, ad: hedefAd, ust: hm2(varisT), alt: P.varis != null ? `%${num(P.varis)}` : '', tur: 'don' }] : []),
+        { k: P.topKm, ad: yol === 2 ? nereden : hedefAd, ust: yol === 2 ? '' : hm2(varisT), alt: `%${num(yol === 2 ? P.donus : P.varis)}`, tur: 'son' },
       ];
       const serit = `<div class="yp-rota">
         <div class="yp-cizgi"></div>
         ${noktalar.map((n) => `<div class="yp-n ${n.tur}${pos(n.k) > 88 ? ' sag' : pos(n.k) < 12 ? ' sol' : ''}" style="left:${pos(n.k).toFixed(1)}%">
-          <small>${esc(n.ust)}</small><i>${n.tur === 'dc' ? icon('bolt') : ''}</i><b>${n.alt}</b></div>`).join('')}
+          <small class="ad">${esc(n.ad || '')}</small><small>${esc(n.ust)}</small><i>${n.tur === 'dc' ? icon('bolt') : ''}</i><b>${n.alt}</b></div>`).join('')}
       </div>`;
-      const dc = Number(M.car.public_tl) || 12;
+      const dc = dcTur === 'tam' ? (Number(M.car.public_tl_tam) || 14.98) : (Number(M.car.public_tl) || 12);
       out.dataset.dolu = '1';
       out.innerHTML = `
         <div class="yp-ana"><span>${baslik}</span><b>%${num(P.basla)}</b></div>
@@ -328,7 +349,7 @@ function openYolculuk(M) {
         ${serit}
         <div class="yp-sure">${icon('clock')}<span><b>${hm2(cikis)} → ${hm2(varisT)}</b>${gunFarki} · ${yol === 2 ? 'tek yön ' : ''}${sureYaz(sureDk)}${tekMola ? ` <small>· ${tekMola} dk mola dahil</small>` : ''}</span></div>
         <div class="yp-izgara">
-          <div><b>${num(P.topKm)} km</b><span>${T != null ? `${num(T, 0)} °C · ` : ''}${num(P.c, 1)} kWh/100</span></div>
+          <div><b>${num(P.topKm)} km${mesafeNot ? '*' : ''}</b><span>${T != null ? `${num(T, 0)} °C · ` : ''}${num(P.c, 1)} kWh/100</span></div>
           <div><b>${num(P.menzil)} km</b><span>otoyol menzili</span></div>
           <div><b>${P.dcDurak ? `${P.molaDk} dk` : 'Yok'}</b><span>${P.dcDurak ? `${P.dcDurak} DC molası` : 'DC molası'}</span></div>
           <div class="yesil"><b>${num(P.tl)} ₺</b><span>Toplam Masraf</span></div>
@@ -337,12 +358,17 @@ function openYolculuk(M) {
         </div>
         <p class="kr-not yp-not" data-son>Tüketimin ${num(P.temel, 1)} → ${hiz[0]} km/sa'te ${num(P.c, 1)} · durağa %${YEDEK} ile (${num(P.yedekKm)} km yedek) · DC ${num(dc, 2)} ₺, 150 kW · ortalama hız ≈ ${num(ortHiz)} km/sa</p>`;
     };
+    sh.querySelectorAll('#yp-dc button').forEach((b) => b.addEventListener('click', () => {
+      dcTur = b.dataset.dc;
+      sh.querySelectorAll('#yp-dc button').forEach((x) => x.classList.toggle('on', x === b));
+      hesap();
+    }));
     sh.querySelectorAll('#yp-y button').forEach((b) => b.addEventListener('click', () => {
       yol = Number(b.dataset.y);
       sh.querySelectorAll('#yp-y button').forEach((x) => x.classList.toggle('on', x === b));
       hesap();
     }));
-    for (const id of ['#yp-s', '#yp-t', '#yp-h', '#yp-saat']) sh.querySelector(id).addEventListener('change', hesap);
+    for (const id of ['#yp-n', '#yp-s', '#yp-t', '#yp-h', '#yp-saat']) sh.querySelector(id).addEventListener('change', hesap);
     sh.querySelector('#yp-km').addEventListener('change', hesap);
     setTimeout(hesap, 340);                                      // açılış kayması bitince (takılmasın)
   });

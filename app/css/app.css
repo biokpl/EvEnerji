@@ -971,13 +971,13 @@ input.num, input[data-m] { caret-color: transparent; cursor: pointer; }
 .yp-bas { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
 .yp-bas h3 { margin: 0; }
 .yp-kapat { width: 32px; height: 32px; border: 0; border-radius: 50%; cursor: pointer; font-size: 14px; color: var(--muted); background: var(--card-hi); }
-.yp-giris { display: grid; grid-template-columns: 1fr 1fr; gap: 8px 10px; }
+.yp-giris { display: grid; grid-template-columns: 1fr 1fr; gap: 7px 10px; }
 .yp-g { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
 .yp-g > span { font-size: 10.5px; font-weight: 800; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
-.yp-g .input { width: 100%; min-width: 0; height: 40px; padding: 0 10px; font-size: 14px; text-align: left; }
+.yp-g .input { width: 100%; min-width: 0; height: 34px; padding: 0 9px; font-size: 13.5px; border-radius: 10px; text-align: left; }
 .yp-tam { grid-column: 1 / -1; }
-.yp-seg { display: grid; grid-template-columns: 1fr 1fr; height: 40px; padding: 3px; border-radius: 12px; background: var(--card-hi); box-shadow: inset 0 0 0 1px var(--line); }
-.yp-seg button { border: 0; border-radius: 9px; background: transparent; font: inherit; font-size: 12px; font-weight: 800; color: var(--muted); cursor: pointer; padding: 0 2px; white-space: nowrap; letter-spacing: -.01em; }
+.yp-seg { display: grid; grid-template-columns: 1fr 1fr; height: 34px; padding: 2px; border-radius: 10px; background: var(--card-hi); box-shadow: inset 0 0 0 1px var(--line); }
+.yp-seg button { border: 0; border-radius: 8px; background: transparent; font: inherit; font-size: 11.5px; font-weight: 800; color: var(--muted); cursor: pointer; padding: 0 2px; white-space: nowrap; letter-spacing: -.01em; }
 .yp-seg button.on { color: var(--text); background: var(--card-solid); box-shadow: 0 2px 8px -2px rgba(0, 0, 0, .25); }
 .yp-sonuc { margin-top: 10px; padding: 12px 13px; }
 /* rota şeridi */
@@ -1021,3 +1021,8 @@ input.num, input[data-m] { caret-color: transparent; cursor: pointer; }
 .yp-sure b { color: var(--text); font-weight: 800; font-variant-numeric: tabular-nums; }
 .yp-sure small { font-size: 11px; font-weight: 600; }
 .yp-n.dc small { color: var(--text); opacity: .75; }
+
+/* rota şeridi: şehir adı saatin üstünde */
+.yp-rota { height: 88px; }
+.yp-cizgi { top: 42px; }
+.yp-n small.ad { color: var(--text); opacity: .9; }

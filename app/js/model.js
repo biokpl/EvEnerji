@@ -201,7 +201,7 @@ export function build(raw) {
 
   // Şarj yüzdesi (SoC): araç veri vermediği için prizden ölçülen kWh ile tahmin.
   // Kullanıcı başlangıç (ve isterse bitiş) yüzdesini girer: settings/soc/{oturum} = {basla, bitis}
-  const car = { battery_kwh: 88.5, efficiency: 0.9, public_tl: 9, hedef_yuzde: 100, ...(S.car || {}) };
+  const car = { battery_kwh: 88.5, efficiency: 0.9, public_tl: 12, hedef_yuzde: 100, ...(S.car || {}) };
   const cap = Number(car.battery_kwh) || 88.5;
   const socIn = S.soc || {};
   for (const s of sessions) {

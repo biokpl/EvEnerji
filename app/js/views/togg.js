@@ -314,7 +314,7 @@ function openYolculuk(M) {
         <div class="yp-durak yp-masraf"><span>Evde şarj · ${num(P.evKwhCek)} kWh · ${num(P.evBirim, 2)} ₺/kWh</span><span>≈ ${num(P.evTl)} ₺</span></div>
         ${P.dcDurak ? `<div class="yp-durak yp-masraf"><span>Yolda DC · ${num(P.dcKwh)} kWh · ${num(Number(M.car.public_tl) || 12, 2)} ₺/kWh</span><span>≈ ${num(P.dcTl)} ₺</span></div>` : ''}
         <div class="kr-row"><span>LPG'li araçla · ${num(P.lpgL100, 1)} L/100 km</span><b>≈ ${num(P.lpgTl)} ₺</b></div>
-        <p class="kr-not">Senin öğrenilen tüketimin (${num(P.temel, 1)}) ve LPG'li aracının tüketimi seçilen hıza göre artırıldı · durağa %${YEDEK} ile varış (≈ ${num(P.yedekKm)} km yedek) · DC'de %80'e · mola süresi 150 kW+ istasyon içindir</p>`;
+        <p class="kr-not">Senin öğrenilen tüketimin (${num(P.temel, 1)}) ve LPG'li aracının tüketimi seçilen hıza göre artırıldı · durağa %${YEDEK} ile varış (≈ ${num(P.yedekKm)} km yedek) · DC'de %80'e · mola süresi 150 kW şarj gücüyle</p>`;
     };
     for (const id of ['#yp-s', '#yp-t', '#yp-y', '#yp-h']) sh.querySelector(id).addEventListener('change', hesap);
     sh.querySelector('#yp-km').addEventListener('change', hesap);

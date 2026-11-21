@@ -14,7 +14,7 @@ export const OTOYOL_KATSAYI = 1.12;    // varsayılan 110 km/sa: öğrenilen kar
 // motor yük arttıkça biraz verimlendiği için oransal artış elektrikliden az.
 export const HIZLAR = [[90, 1.0, 1.0], [110, 1.12, 1.08], [120, 1.22, 1.15], [130, 1.34, 1.23], [140, 1.47, 1.32]];
 export const YEDEK = 20;               // durağa ve varışa en az %20 ile (otoyolda ≈ 75 km yedek; istasyon dolu/arızalıysa sonrakine yeter)
-const DC_KW = 105;                     // %20→%80 arası ortalama DC şarj gücü (150 kW+ istasyonda; T10X ≈ 28–32 dk)
+const DC_KW = 150;                     // DC şarj gücü (kullanıcı: 150 kW ile hesapla; bağlanınca şarj hemen başlıyor)
 const DC_HEDEF = 80;                   // yolda DC'de %80'e kadar (üstü yavaş)
 
 // Varış yeri ve İstanbul için o günün ortalama sıcaklığı (Open-Meteo, en çok 16 gün ileri)
@@ -51,7 +51,7 @@ export function planla({ km, gidisDonus, T, M, katsayi = OTOYOL_KATSAYI, lpgKats
       const kalan = ((topKm - gidilen) * c / 100 / cap) * 100;                 // kalan yolun yüzdesi
       const hedef = Math.min(DC_HEDEF, Math.ceil((kalan + YEDEK) / 5) * 5);
       const bat = ((hedef - YEDEK) / 100) * cap;
-      duraklar.push({ km: gidilen, bas: YEDEK, son: hedef, kwh: bat / 0.95, dk: Math.round((bat / DC_KW) * 60 + 4) });   // +4 dk bağlanma
+      duraklar.push({ km: gidilen, bas: YEDEK, son: hedef, kwh: bat / 0.95, dk: Math.max(1, Math.round((bat / DC_KW) * 60)) });
       soc = hedef;
     }
   }

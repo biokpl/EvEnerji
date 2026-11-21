@@ -221,6 +221,12 @@ export function build(raw) {
   // bitiş %'si − sonrakinin başlangıç %'si ve aradaki km. Hava/mevsimle değiştiği için yalnız SON sürüşler
   // (en yeniden geriye ~120 km dolana kadar) kullanılır; tek kısa yolun %1'lik yuvarlama hatası toplamda erir.
   const sirali = [...sessions].sort((a, b) => a.start - b.start);
+  // Ara okumalar: şarj beklemeden girilen araç yüzdesi + km (Trumore). Şarjsız bir nokta: hem önceki sürüşü
+  // kapatır hem yenisini başlatır; yalnız öğrenmeye ve tahmine katılır (şarj listesine girmez)
+  const okumalar = Object.entries(S.okuma || {}).map(([k, o]) => ({ sid: `okuma-${k}`, okuma: true, start: (o.ts || Number(k)) / 1000,
+    end: (o.ts || Number(k)) / 1000, kwh: 0, odo: Number(o.odo) || null, socStart: Number(o.soc), socEnd: Number(o.soc) }))
+    .filter((o) => Number.isFinite(o.socStart) && o.odo);
+  const ogrSira = [...sirali, ...okumalar].sort((a, b) => a.start - b.start);
   const surusler = [];
   for (let i = 1; i < sirali.length; i++) {
     const o = sirali[i - 1], n = sirali[i];
@@ -239,7 +245,7 @@ export function build(raw) {
   const ogrOpt = { cap, eff: car.eff, hedef: Number(car.hedef_yuzde) || 100, hava, yedek: yedekTuk };
   const hb = hava[today];
   const bugunT = hb ? ((hb.sabah ?? hb.ort) + (hb.aksam ?? hb.ort)) / 2 : null;   // iş yolu saatlerinin ortalaması
-  const ogrenme = ogren({ ...ogrOpt, sessions: sirali, bugunT });
+  const ogrenme = ogren({ ...ogrOpt, sessions: ogrSira, bugunT });
   const aracTuketim = ogrenme.bugun ?? yedekTuk;                                  // yoksa son sürüşler / Ayarlar
   const per100 = per100Bat ? per100Bat / car.eff : null;                          // geriye uyum: prizden
   // Prizden çekilen kWh/100 km = araç tüketimi ÷ şarj verimi (maliyet hesabı için: şarj kaybı dahil)
@@ -247,7 +253,7 @@ export function build(raw) {
   const per100Tahmini = !per100Bat && !ogrenme.model;
   // Kendi hesaplama modu: girilmemiş yüzde/km öğrenilen modelle doldurulur (öğrenmeye katılmaz)
   if (ogrenme.oto) {
-    otoDoldur(sirali, ogrenme, { ...ogrOpt, yedek: aracTuketim });
+    otoDoldur(ogrSira, ogrenme, { ...ogrOpt, yedek: aracTuketim });
     ogrenme.kontrol = kontrolSirasi(sirali);       // bu şarjda yine de sor (her 5. şarj sapma kontrolü)
   }
   const kmOf = (duvarKwh) => ((duvarKwh * car.eff) / aracTuketim) * 100;          // bataryaya giren enerjiyle menzil
@@ -354,12 +360,12 @@ export function build(raw) {
     }
   }
   // Araç şimdi: şarj sürüyorsa sabah çıkış tahmini, değilse son şarjdan bu yana düşülen yüzde
-  const aracSimdi = simdiDurum(sirali, ogrenme, { ...ogrOpt, yedek: aracTuketim }, Date.now() / 1000, 20,
+  const aracSimdi = simdiDurum(ogrSira, ogrenme, { ...ogrOpt, yedek: aracTuketim }, Date.now() / 1000, 20,
     activeSession && activeSession.socNow != null
       ? { soc: activeSession.socNow, w: activeSession.kopuk ? 0 : (activeSession.dev.live?.w || 0), hedef: Number(car.hedef_yuzde) || 100,
           odo: sirali.find((x) => x.sid === activeSession.id)?.odo || null }
       : null);
-  if (aracSimdi) aracSimdi.ayKm = ayKm(sirali, aracSimdi.odo, ogrenme.kmM);
+  if (aracSimdi) aracSimdi.ayKm = ayKm(ogrSira, aracSimdi.odo, ogrenme.kmM);
 
   return {
     raw, now, y, mi, today, S, t, tNext, durum, projDurum, devices, enabled, home, evs, plugs, winderDev,

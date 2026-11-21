@@ -220,12 +220,12 @@ function aracSimdiCard(M) {
     <div class="kr-head">
       <div><div class="kr-lbl">Araç şimdi · ${A.sarjda ? 'şarjda' : 'tahmini'}</div>
         <div class="sm-buyuk"><b>≈ %${num(A.soc)}</b><span>≈ ${num(A.menzil)} km menzil</span></div></div>
-      <span class="kr-pill">${icon('battery')}Bugün ${num(A.c, 1)}</span>
+      <button class="kr-pill tk-duzen" id="ok-gir">${icon('edit')}Güncelle</button>
     </div>
     <div class="sm-pil"><i style="width:${Math.max(2, Math.min(100, A.soc)).toFixed(1)}%"></i><b style="left:${A.alt}%"></b></div>
     <p class="kr-not">${A.sarjda
       ? (A.cikis ? `Şarjda · ${A.cikis.not} ≈ %${num(A.cikis.soc)}${A.cikis.dolu ? ' (dolmuş olur)' : ''}` : 'Şarjda')
-      : `Son şarj %${num(A.basSoc)} · o günden beri ≈ ${num(A.km)} km`}${A.odo ? ` · araç ≈ ${num(A.odo)} km` : ''}</p>
+      : `${A.son?.okuma ? `Son okuma ${new Date(A.son.end * 1000).toLocaleDateString('tr-TR', { day: 'numeric', month: 'short' })} %${num(A.basSoc)}` : `Son şarj %${num(A.basSoc)}`} · o günden beri ≈ ${num(A.km)} km`}${A.odo ? ` · araç ≈ ${num(A.odo)} km` : ''} · bugün ${num(A.c, 1)} kWh/100 km</p>
     <div class="kr-cam">
       <div class="sm-satir"><span class="kr-lbl">Yeter</span><div>${yeter}</div></div>
       ${A.yarin ? `<div class="kr-ayrac"></div>
@@ -501,6 +501,33 @@ function openTakvim(M, app) {
   });
 }
 
+// Ara okuma: araçtaki (Trumore) yüzde ve km'yi şarj beklemeden gir; tahmin ve öğrenme bundan düzelir
+function openOkuma(M, app) {
+  const A = M.aracSimdi;
+  openSheet(`
+    <h3>Araçtaki değerler</h3>
+    <div class="sh-sub">Trumore ya da araç ekranından · tahmin ve öğrenme bu değerle düzelir</div>
+    <div class="field"><div><label for="ok-y">Pil yüzdesi</label>${A ? `<small>Uygulamanın tahmini ≈ %${num(A.soc)}</small>` : ''}</div>
+      <input class="input num" id="ok-y" inputmode="numeric" placeholder="%"></div>
+    <div class="field"><div><label for="ok-km">Toplam km</label>${A?.odo ? `<small>Tahmin ≈ ${num(A.odo)} km</small>` : ''}</div>
+      <input class="input num" id="ok-km" inputmode="numeric" placeholder="km"></div>
+    <div class="btn-row" style="margin-top:14px">
+      <button class="btn ghost" id="cancel">Vazgeç</button>
+      <button class="btn primary" id="save">${icon('check')}Kaydet</button>
+    </div>`, (sh) => {
+    sh.querySelector('#cancel').onclick = () => closeSheet();
+    sh.querySelector('#save').onclick = async () => {
+      const y = socVal(sh.querySelector('#ok-y').value);
+      const km = parseInt(String(sh.querySelector('#ok-km').value).replace(/\D/g, ''), 10);
+      if (y == null) return toast('0–100 arası bir yüzde gir');
+      if (!(km > 0)) return toast('Toplam km gir');
+      const ts = Date.now();
+      try { await app.store.patch('settings/okuma', { [ts]: { soc: y, odo: km, ts } }); closeSheet(); toast('Kaydedildi'); }
+      catch { toast('Kaydedilemedi'); }
+    };
+  });
+}
+
 // Öğrenen tüketim kartı: sıcaklığa göre tüketim, kendini sınama (son 5 şarj), kendi hesaplama durumu
 function ogrenmeCard(M) {
   const O = M.ogrenme;
@@ -688,6 +715,7 @@ export function renderTogg(el, M, app) {
   }));
   el.querySelector('#more')?.addEventListener('click', () => { showAll = !showAll; app.refresh(); });
   el.querySelector('#tk-duzen')?.addEventListener('click', () => openTakvim(M, app));
+  el.querySelector('#ok-gir')?.addEventListener('click', () => openOkuma(M, app));
   takvimEtkilesim(el, M, app);
   el.querySelector('#yol-ac')?.addEventListener('click', () => openYolculuk(M));
   el.querySelector('#kn-hedef')?.addEventListener('click', () => openKumbara(M, app));

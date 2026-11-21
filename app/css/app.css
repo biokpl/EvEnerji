@@ -981,7 +981,7 @@ input.num, input[data-m] { caret-color: transparent; cursor: pointer; }
 .yp-seg button.on { color: var(--text); background: var(--card-solid); box-shadow: 0 2px 8px -2px rgba(0, 0, 0, .25); }
 .yp-sonuc { margin-top: 10px; padding: 12px 13px; }
 /* rota şeridi */
-.yp-rota { position: relative; height: 66px; margin: 12px 14px 4px; }
+.yp-rota { position: relative; height: 76px; margin: 12px 14px 4px; }
 .yp-cizgi { position: absolute; left: 0; right: 0; top: 30px; height: 4px; border-radius: 2px;
   background: linear-gradient(90deg, var(--ev), color-mix(in srgb, var(--ev) 55%, var(--home))); box-shadow: 0 0 10px -2px color-mix(in srgb, var(--ev) 60%, transparent); }
 .yp-n { position: absolute; top: 0; transform: translateX(-50%); display: flex; flex-direction: column; align-items: center; width: 70px; }
@@ -1006,6 +1006,7 @@ input.num, input[data-m] { caret-color: transparent; cursor: pointer; }
 .yp-not { margin-top: 8px !important; font-size: 10.5px !important; }
 
 .yp-n.dc b { position: relative; line-height: 15px; color: color-mix(in srgb, var(--mid) 45%, var(--muted)); opacity: .8; font-weight: 700; }
-.yp-n b em { position: absolute; left: 100%; top: 1px; line-height: 15px; font-style: normal; font-size: 8px; font-weight: 700; margin-left: 2px; white-space: nowrap; color: var(--muted); }   /* yüzde simgenin tam altında, dakika yanında */
+.yp-n b em { display: block; text-align: center; font-style: normal; font-size: 8.5px; font-weight: 700; line-height: 1; margin-top: 1px; white-space: nowrap; color: var(--muted); }   /* mola dakikası yüzdenin altında */
 
 .yp-sonuc { min-height: 318px; }   /* açılırken yükseklik sabit kalsın */
+.yp-izgara .yp-ikili b { font-size: 12.5px; letter-spacing: -.02em; }

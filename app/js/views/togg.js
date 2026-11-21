@@ -299,7 +299,7 @@ function openYolculuk(M) {
       const pos = (k) => Math.min(100, Math.max(0, (k / P.topKm) * 100));
       const noktalar = [
         { k: 0, ust: 'İstanbul', alt: `%${num(P.basla)}`, tur: 'bas' },
-        ...P.duraklar.map((d, j) => ({ k: d.km, ust: '', alt: `%${d.son}<em> - ${d.dk}′</em>`, tur: 'dc', no: j + 1 })),   // durakta varılacak % + mola dk
+        ...P.duraklar.map((d, j) => ({ k: d.km, ust: '', alt: `%${d.son}<em>${d.dk}′</em>`, tur: 'dc', no: j + 1 })),   // durakta varılacak % + mola dk
         ...(yol === 2 ? [{ k: km, ust: hedefAd, alt: P.varis != null ? `%${num(P.varis)}` : '', tur: 'don' }] : []),
         { k: P.topKm, ust: yol === 2 ? 'Ev' : hedefAd, alt: `%${num(yol === 2 ? P.donus : P.varis)}`, tur: 'son' },
       ];
@@ -318,8 +318,8 @@ function openYolculuk(M) {
           <div><b>${num(P.topKm)} km</b><span>${T != null ? `${num(T, 0)} °C · ` : ''}${num(P.c, 1)} kWh/100</span></div>
           <div><b>${num(P.menzil)} km</b><span>otoyol menzili</span></div>
           <div><b>${P.dcDurak ? `${P.molaDk} dk` : 'Yok'}</b><span>${P.dcDurak ? `${P.dcDurak} DC molası` : 'DC molası'}</span></div>
-          <div class="yesil"><b>${num(P.tl)} ₺</b><span>toplam masraf</span></div>
-          <div><b>${num(P.evTl)} / ${num(P.dcTl)}</b><span>ev / DC ₺</span></div>
+          <div class="yesil"><b>${num(P.tl)} ₺</b><span>Toplam Masraf</span></div>
+          <div class="yp-ikili"><b>${num(P.evTl)} ₺ / ${num(P.dcTl)} ₺</b><span>Ev / DC fiyatı</span></div>
           <div><b>${num(P.lpgTl)} ₺</b><span>LPG'li araçla</span></div>
         </div>
         <p class="kr-not yp-not" data-son>Tüketimin ${num(P.temel, 1)} → ${hiz[0]} km/sa'te ${num(P.c, 1)} · durağa %${YEDEK} ile (${num(P.yedekKm)} km yedek) · DC ${num(dc, 2)} ₺, 150 kW</p>`;

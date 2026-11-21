@@ -336,7 +336,7 @@ function karneCard(M) {
   // Kumbara: bu yıl LPG'li araca göre biriken (km kartıyla aynı hesap)
   const ev = M.evAvgTl > 0 ? (M.per100Duvar * M.evAvgTl) / 100 : null, lpg = (lpgL * lpgTl) / 100;
   const kmYil = M.per100Duvar > 0 ? (M.evYtd / M.per100Duvar) * 100 : 0;
-  const biriken = ev != null ? kmYil * (lpg - ev) : null;
+  const biriken = ev != null ? kmYil * lpg - M.evTl : null;            // bu yıl LPG'ye gidecek − Togg'a ödenen
   const K = c.kumbara || {};
   const hedef = Number(K.tutar) || 0;
   const oran = hedef && biriken != null ? Math.min(100, (biriken / hedef) * 100) : null;

@@ -133,10 +133,11 @@ function flow(M) {
 
 // Km başı maliyet: Togg (evde, ortalama ödenen ₺/kWh) · Togg DC · aynı yolu LPG'li araçla gitmek
 function kmCard(M) {
-  if (!M.evYtd || !(M.evAvgTl > 0) || !(M.per100Duvar > 0)) return '';
+  const birim = M.toggAyBirim(M.mi);                       // Togg'un bu ayki 1 kWh maliyeti (Togg sekmesiyle aynı)
+  if (!M.evYtd || !(birim > 0) || !(M.per100Duvar > 0)) return '';
   const c = M.car;
   const lpgTl = Number(c.lpg_tl) || 50.7, lpgL = Number(c.lpg_l100) || 10, dc = Number(c.public_tl) || 12;
-  const ev = (M.per100Duvar * M.evAvgTl) / 100;              // ₺/km evde (prizden çekilen enerji, ödenen ort. fiyat)
+  const ev = (M.per100Duvar * birim) / 100;                  // ₺/km evde (prizden çekilen enerji × bu ayki Togg birimi)
   const dcKm = (M.per100Duvar * dc) / 100;
   const lpg = (lpgL * lpgTl) / 100;
   const kmYil = (M.evYtd / M.per100Duvar) * 100;               // bu yıl gidilen ≈ km
@@ -155,7 +156,7 @@ function kmCard(M) {
         <div class="kmk-buyuk"><b>${yak}${num(ev, 2)}</b><span>₺/km</span></div></div>
       <span class="kr-pill">${icon('car')}LPG'den %${ucuz} ucuz</span>
     </div>
-    <p class="kr-not" style="margin-top:2px">Evde şarj · ort. ${num(M.evAvgTl, 2)} ₺/kWh · araç ${num(M.aracTuketim, 1)} kWh/100 km${M.ogrenme.model ? '' : M.per100Bat ? ` (son ${num(M.per100Km)} km)` : ' (Trumore)'} · şarj kaybı dahil</p>
+    <p class="kr-not" style="margin-top:2px">Evde şarj · bu ay ${num(birim, 2)} ₺/kWh · araç ${num(M.aracTuketim, 1)} kWh/100 km${M.ogrenme.model ? '' : M.per100Bat ? ` (son ${num(M.per100Km)} km)` : ' (Trumore)'} · şarj kaybı dahil</p>
     <div class="kr-bars">
       ${satir('Togg · Evde', ev, 'var(--ev)', true)}
       ${satir(`Togg · DC (${num(dc, dc % 1 ? 2 : 0)} ₺)`, dcKm, 'var(--home)', false)}
@@ -165,7 +166,7 @@ function kmCard(M) {
       <div class="kr-lbl">LPG'ye göre tasarruf</div>
       <div class="kr-row" style="margin-top:6px"><span>Her km'de</span><b class="kmk-yesil" style="font-size:19px">${yak}${num(lpg - ev, 2)} ₺</b></div>
       <div class="kmk-iki">
-        <div><span>Bu yıl · ≈ ${num(kmYil)} km</span><b class="kmk-yesil">≈ ${num(kmYil * (lpg - ev))} ₺</b><span>LPG ${num(kmYil * lpg)} · Togg ${num(M.evTl)}</span></div>
+        <div><span>Bu yıl · ≈ ${num(kmYil)} km</span><b class="kmk-yesil">≈ ${num(kmYil * lpg - M.evTl)} ₺</b><span>LPG ${num(kmYil * lpg)} · Togg ${num(M.evTl)}</span></div>
         <div><span>Yıllık · ≈ ${num(kmTempo)} km</span><b class="kmk-yesil">≈ ${num(kmTempo * (lpg - ev))} ₺</b><span>bu tempoyla</span></div>
       </div>
     </div>
@@ -196,7 +197,7 @@ function kpis(M) {
     <div class="kpi" data-go="togg">
       <div class="k-label">${icon('bolt')}Togg ${M.y}</div>
       <div class="k-val">${num(M.evTl)}<small>₺</small></div>
-      <div class="k-sub">${kwh(M.evYtd, 0)} · ort. ${M.per100Duvar > 0 ? `${num((M.per100Duvar * M.evAvgTl) / 100, 2)} ₺/km` : `${num(M.evAvgTl, 2)} ₺/kWh`}</div>
+      <div class="k-sub">${kwh(M.evYtd, 0)} · ${M.per100Duvar > 0 ? `${num((M.per100Duvar * M.toggAyBirim(M.mi)) / 100, 2)} ₺/km` : `ort. ${num(M.evAvgTl, 2)} ₺/kWh`}</div>
     </div>
   </div>`;
 }

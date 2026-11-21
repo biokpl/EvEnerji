@@ -493,9 +493,9 @@ input.num, input[data-m] { caret-color: transparent; cursor: pointer; }
 .nav button.on svg { color: var(--accent); }
 
 /* Alt pencere */
-.sheet-bg { position: fixed; inset: 0; z-index: 50; background: rgba(0, 0, 0, 0.5); opacity: 0; transition: opacity 0.25s; backdrop-filter: blur(3px); }
+.sheet-bg { position: fixed; inset: 0; z-index: 50; background: rgba(0, 0, 0, 0.55); opacity: 0; transition: opacity 0.25s; }   /* tam ekran bulanıklık telefonda açılışı takıyordu */
 .sheet-bg.open { opacity: 1; }
-.sheet { position: fixed; left: 50%; bottom: 0; z-index: 51; width: min(560px, 100%); transform: translate(-50%, 105%); transition: transform 0.32s cubic-bezier(.2, .8, .2, 1); background: var(--card-solid); border-radius: 26px 26px 0 0; border: 1px solid var(--line); border-bottom: 0; padding: 10px 18px calc(22px + env(safe-area-inset-bottom)); max-height: 88vh; overflow-y: auto; box-shadow: 0 -20px 60px rgba(0, 0, 0, 0.4); }
+.sheet { position: fixed; left: 50%; bottom: 0; z-index: 51; width: min(560px, 100%); transform: translate(-50%, 105%); transition: transform 0.32s cubic-bezier(.2, .8, .2, 1); will-change: transform; contain: layout paint; background: var(--card-solid); border-radius: 26px 26px 0 0; border: 1px solid var(--line); border-bottom: 0; padding: 10px 18px calc(22px + env(safe-area-inset-bottom)); max-height: 88vh; overflow-y: auto; box-shadow: 0 -20px 60px rgba(0, 0, 0, 0.4); }
 .sheet.open { transform: translate(-50%, 0); }
 .sheet { overscroll-behavior: contain; }
 .sheet.dragging, .sheet-bg.dragging { transition: none; }
@@ -924,7 +924,7 @@ input.num, input[data-m] { caret-color: transparent; cursor: pointer; }
   box-shadow: 0 6px 16px -6px rgba(15, 30, 60, 0.22), inset 0 0 0 0.5px rgba(15, 30, 60, 0.06);
 }
 /* alt pencere: beyaz cam */
-:root[data-theme="light"] .sheet { background: rgba(251, 252, 254, 0.92); backdrop-filter: blur(24px) saturate(1.6); -webkit-backdrop-filter: blur(24px) saturate(1.6); box-shadow: 0 -20px 60px rgba(15, 30, 60, 0.18); }
+:root[data-theme="light"] .sheet { background: #f8fafd; box-shadow: 0 -20px 60px rgba(15, 30, 60, 0.18); }   /* bulanıklık yok: açılış akıcı */
 :root[data-theme="light"] .sheet-bg { background: rgba(15, 30, 60, 0.25); }
 
 :root[data-theme="light"] .tk-cipler span { background: rgba(15, 30, 60, 0.05); box-shadow: inset 0 0 0 .5px rgba(15, 30, 60, .08); color: var(--muted); }
@@ -1007,3 +1007,5 @@ input.num, input[data-m] { caret-color: transparent; cursor: pointer; }
 
 .yp-n.dc b { position: relative; line-height: 15px; color: color-mix(in srgb, var(--mid) 45%, var(--muted)); opacity: .8; font-weight: 700; }
 .yp-n b em { position: absolute; left: 100%; top: 1px; line-height: 15px; font-style: normal; font-size: 8px; font-weight: 700; margin-left: 2px; white-space: nowrap; color: var(--muted); }   /* yüzde simgenin tam altında, dakika yanında */
+
+.yp-sonuc { min-height: 318px; }   /* açılırken yükseklik sabit kalsın */

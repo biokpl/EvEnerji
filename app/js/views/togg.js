@@ -277,7 +277,7 @@ function openYolculuk(M) {
       if (!(km > 0)) { out.innerHTML = '<p class="kr-not" style="margin:0">Tek yön km gir</p>'; return; }
       const gun = sh.querySelector('#yp-t').value || gun0;
       const hiz = HIZLAR[Number(sh.querySelector('#yp-h').value)];
-      out.innerHTML = '<p class="kr-not" style="margin:0">Hava tahmini alınıyor…</p>';
+      if (!out.dataset.dolu) out.innerHTML = '<p class="kr-not" style="margin:0">Hava tahmini alınıyor…</p>';
       const T = await yolHavasi(sehir ? sehir[2] : 41.01, sehir ? sehir[3] : 28.97, gun);
       const P = planla({ km, gidisDonus: yol === 2, T: T ?? M.ogrenme?.bugunT, M, katsayi: hiz[1], lpgKatsayi: hiz[2] });
       const hedefAd = sehir ? sehir[0] : 'Varış';
@@ -309,6 +309,7 @@ function openYolculuk(M) {
           <small>${esc(n.ust)}</small><i>${n.tur === 'dc' ? icon('bolt') : ''}</i><b>${n.alt}</b></div>`).join('')}
       </div>`;
       const dc = Number(M.car.public_tl) || 12;
+      out.dataset.dolu = '1';
       out.innerHTML = `
         <div class="yp-ana"><span>${baslik}</span><b>%${num(P.basla)}</b></div>
         ${alt ? `<p class="kr-not" style="margin:2px 0 0">${alt}</p>` : ''}
@@ -321,7 +322,7 @@ function openYolculuk(M) {
           <div><b>${num(P.evTl)} / ${num(P.dcTl)}</b><span>ev / DC ₺</span></div>
           <div><b>${num(P.lpgTl)} ₺</b><span>LPG'li araçla</span></div>
         </div>
-        <p class="kr-not yp-not">Tüketimin ${num(P.temel, 1)} → ${hiz[0]} km/sa'te ${num(P.c, 1)} · durağa %${YEDEK} ile (${num(P.yedekKm)} km yedek) · DC ${num(dc, 2)} ₺, 150 kW</p>`;
+        <p class="kr-not yp-not" data-son>Tüketimin ${num(P.temel, 1)} → ${hiz[0]} km/sa'te ${num(P.c, 1)} · durağa %${YEDEK} ile (${num(P.yedekKm)} km yedek) · DC ${num(dc, 2)} ₺, 150 kW</p>`;
     };
     sh.querySelectorAll('#yp-y button').forEach((b) => b.addEventListener('click', () => {
       yol = Number(b.dataset.y);
@@ -330,7 +331,7 @@ function openYolculuk(M) {
     }));
     for (const id of ['#yp-s', '#yp-t', '#yp-h']) sh.querySelector(id).addEventListener('change', hesap);
     sh.querySelector('#yp-km').addEventListener('change', hesap);
-    hesap();
+    setTimeout(hesap, 340);                                      // açılış kayması bitince (takılmasın)
   });
 }
 

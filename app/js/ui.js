@@ -69,8 +69,8 @@ const _AY_EK = [['ta', 'tan'], ['ta', 'tan'], ['ta', 'tan'], ['da', 'dan'], ['ta
   ['da', 'dan'], ['ta', 'tan'], ['de', 'den'], ['de', 'den'], ['da', 'dan'], ['ta', 'tan']];
 export const ayDa = (i) => `${AYLAR[i]}'${_AY_EK[i][0]}`;
 export const ayDan = (i) => `${AYLAR[i]}'${_AY_EK[i][1]}`;
-// Uygulama sürümü (yayında sw.js CACHE ile aynı tutulur: 'evenerji-v10.1')
-export const SURUM = 'v10.1';
+// Uygulama sürümü (yayında sw.js CACHE ile aynı tutulur: 'evenerji-v10.2')
+export const SURUM = 'v10.2';
 export const AY_K =['Oca', 'Şub', 'Mar', 'Nis', 'May', 'Haz', 'Tem', 'Ağu', 'Eyl', 'Eki', 'Kas', 'Ara'];
 export const GUN_K = ['Paz', 'Pzt', 'Sal', 'Çar', 'Per', 'Cum', 'Cmt'];
 export const iso = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
@@ -136,9 +136,10 @@ export function openSheet(html, onMount) {
   sh.addEventListener('touchmove', move, { passive: false });
   sh.addEventListener('touchend', end);
   sh.addEventListener('touchcancel', end);
-  requestAnimationFrame(() => { bg.classList.add('open'); sh.classList.add('open'); });
   hydrateIcons(sh);
   onMount && onMount(sh);
+  // İki kare bekle: başlangıç konumu kesin çizilsin, kayma animasyonu baştan akıcı başlasın
+  requestAnimationFrame(() => requestAnimationFrame(() => { bg.classList.add('open'); sh.classList.add('open'); }));
   return sh;
 }
 export function closeSheet(instant = false) {

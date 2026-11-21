@@ -18,7 +18,15 @@ const DC_KW = 150;                     // DC şarj gücü (kullanıcı: 150 kW i
 const DC_HEDEF = 80;                   // yolda DC'de %80'e kadar (üstü yavaş)
 
 // Varış yeri ve İstanbul için o günün ortalama sıcaklığı (Open-Meteo, en çok 16 gün ileri)
+const havaBellek = new Map();                                     // aynı gün/şehir için tekrar ağa gitme
 export async function yolHavasi(lat, lon, gun) {
+  const anahtar = `${lat},${lon},${gun}`;
+  if (havaBellek.has(anahtar)) return havaBellek.get(anahtar);
+  const T = await yolHavasiAg(lat, lon, gun);
+  if (T != null) havaBellek.set(anahtar, T);
+  return T;
+}
+async function yolHavasiAg(lat, lon, gun) {
   const url = (la, lo) => `https://api.open-meteo.com/v1/forecast?latitude=${la}&longitude=${lo}&daily=temperature_2m_mean&timezone=Europe%2FIstanbul&start_date=${gun}&end_date=${gun}`;
   try {
     const [a, b] = await Promise.all([fetch(url(41.01, 28.97)), fetch(url(lat, lon))].map((p) => p.then((r) => r.json())));

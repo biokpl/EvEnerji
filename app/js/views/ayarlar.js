@@ -59,7 +59,7 @@ export function renderAyarlar(el, M, app) {
 
     <div class="card">
       <h2>Araç</h2>
-      <div class="field"><div><label for="bk">Batarya (kWh)</label><small>T10X Uzun Menzil 88,5 · Standart 52,4</small></div><input class="input num" id="bk" inputmode="decimal" value="${f(car.battery_kwh)}"></div>
+      <div class="field"><div><label for="bk">Batarya (kWh)</label><small>T10X Uzun Menzil LFP 89,6 kWh</small></div><input class="input num" id="bk" inputmode="decimal" value="${f(car.battery_kwh)}"></div>
       <div class="field"><div><label for="ef">Şarj verimi (%)</label><small>${car.learnedEff
         ? `Ölçülen: <b>%${num(car.learnedEff * 100)}</b> (${car.learnedN} şarjdan, bu kullanılıyor). Bitiş yüzdesi girdikçe güncellenir.`
         : 'Duvardan çekilenin bataryaya giden payı (Mode-2 AC ≈ %88–92). Şarjlara başlangıç ve bitiş yüzdesi girersen gerçek değer öğrenilir.'}</small></div><input class="input num" id="ef" inputmode="numeric" value="${Math.round(car.efficiency * 100)}"></div>
@@ -169,7 +169,7 @@ export function renderAyarlar(el, M, app) {
   };
   $('#saveC').onclick = () => save('settings/car', {
     ...(M.S.car || {}),   // batarya kimyası gibi formda olmayan alanlar korunur
-    battery_kwh: n($('#bk').value) || 88.5, efficiency: Math.min(1, (n($('#ef').value) || 90) / 100), public_tl: n($('#pt').value) || 12, public_tl_tam: n($('#pt2').value) || 14.9,
+    battery_kwh: n($('#bk').value) || 89.6, efficiency: Math.min(1, (n($('#ef').value) || 90) / 100), public_tl: n($('#pt').value) || 12, public_tl_tam: n($('#pt2').value) || 14.9,
     lpg_tl: n($('#lp').value) || 50.7, lpg_l100: n($('#lpt').value) || 10,
     hedef_yuzde: Math.min(100, Math.max(10, n($('#hy').value) || 100)),
     tuketim_kwh_100: Math.min(60, Math.max(8, n($('#tk').value) || 19)),

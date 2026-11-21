@@ -101,7 +101,7 @@ export function buildDemo(now = new Date()) {
     settings: {
       tariff: { [y]: { limit_kwh: 4000, normal_tl: 3.24, sktt_tl: 6.49, onceki_yil_kwh: 3610 }, [y + 1]: { limit_kwh: 3000 } },
       alerts: { esikler: [70, 85, 95] },
-      car: { battery_kwh: 88.5, efficiency: 0.9 },
+      car: { battery_kwh: 89.6, efficiency: 0.9 },
     },
     status: { ts, devices: 3, host: 'demo', ntfy: 'EvEnerji-demo' },
     discovered: { gunsan_priz_2: { name: 'Günsan Priz 2', product: 'Günsan Akıllı Priz 16A', category: 'cz', provider: 'tuya' } },

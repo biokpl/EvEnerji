@@ -63,7 +63,7 @@ export const OTOYOL_KATSAYI = 1.12;    // varsayılan 110 km/sa: öğrenilen kar
 export const HIZLAR = [[90, 1.0, 1.0], [110, 1.12, 1.08], [120, 1.22, 1.15], [130, 1.34, 1.23], [140, 1.47, 1.32]];
 export const YEDEK = 20;               // durağa ve varışa en az %20 ile (otoyolda ≈ 75 km yedek; istasyon dolu/arızalıysa sonrakine yeter)
 const DC_KW = 150;                     // DC şarj gücü (kullanıcı: 150 kW ile hesapla; bağlanınca şarj hemen başlıyor)
-const DC_HEDEF = 80;                   // yolda DC'de %80'e kadar (üstü yavaş)
+const DC_HEDEF = 85;                   // yolda DC'de en çok %85 (üstünde şarj yavaşlıyor)
 
 // Varış yeri ve İstanbul için o günün ortalama sıcaklığı (Open-Meteo, en çok 16 gün ileri)
 const havaBellek = new Map();                                     // aynı gün/şehir için tekrar ağa gitme
@@ -86,7 +86,7 @@ async function yolHavasiAg(lat, lon, gun, kLat, kLon) {
 // km: tek yön; gidisDonus: dönüşte varışta şarj yok sayılır; katsayi: hız seçimi
 export function planla({ km, gidisDonus, T, M, katsayi = OTOYOL_KATSAYI, lpgKatsayi = 1.08, dcFiyat = null, baslaSoc = null }) {
   const LPG_110 = 1.08;                                                         // tablodaki 110 km/sa katsayısı
-  const car = M.car, cap = Number(car.battery_kwh) || 88.5, eff = M.carEff || 0.87;
+  const car = M.car, cap = Number(car.battery_kwh) || 89.6, eff = M.carEff || 0.87;
   const O = M.ogrenme;
   const temel = O?.model ? O.model.tahmin(T) : M.aracTuketim;
   const c = temel * katsayi;                                                    // kWh/100 km

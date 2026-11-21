@@ -306,7 +306,7 @@ function openYolculuk(M) {
       const hedefAd = elle ? 'Varış' : nereye;
       // Şarj: şu anki yüzdeden çıkış yüzdesine; en geç ne zaman takılmalı (çıkış 08:00)
       const A = M.activeSession?.socNow != null ? { soc: M.activeSession.socNow } : M.aracSimdi ? { soc: M.aracSimdi.soc } : null;
-      const cap = Number(M.car.battery_kwh) || 88.5;
+      const cap = Number(M.car.battery_kwh) || 89.6;
       const eksik = A ? Math.max(0, P.hedefBasla - A.soc) : null;
       const kwhPriz = A ? (eksik / 100) * cap / (M.carEff || 0.87) : null;
       const kw = Math.max(1, (M.sessions.find((x) => x.peak_w)?.peak_w || 1900) / 1000);

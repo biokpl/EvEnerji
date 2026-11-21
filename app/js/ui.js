@@ -22,6 +22,7 @@ const P = {
   key: '<circle cx="7.5" cy="15.5" r="4.5"/><path d="m10.7 12.3 9.8-9.8M17 6l3 3M14.5 8.5l2 2"/>',
   lock: '<rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/>',
   clock: '<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>',
+  thermo: '<path d="M14 14.8V5a2 2 0 0 0-4 0v9.8a4 4 0 1 0 4 0Z"/><path d="M12 10v7"/>',
   coin: '<circle cx="12" cy="12" r="9"/><path d="M14.8 9.2A3 3 0 0 0 12 8c-1.7 0-3 .9-3 2s1.3 1.7 3 2 3 .9 3 2-1.3 2-3 2a3 3 0 0 1-2.8-1.2M12 6.5v11"/>',
   tv: '<rect x="3" y="5" width="18" height="12" rx="2"/><path d="M8 21h8M12 17v4"/>',
   fridge: '<rect x="5" y="2.5" width="14" height="19" rx="2"/><path d="M5 10h14M9 6v2M9 13v3"/>',
@@ -70,7 +71,7 @@ const _AY_EK = [['ta', 'tan'], ['ta', 'tan'], ['ta', 'tan'], ['da', 'dan'], ['ta
 export const ayDa = (i) => `${AYLAR[i]}'${_AY_EK[i][0]}`;
 export const ayDan = (i) => `${AYLAR[i]}'${_AY_EK[i][1]}`;
 // Uygulama sürümü (yayında sw.js CACHE ile aynı tutulur: 'evenerji-v10.5')
-export const SURUM = 'v10.6';
+export const SURUM = 'v10.7';
 export const AY_K =['Oca', 'Şub', 'Mar', 'Nis', 'May', 'Haz', 'Tem', 'Ağu', 'Eyl', 'Eki', 'Kas', 'Ara'];
 export const GUN_K = ['Paz', 'Pzt', 'Sal', 'Çar', 'Per', 'Cum', 'Cmt'];
 export const iso = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;

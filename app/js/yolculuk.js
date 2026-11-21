@@ -84,7 +84,7 @@ async function yolHavasiAg(lat, lon, gun, kLat, kLon) {
 }
 
 // km: tek yön; gidisDonus: dönüşte varışta şarj yok sayılır; katsayi: hız seçimi
-export function planla({ km, gidisDonus, T, M, katsayi = OTOYOL_KATSAYI, lpgKatsayi = 1.08, dcFiyat = null }) {
+export function planla({ km, gidisDonus, T, M, katsayi = OTOYOL_KATSAYI, lpgKatsayi = 1.08, dcFiyat = null, baslaSoc = null }) {
   const LPG_110 = 1.08;                                                         // tablodaki 110 km/sa katsayısı
   const car = M.car, cap = Number(car.battery_kwh) || 88.5, eff = M.carEff || 0.87;
   const O = M.ogrenme;
@@ -94,20 +94,22 @@ export function planla({ km, gidisDonus, T, M, katsayi = OTOYOL_KATSAYI, lpgKats
   const kwh = (topKm * c) / 100;
   const kullan = (kwh / cap) * 100;                                             // yolculuğun yüzdesi
   const yuzdeKm = (yuzde) => ((yuzde / 100) * cap / c) * 100;                   // bu kadar yüzdeyle gidilen km
-  const basla = Math.min(100, Math.ceil((kullan + YEDEK) / 5) * 5);
+  const hedefBasla = Math.min(100, Math.ceil((kullan + YEDEK) / 5) * 5);     // çıkışta olması gereken
+  // Çıkışa kadar hedefe yetişemiyorsa plan gerçekte ulaşılacak yüzdeyle başlar (eksik DC durağıyla kapanır)
+  const basla = baslaSoc != null ? Math.max(0, Math.min(hedefBasla, baslaSoc)) : hedefBasla;
   // Durak durak: %YEDEK'e inince dur, kalan yola yetecek kadar (en çok %DC_HEDEF) şarj et
   const duraklar = [];
   let soc = basla, gidilen = 0;
-  if (kullan + 5 > 100) {                                                       // %100'le de yetmiyor
+  {                                                                             // başlangıç yetmiyorsa durak durak
     for (let i = 0; i < 12; i++) {
-      const menzil = yuzdeKm(soc - YEDEK);
+      const menzil = Math.max(0, yuzdeKm(soc - YEDEK));
       if (gidilen + menzil >= topKm) break;
       if (gidilen + yuzdeKm(soc - 12) >= topKm) break;                       // birkaç km için durma: varışta %12+ kalır
       gidilen += menzil;
       const kalan = ((topKm - gidilen) * c / 100 / cap) * 100;                 // kalan yolun yüzdesi
       const hedef = Math.min(DC_HEDEF, Math.ceil((kalan + YEDEK) / 5) * 5);
-      const bat = ((hedef - YEDEK) / 100) * cap;
-      duraklar.push({ km: gidilen, bas: YEDEK, son: hedef, kwh: bat / 0.95, dk: Math.max(1, Math.round((bat / DC_KW) * 60)) });
+      const bas = Math.min(soc, YEDEK), bat = ((hedef - bas) / 100) * cap;
+      duraklar.push({ km: gidilen, bas, son: hedef, kwh: bat / 0.95, dk: Math.max(1, Math.round((bat / DC_KW) * 60)) });
       soc = hedef;
     }
   }
@@ -121,6 +123,6 @@ export function planla({ km, gidisDonus, T, M, katsayi = OTOYOL_KATSAYI, lpgKats
   const sonSoc = soc - (((topKm - gidilen) * c / 100) / cap) * 100;             // yolculuk sonunda
   const tekYonSoc = gidisDonus ? null : sonSoc;
   const varis = gidisDonus ? (duraklar.length ? null : basla - (((km * c) / 100) / cap) * 100) : sonSoc;
-  return { c, temel, topKm, kwh, basla, varis, donus: gidisDonus ? sonSoc : null, dcDurak: duraklar.length, duraklar, dcKwh,
+  return { c, temel, topKm, kwh, basla, hedefBasla, varis, donus: gidisDonus ? sonSoc : null, dcDurak: duraklar.length, duraklar, dcKwh,
     menzil: yuzdeKm(100 - YEDEK), yedekKm: yuzdeKm(YEDEK), molaDk: duraklar.reduce((t, d) => t + d.dk, 0), tl: evTl + dcTl, evTl, evKwhCek, evBirim, dcTl, lpgTl, lpgL100, T, tekYonSoc };
 }

@@ -301,23 +301,30 @@ function openYolculuk(M) {
       const hiz = HIZLAR[Number(sh.querySelector('#yp-h').value)];
       if (!out.dataset.dolu) out.innerHTML = '<p class="kr-not" style="margin:0">Hava tahmini alınıyor…</p>';
       const T = await yolHavasi(varisK[0], varisK[1], gun, kalkis[0], kalkis[1]);
-      const P = planla({ km, gidisDonus: yol === 2, T: T ?? M.ogrenme?.bugunT, M, katsayi: hiz[1], lpgKatsayi: hiz[2], dcFiyat: dcTur === 'tam' ? (Number(M.car.public_tl_tam) || 14.98) : (Number(M.car.public_tl) || 12) });
+      const planOpt = { km, gidisDonus: yol === 2, T: T ?? M.ogrenme?.bugunT, M, katsayi: hiz[1], lpgKatsayi: hiz[2], dcFiyat: dcTur === 'tam' ? (Number(M.car.public_tl_tam) || 14.98) : (Number(M.car.public_tl) || 12) };
+      let P = planla(planOpt);
       const hedefAd = elle ? 'Varış' : nereye;
       // Şarj: şu anki yüzdeden çıkış yüzdesine; en geç ne zaman takılmalı (çıkış 08:00)
       const A = M.activeSession?.socNow != null ? { soc: M.activeSession.socNow } : M.aracSimdi ? { soc: M.aracSimdi.soc } : null;
       const cap = Number(M.car.battery_kwh) || 88.5;
-      const eksik = A ? Math.max(0, P.basla - A.soc) : null;
+      const eksik = A ? Math.max(0, P.hedefBasla - A.soc) : null;
       const kwhPriz = A ? (eksik / 100) * cap / (M.carEff || 0.87) : null;
       const kw = Math.max(1, (M.sessions.find((x) => x.peak_w)?.peak_w || 1900) / 1000);
       const saat = A ? kwhPriz / kw : null;
       const cikisSaat = sh.querySelector('#yp-saat').value || '08:00';
+      const hm2c = (d) => d.toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' });
       const cikis = new Date(`${gun}T${cikisSaat}:00`), tak = A ? new Date(cikis.getTime() - saat * 3600e3) : null;
+      // Yetişmiyorsa: şimdi takılırsa çıkışa kadar ulaşılacak yüzde; plan bu yüzdeyle yeniden kurulur
+      const kalanSaat = Math.max(0, (cikis - Date.now()) / 3600e3);
+      const yetismez = A && eksik > 0.5 && tak < new Date();
+      if (yetismez) P = planla({ ...planOpt, baslaSoc: Math.floor(Math.min(P.hedefBasla, A.soc + (kalanSaat * kw * (M.carEff || 0.87) / cap) * 100)) });
       const buyuk = (t) => t.charAt(0).toLocaleUpperCase('tr-TR') + t.slice(1);
       const baslik = !A ? `${buyuk(new Date(cikis - 864e5).toLocaleDateString('tr-TR', { weekday: 'long' }))} akşamı şarj et`
         : eksik <= 0.5 ? 'Ek şarj gerekmiyor'
           : tak < new Date() ? 'Hemen şarja tak'
             : `${buyuk(tak.toLocaleDateString('tr-TR', { weekday: 'long' }))} ${tak.toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' })}'de şarja tak`;
-      const alt = A && eksik > 0.5 ? `Şu an %${num(A.soc)} · evde ${num(kwhPriz)} kWh · ${saat >= 1 ? `${Math.round(saat)} saat` : `${Math.round(saat * 60)} dk`}` : A ? `Şu an %${num(A.soc)}` : '';
+      const alt = yetismez ? `Şu an %${num(A.soc)} → ${hm2c(cikis)}'de %${num(P.basla)} · %${num(P.hedefBasla)} için ${saat >= 1 ? `${Math.round(saat)} saat` : `${Math.round(saat * 60)} dk`} gerekiyor`
+        : A && eksik > 0.5 ? `Şu an %${num(A.soc)} · evde ${num(kwhPriz)} kWh · ${saat >= 1 ? `${Math.round(saat)} saat` : `${Math.round(saat * 60)} dk`}` : A ? `Şu an %${num(A.soc)}` : '';
       // Saatler: ortalama hız seçilen hızın %85'i (şehir çıkışı, yavaşlama); DC molaları eklenir
       const ortHiz = hiz[0] * 0.85;
       const saatAt = (k) => new Date(cikis.getTime() + (k / ortHiz) * 3600e3
@@ -326,7 +333,6 @@ function openYolculuk(M) {
       const varisT = saatAt(km);                                       // varış (gidiş-dönüşte dönüş noktası)
       const sureDk = Math.round((varisT - cikis) / 60e3);
       const sureYaz = (dk) => `${Math.floor(dk / 60)} sa ${dk % 60} dk`;
-      const tekMola = P.duraklar.filter((d) => d.km < km).reduce((t, d) => t + d.dk, 0);
       const gunFarki = varisT.toDateString() !== cikis.toDateString() ? ' (ertesi gün)' : '';
       // Rota şeridi: başlangıç, DC durakları, (dönüş noktası), varış
       const pos = (k) => Math.min(100, Math.max(0, (k / P.topKm) * 100));
@@ -336,6 +342,8 @@ function openYolculuk(M) {
         ...(yol === 2 ? [{ k: km, ad: hedefAd, ust: hm2(varisT), alt: P.varis != null ? `%${num(P.varis)}` : '', tur: 'don' }] : []),
         { k: P.topKm, ad: yol === 2 ? nereden : hedefAd, ust: yol === 2 ? '' : hm2(varisT), alt: `%${num(yol === 2 ? P.donus : P.varis)}`, tur: 'son' },
       ];
+      // Şehir noktasına çok yakın DC durağının saati şehrin saatiyle çakışmasın
+      for (const n of noktalar) if (n.tur === 'dc' && noktalar.some((o) => o.tur !== 'dc' && Math.abs(pos(o.k) - pos(n.k)) < 9)) n.ust = '';
       const serit = `<div class="yp-rota">
         <div class="yp-cizgi"></div>
         ${noktalar.map((n) => `<div class="yp-n ${n.tur}${pos(n.k) > 88 ? ' sag' : pos(n.k) < 12 ? ' sol' : ''}" style="left:${pos(n.k).toFixed(1)}%">
@@ -347,9 +355,9 @@ function openYolculuk(M) {
         <div class="yp-ana"><span>${baslik}</span><b>%${num(P.basla)}</b></div>
         ${alt ? `<p class="kr-not" style="margin:2px 0 0">${alt}</p>` : ''}
         ${serit}
-        <div class="yp-sure">${icon('clock')}<span><b>${hm2(cikis)} → ${hm2(varisT)}</b>${gunFarki} · ${yol === 2 ? 'tek yön ' : ''}${sureYaz(sureDk)}${tekMola ? ` <small>· ${tekMola} dk mola dahil</small>` : ''}</span></div>
+        <div class="yp-sure">${icon('clock')}<span><b>${hm2(cikis)} → ${hm2(varisT)}</b>${gunFarki} · ${yol === 2 ? 'tek yön ' : ''}${sureYaz(sureDk)}${(() => { const m = P.duraklar.filter((d) => d.km < km).reduce((t, d) => t + d.dk, 0); return m ? ` <small>· ${m} dk mola dahil</small>` : ''; })()}</span>${T != null ? `<em class="yp-hava" title="Yol boyu ortalama sıcaklık">${icon('thermo')}${num(T, 0)}°</em>` : ''}</div>
         <div class="yp-izgara">
-          <div><b>${num(P.topKm)} km${mesafeNot ? '*' : ''}</b><span>${T != null ? `${num(T, 0)} °C · ` : ''}${num(P.c, 1)} kWh/100</span></div>
+          <div><b>${num(P.topKm)} km${mesafeNot ? '*' : ''}</b><span>${num(P.c, 1)} kWh/100 km</span></div>
           <div><b>${num(P.menzil)} km</b><span>otoyol menzili</span></div>
           <div><b>${P.dcDurak ? `${P.molaDk} dk` : 'Yok'}</b><span>${P.dcDurak ? `${P.dcDurak} DC molası` : 'DC molası'}</span></div>
           <div class="yesil"><b>${num(P.tl)} ₺</b><span>Toplam Masraf</span></div>

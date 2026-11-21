@@ -1026,3 +1026,17 @@ input.num, input[data-m] { caret-color: transparent; cursor: pointer; }
 .yp-rota { height: 88px; }
 .yp-cizgi { top: 42px; }
 .yp-n small.ad { color: var(--text); opacity: .9; }
+
+/* Yolculuk: süre satırının sağında yol sıcaklığı */
+.yp-sure > span { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.yp-hava { display: inline-flex; align-items: center; gap: 3px; flex: none; margin-left: auto; padding: 2px 7px 2px 5px; border-radius: 999px; font-style: normal;
+  font-size: 12px; font-weight: 800; color: var(--text); background: color-mix(in srgb, var(--text) 8%, transparent); font-variant-numeric: tabular-nums; }
+.yp-sure .yp-hava svg { width: 13px; height: 13px; color: #f59e0b; }
+.yp-sure { gap: 6px; padding: 7px 8px 7px 10px; }
+.yp-sure small { font-size: 10px; letter-spacing: -.01em; }
+.yp-hava { padding: 2px 6px 2px 4px; font-size: 11.5px; }
+.yp-sure { gap: 5px; padding: 7px 7px 7px 9px; font-size: 12px; }
+.yp-sure small { font-size: 9.5px; }
+.yp-sure > svg { width: 14px; height: 14px; }
+.yp-sure > span { white-space: normal; overflow: visible; line-height: 1.3; }
+.yp-sure small { white-space: nowrap; }

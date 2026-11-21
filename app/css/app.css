@@ -1011,3 +1011,13 @@ input.num, input[data-m] { caret-color: transparent; cursor: pointer; }
 .yp-sonuc { min-height: 318px; }   /* açılırken yükseklik sabit kalsın */
 .yp-izgara .yp-ikili b { font-size: 12.5px; letter-spacing: -.02em; }
 .yp-izgara .lpg b { color: var(--mid); }   /* LPG: km başı maliyet kartındaki LPG rengiyle aynı */
+
+/* Yolculuk: çıkış günü + saati, süre satırı */
+.yp-tarih { display: grid; grid-template-columns: minmax(0, 1fr) 66px; gap: 4px; }
+.yp-tarih .input { font-size: 13px; padding: 0 6px; }
+.yp-sure { display: flex; align-items: center; gap: 7px; margin-top: 8px; padding: 7px 10px; border-radius: 12px; font-size: 12.5px; font-weight: 700; color: var(--muted);
+  background: color-mix(in srgb, var(--ev) 10%, transparent); box-shadow: inset 0 0 0 .5px color-mix(in srgb, var(--ev) 35%, transparent); }
+.yp-sure svg { width: 15px; height: 15px; flex: none; color: var(--ev); }
+.yp-sure b { color: var(--text); font-weight: 800; font-variant-numeric: tabular-nums; }
+.yp-sure small { font-size: 11px; font-weight: 600; }
+.yp-n.dc small { color: var(--text); opacity: .75; }

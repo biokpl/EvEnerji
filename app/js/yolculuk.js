@@ -8,8 +8,13 @@ export const SEHIRLER = [
   ['Balıkesir', 260, 39.65, 27.88], ['Çanakkale', 320, 40.15, 26.41], ['Eskişehir', 320, 39.78, 30.52],
   ['Ankara', 450, 39.93, 32.86], ['İzmir', 470, 38.42, 27.14], ['Bodrum', 690, 37.03, 27.43],
 ];
-export const OTOYOL_KATSAYI = 1.2;     // 110–120 km/sa'te tüketim şehir/karma sürüşe göre ≈ %20 fazla
-const YEDEK = 15;                      // varışta en az %15 kalsın
+export const OTOYOL_KATSAYI = 1.12;    // varsayılan 110 km/sa: öğrenilen karma tüketimden ≈ %12 fazla
+// Hız seçimi: hava direnci hızın karesiyle artar. [hız, elektrikli katsayı, LPG katsayı]
+// Elektrikli: öğrenilen karma tüketim temel. LPG: kullanıcının ortalaması (41 L / 410 km, Ayarlar) 110 km/sa kabul;
+// motor yük arttıkça biraz verimlendiği için oransal artış elektrikliden az.
+export const HIZLAR = [[90, 1.0, 1.0], [110, 1.12, 1.08], [120, 1.22, 1.15], [130, 1.34, 1.23], [140, 1.47, 1.32]];
+export const YEDEK = 20;               // durağa ve varışa en az %20 ile (otoyolda ≈ 75 km yedek; istasyon dolu/arızalıysa sonrakine yeter)
+const DC_KW = 105;                     // %20→%80 arası ortalama DC şarj gücü (150 kW+ istasyonda; T10X ≈ 28–32 dk)
 const DC_HEDEF = 80;                   // yolda DC'de %80'e kadar (üstü yavaş)
 
 // Varış yeri ve İstanbul için o günün ortalama sıcaklığı (Open-Meteo, en çok 16 gün ileri)
@@ -22,26 +27,44 @@ export async function yolHavasi(lat, lon, gun) {
   } catch { return null; }
 }
 
-// km: tek yön; gidisDonus: dönüşte varışta şarj yok sayılır
-export function planla({ km, gidisDonus, T, M }) {
+// km: tek yön; gidisDonus: dönüşte varışta şarj yok sayılır; katsayi: hız seçimi
+export function planla({ km, gidisDonus, T, M, katsayi = OTOYOL_KATSAYI, lpgKatsayi = 1.08 }) {
+  const LPG_110 = 1.08;                                                         // tablodaki 110 km/sa katsayısı
   const car = M.car, cap = Number(car.battery_kwh) || 88.5, eff = M.carEff || 0.87;
   const O = M.ogrenme;
-  const c = (O?.model ? O.model.tahmin(T) : M.aracTuketim) * OTOYOL_KATSAYI;   // kWh/100 km
+  const temel = O?.model ? O.model.tahmin(T) : M.aracTuketim;
+  const c = temel * katsayi;                                                    // kWh/100 km
   const topKm = km * (gidisDonus ? 2 : 1);
   const kwh = (topKm * c) / 100;
   const kullan = (kwh / cap) * 100;                                             // yolculuğun yüzdesi
-  const gerekYuzde = kullan + YEDEK;
-  const basla = Math.min(100, Math.ceil(gerekYuzde / 5) * 5);                   // 5'in katına yuvarla
-  // %100'le çıkınca en az %5 kalıyorsa DC gerekmez (yedek biraz azalır); yoksa eksik DC'de tamamlanır
-  const eksik = kullan + 5 <= 100 ? 0 : Math.max(0, gerekYuzde - 100);
-  const dcKwh = (eksik / 100) * cap / 0.95;                                     // DC kaybı ≈ %5
-  const dcDurak = eksik > 0 ? Math.ceil(eksik / (DC_HEDEF - YEDEK)) : 0;
-  const evKwh = ((Math.min(100, gerekYuzde) / 100) * cap) / eff;                // evden çekilecek (kabaca)
-  const evTl = ((kwh - (eksik / 100) * cap) / eff) * M.toggAyBirim(M.mi);
+  const yuzdeKm = (yuzde) => ((yuzde / 100) * cap / c) * 100;                   // bu kadar yüzdeyle gidilen km
+  const basla = Math.min(100, Math.ceil((kullan + YEDEK) / 5) * 5);
+  // Durak durak: %YEDEK'e inince dur, kalan yola yetecek kadar (en çok %DC_HEDEF) şarj et
+  const duraklar = [];
+  let soc = basla, gidilen = 0;
+  if (kullan + 5 > 100) {                                                       // %100'le de yetmiyor
+    for (let i = 0; i < 12; i++) {
+      const menzil = yuzdeKm(soc - YEDEK);
+      if (gidilen + menzil >= topKm) break;
+      if (gidilen + yuzdeKm(soc - 12) >= topKm) break;                       // birkaç km için durma: varışta %12+ kalır
+      gidilen += menzil;
+      const kalan = ((topKm - gidilen) * c / 100 / cap) * 100;                 // kalan yolun yüzdesi
+      const hedef = Math.min(DC_HEDEF, Math.ceil((kalan + YEDEK) / 5) * 5);
+      const bat = ((hedef - YEDEK) / 100) * cap;
+      duraklar.push({ km: gidilen, bas: YEDEK, son: hedef, kwh: bat / 0.95, dk: Math.round((bat / DC_KW) * 60 + 4) });   // +4 dk bağlanma
+      soc = hedef;
+    }
+  }
+  const dcKwh = duraklar.reduce((t, d) => t + d.kwh, 0);
+  const dcBat = dcKwh * 0.95;
+  const evBirim = M.toggAyBirim(M.mi), evKwhCek = (kwh - dcBat) / eff;          // evden çekilen (şarj kaybı dahil)
+  const evTl = evKwhCek * evBirim;
   const dcTl = dcKwh * (Number(car.public_tl) || 12);
-  const lpgTl = (topKm * (Number(car.lpg_l100) || 10) / 100) * (Number(car.lpg_tl) || 50.7);
-  const tekYon = (((km * c) / 100) / cap) * 100;
-  const varis = eksik ? Math.max(YEDEK, basla - tekYon) : basla - tekYon;
-  const donus = gidisDonus ? (eksik ? YEDEK : basla - kullan) : null;
-  return { c, topKm, kwh, basla, varis, donus, dcDurak, dcKwh, evKwh, tl: evTl + dcTl, evTl, dcTl, lpgTl, T };
+  const lpgL100 = (Number(car.lpg_l100) || 10) * (lpgKatsayi / LPG_110);           // ortalama 110 km/sa kabul
+  const lpgTl = (topKm * lpgL100 / 100) * (Number(car.lpg_tl) || 50.7);
+  const sonSoc = soc - (((topKm - gidilen) * c / 100) / cap) * 100;             // yolculuk sonunda
+  const tekYonSoc = gidisDonus ? null : sonSoc;
+  const varis = gidisDonus ? (duraklar.length ? null : basla - (((km * c) / 100) / cap) * 100) : sonSoc;
+  return { c, temel, topKm, kwh, basla, varis, donus: gidisDonus ? sonSoc : null, dcDurak: duraklar.length, duraklar, dcKwh,
+    menzil: yuzdeKm(100 - YEDEK), yedekKm: yuzdeKm(YEDEK), molaDk: duraklar.reduce((t, d) => t + d.dk, 0), tl: evTl + dcTl, evTl, evKwhCek, evBirim, dcTl, lpgTl, lpgL100, T, tekYonSoc };
 }

@@ -956,3 +956,13 @@ input.num, input[data-m] { caret-color: transparent; cursor: pointer; }
   filter: drop-shadow(0 0 2px color-mix(in srgb, var(--tc) 90%, transparent)) drop-shadow(0 0 6px color-mix(in srgb, var(--tc) 65%, transparent)); }
 :root[data-theme="light"] .tk-halka .dolu { stroke: var(--tc);
   filter: drop-shadow(0 0 2px color-mix(in srgb, var(--tc) 70%, transparent)) drop-shadow(0 0 5px color-mix(in srgb, var(--tc) 45%, transparent)); }
+
+.yp-durak { display: flex; flex-direction: column; gap: 1px; margin: 6px 0 0 10px; padding-left: 10px; border-left: 2px solid color-mix(in srgb, var(--mid) 60%, transparent); font-size: 11.5px; font-weight: 700; color: var(--muted); }
+.yp-durak span:first-child { color: var(--text); font-weight: 800; }
+
+.yp-masraf { flex-direction: row; justify-content: space-between; border-left-color: color-mix(in srgb, var(--good) 55%, transparent); }
+.yp-masraf span:first-child { color: var(--muted); font-weight: 700; }
+.yp-masraf span:last-child { color: var(--text); font-weight: 800; }
+
+.yp-uc { margin-top: 10px; padding: 8px 0 2px; border-top: 1px solid var(--line); }
+.yp-uc b { font-size: 16px; }

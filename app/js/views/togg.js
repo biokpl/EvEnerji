@@ -3,7 +3,7 @@ import { axisStyle, colors, mount } from '../charts.js';
 import { AYLAR, AY_K, GUN_K, closeSheet, dur, esc, hm, icon, kwh, num, openSheet, pct, tl, toast, watt } from '../ui.js';
 import { chargeCard } from './pano.js';
 import { BAKIM_AY, BAKIM_KM, takvim, tkIkon } from '../takvim.js';
-import { OTOYOL_KATSAYI, SEHIRLER, planla, yolHavasi } from '../yolculuk.js';
+import { HIZLAR, SEHIRLER, YEDEK, planla, yolHavasi } from '../yolculuk.js';
 
 let showAll = false;
 
@@ -265,6 +265,8 @@ function openYolculuk(M) {
     <div class="field"><div><label for="yp-t">Gidiş günü</label></div><input class="input" type="date" id="yp-t" value="${gun0}"></div>
     <div class="field"><div><label for="yp-y">Yol</label></div>
       <select class="input" id="yp-y"><option value="1" selected>Tek yön</option><option value="2">Gidiş-dönüş (orada şarj yok)</option></select></div>
+    <div class="field"><div><label for="yp-h">Otoyol hızı</label></div>
+      <select class="input" id="yp-h">${HIZLAR.map(([h], i) => `<option value="${i}"${h === 110 ? ' selected' : ''}>${h} km/sa</option>`).join('')}</select></div>
     <div id="yp-sonuc" class="kr-cam yp-sonuc"><p class="kr-not" style="margin:0">Hesaplanıyor…</p></div>
     <div class="btn-row" style="margin-top:14px"><button class="btn ghost" id="cancel">Kapat</button></div>`, (sh) => {
     sh.querySelector('#cancel').onclick = () => closeSheet();
@@ -278,24 +280,43 @@ function openYolculuk(M) {
       const gun = sh.querySelector('#yp-t').value || gun0;
       out.innerHTML = '<p class="kr-not" style="margin:0">Hava tahmini alınıyor…</p>';
       const T = await yolHavasi(sehir ? sehir[2] : 41.01, sehir ? sehir[3] : 28.97, gun);
-      const P = planla({ km, gidisDonus: sh.querySelector('#yp-y').value === '2', T: T ?? M.ogrenme?.bugunT, M });
+      const P = planla({ km, gidisDonus: sh.querySelector('#yp-y').value === '2', T: T ?? M.ogrenme?.bugunT, M, katsayi: HIZLAR[Number(sh.querySelector('#yp-h').value)][1], lpgKatsayi: HIZLAR[Number(sh.querySelector('#yp-h').value)][2] });
       const d = new Date(`${gun}T12:00:00`);
       const g = new Date(d.getTime() - 864e5).toLocaleDateString('tr-TR', { weekday: 'long' });
       const once = g.charAt(0).toLocaleUpperCase('tr-TR') + g.slice(1);
       out.innerHTML = `
-        <div class="yp-ana"><span>${once} akşamı şarj et</span><b>%${num(P.basla)}</b></div>
-        <div class="kr-ayrac"></div>
+        ${(() => {
+          // Şu anki pil yüzdesinden çıkış yüzdesine evde ne kadar şarj gerekir, şarja en geç ne zaman takılmalı
+          const A = M.activeSession?.socNow != null ? { soc: M.activeSession.socNow, sarj: true } : M.aracSimdi ? { soc: M.aracSimdi.soc } : null;
+          if (!A) return `<div class="yp-ana"><span>${once} akşamı şarj et</span><b>%${num(P.basla)}</b></div>`;
+          const cap = Number(M.car.battery_kwh) || 88.5, eksik = Math.max(0, P.basla - A.soc);
+          const kwhPriz = (eksik / 100) * cap / (M.carEff || 0.87);
+          const kw = Math.max(1, (M.sessions.find((x) => x.peak_w)?.peak_w || 1900) / 1000);
+          const saat = kwhPriz / kw;
+          const cikis = new Date(`${gun}T08:00:00`), tak = new Date(cikis.getTime() - saat * 3600e3);
+          const gunAd = tak.toLocaleDateString('tr-TR', { weekday: 'long' });
+          const sure = `${saat >= 1 ? `${Math.floor(saat)} sa ` : ''}${Math.round((saat % 1) * 60)} dk`;
+          const gecti = tak < new Date();
+          return `<div class="yp-ana"><span>${eksik > 0.5 ? (gecti ? 'Hemen şarja tak' : `${gunAd.charAt(0).toLocaleUpperCase('tr-TR') + gunAd.slice(1)} ${tak.toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' })}'de şarja tak`) : 'Ek şarj gerekmiyor'}</span><b>%${num(P.basla)}</b></div>
+            ${eksik > 0.5 ? `<div class="og-uc yp-uc"><div><b>%${num(A.soc)}</b><span>şu an</span></div><div><b>${num(kwhPriz)} kWh</b><span>evde çekilecek</span></div><div><b>${saat >= 1 ? `${Math.round(saat)} sa` : `${Math.round(saat * 60)} dk`}</b><span>şarj süresi</span></div></div>` : ''}
+            ${gecti && eksik > 0.5 ? '<p class="kr-not" style="margin-top:4px">Çıkışa kadar %100\'e yetişmeyebilir.</p>' : ''}`;
+        })()}
         <div class="kr-row"><span>${T != null ? `${num(T, 0)} °C · ` : ''}otoyol tüketimi</span><b>≈ ${num(P.c, 1)} kWh/100 km</b></div>
+        <div class="kr-row"><span>Otoyol menzili (%100 → %${YEDEK})</span><b>≈ ${num(P.menzil)} km</b></div>
         <div class="kr-row"><span>Toplam ${num(P.topKm)} km</span><b>≈ ${num(P.kwh, 1)} kWh</b></div>
-        <div class="kr-row"><span>Yolda DC şarj</span><b style="color:${P.dcDurak ? 'var(--mid)' : 'var(--good)'}">${P.dcDurak ? `${P.dcDurak} durak · ≈ ${num(P.dcKwh)} kWh` : 'Gerek yok'}</b></div>
-        <div class="kr-row"><span>Varışta pil</span><b>≈ %${num(P.varis)}</b></div>
-        ${P.donus != null ? `<div class="kr-row"><span>Eve dönüşte</span><b style="color:${P.donus < 15 ? 'var(--mid)' : 'inherit'}">≈ %${num(P.donus)}</b></div>` : ''}
+        <div class="kr-row"><span>Yolda DC şarj</span><b style="color:${P.dcDurak ? 'var(--mid)' : 'var(--good)'}">${P.dcDurak ? `${P.dcDurak} durak` : 'Gerek yok'}</b></div>
+        ${P.duraklar.map((d, i) => `<div class="yp-durak"><span>${i + 1}. durak · ≈ ${num(d.km)}. km · ≈ ${d.dk} dk mola</span><span>%${d.bas} → %${d.son} · ≈ ${num(d.kwh)} kWh · ≈ ${num(d.kwh * (Number(M.car.public_tl) || 12))} ₺</span></div>`).join('')}
+        ${P.dcDurak ? `<div class="kr-row"><span>Toplam şarj molası</span><b>≈ ${P.molaDk} dk</b></div>` : ''}
+        ${P.varis != null ? `<div class="kr-row"><span>Varışta pil</span><b style="color:${P.varis < YEDEK ? 'var(--mid)' : 'inherit'}">≈ %${num(P.varis)}</b></div>` : ''}
+        ${P.donus != null ? `<div class="kr-row"><span>Eve dönüşte</span><b style="color:${P.donus < YEDEK ? 'var(--mid)' : 'inherit'}">≈ %${num(P.donus)}</b></div>` : ''}
         <div class="kr-ayrac"></div>
-        <div class="kr-row"><span>Masraf${P.dcDurak ? ' (ev + DC)' : ''}</span><b class="kmk-yesil" style="font-size:17px">≈ ${num(P.tl)} ₺</b></div>
-        <div class="kr-row"><span>LPG'li araçla</span><b>≈ ${num(P.lpgTl)} ₺</b></div>
-        <p class="kr-not">Otoyol hızında tüketim şehir içine göre ≈ %${Math.round((OTOYOL_KATSAYI - 1) * 100)} fazla alındı · varışta en az %15 yedek</p>`;
+        <div class="kr-row"><span>Toplam masraf</span><b class="kmk-yesil" style="font-size:17px">≈ ${num(P.tl)} ₺</b></div>
+        <div class="yp-durak yp-masraf"><span>Evde şarj · ${num(P.evKwhCek)} kWh · ${num(P.evBirim, 2)} ₺/kWh</span><span>≈ ${num(P.evTl)} ₺</span></div>
+        ${P.dcDurak ? `<div class="yp-durak yp-masraf"><span>Yolda DC · ${num(P.dcKwh)} kWh · ${num(Number(M.car.public_tl) || 12, 2)} ₺/kWh</span><span>≈ ${num(P.dcTl)} ₺</span></div>` : ''}
+        <div class="kr-row"><span>LPG'li araçla · ${num(P.lpgL100, 1)} L/100 km</span><b>≈ ${num(P.lpgTl)} ₺</b></div>
+        <p class="kr-not">Senin öğrenilen tüketimin (${num(P.temel, 1)}) ve LPG'li aracının tüketimi seçilen hıza göre artırıldı · durağa %${YEDEK} ile varış (≈ ${num(P.yedekKm)} km yedek) · DC'de %80'e · mola süresi 150 kW+ istasyon içindir</p>`;
     };
-    for (const id of ['#yp-s', '#yp-t', '#yp-y']) sh.querySelector(id).addEventListener('change', hesap);
+    for (const id of ['#yp-s', '#yp-t', '#yp-y', '#yp-h']) sh.querySelector(id).addEventListener('change', hesap);
     sh.querySelector('#yp-km').addEventListener('change', hesap);
     hesap();
   });

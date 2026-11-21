@@ -266,7 +266,7 @@ function openYolculuk(M) {
     <div class="field"><div><label for="yp-y">Yol</label></div>
       <select class="input" id="yp-y"><option value="1" selected>Tek yön</option><option value="2">Gidiş-dönüş (orada şarj yok)</option></select></div>
     <div class="field"><div><label for="yp-h">Otoyol hızı</label></div>
-      <select class="input" id="yp-h">${HIZLAR.map(([h], i) => `<option value="${i}"${h === 110 ? ' selected' : ''}>${h} km/sa</option>`).join('')}</select></div>
+      <select class="input" id="yp-h">${HIZLAR.map(([h], i) => `<option value="${i}"${h === 120 ? ' selected' : ''}>${h} km/sa</option>`).join('')}</select></div>
     <div id="yp-sonuc" class="kr-cam yp-sonuc"><p class="kr-not" style="margin:0">Hesaplanıyor…</p></div>
     <div class="btn-row" style="margin-top:14px"><button class="btn ghost" id="cancel">Kapat</button></div>`, (sh) => {
     sh.querySelector('#cancel').onclick = () => closeSheet();

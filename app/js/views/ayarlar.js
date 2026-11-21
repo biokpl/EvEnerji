@@ -1,5 +1,5 @@
 // Ayarlar: tarife, geçmiş faturalar, uyarılar, araç, kontrol anahtarı, görünüm, dışa aktarım
-import { AY_K, downloadFile, esc, icon, num, toast } from '../ui.js';
+import { AY_K, SURUM, downloadFile, esc, icon, num, toast } from '../ui.js';
 import { yasalLimit } from '../tariff.js';
 import { cikisYap, girisYap, oturum } from '../auth.js';
 import { bildirimAc, bildirimDurumu } from '../push.js';
@@ -126,6 +126,7 @@ export function renderAyarlar(el, M, app) {
       <h2>Uygulama</h2>
       <div class="field"><div><label>Tema</label></div><div class="seg" id="th">${[['dark', 'Koyu'], ['light', 'Açık']].map(([k, t]) => `<button data-t="${k}" class="${document.documentElement.dataset.theme === k ? 'on' : ''}">${t}</button>`).join('')}</div></div>
       <div class="field"><div><label>Demo veri</label><small>Gerçek veri yerine örnek veriyle göster.</small></div><button class="switch ${st.forcedDemo ? 'on' : ''}" id="demo"></button></div>
+      <div class="field"><div><label>Sürüm</label><small>Güncelleme gelince burada yeni numara görünür.</small></div><b class="num">${SURUM}</b></div>
       <div class="field"><div><label>Veri kaynağı</label><small>${st.mode === 'live' ? 'Canlı · ' : st.mode === 'demo' ? 'Örnek veri · ' : ''}${M.raw.status?.ts ? 'Pi son yazım ' + new Date(M.raw.status.ts * 1000).toLocaleString('tr-TR') : ''}</small></div><span></span></div>
       <div class="btn-row" style="margin-top:12px">
         <button class="btn ghost" id="csvD">${icon('download')}Günlük CSV</button>

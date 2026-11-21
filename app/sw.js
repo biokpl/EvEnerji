@@ -1,5 +1,5 @@
 // Çevrimdışı önbellek (yalnız uygulama dosyaları; Firebase verisi önbelleğe alınmaz).
-const CACHE = 'evenerji-v9.8';
+const CACHE = 'evenerji-v9.9';
 const ASSETS = [
   './', './index.html', './manifest.json', './css/app.css', './vendor/echarts.min.js',
   './js/app.js', './js/data.js', './js/demo.js', './js/model.js', './js/ogrenme.js', './js/push.js', './js/takvim.js', './js/yolculuk.js', './js/tariff.js', './js/ui.js', './js/charts.js', './js/keypad.js', './js/auth.js',
@@ -8,7 +8,9 @@ const ASSETS = [
 ];
 
 self.addEventListener('install', (e) => {
-  e.waitUntil(caches.open(CACHE).then((c) => c.addAll(ASSETS)).then(() => self.skipWaiting()));
+  // cache: 'reload' → tarayıcının HTTP önbelleğindeki eski kopya değil, sunucudaki yeni dosya iner
+  // (yoksa yeni sürüm kurulurken bazı dosyalar 10 dk'lık GitHub önbelleğinden eski gelip sürümler karışıyordu)
+  e.waitUntil(caches.open(CACHE).then((c) => c.addAll(ASSETS.map((u) => new Request(u, { cache: 'reload' })))).then(() => self.skipWaiting()));
 });
 self.addEventListener('activate', (e) => {
   e.waitUntil(caches.keys().then((keys) => Promise.all(keys.filter((k) => k !== CACHE).map((k) => caches.delete(k)))).then(() => self.clients.claim()));

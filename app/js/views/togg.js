@@ -299,7 +299,7 @@ function openYolculuk(M) {
       const pos = (k) => Math.min(100, Math.max(0, (k / P.topKm) * 100));
       const noktalar = [
         { k: 0, ust: 'İstanbul', alt: `%${num(P.basla)}`, tur: 'bas' },
-        ...P.duraklar.map((d, j) => (P.duraklar.length > 2 ? { k: d.km, ust: '', alt: `${d.dk}′`, tur: 'dc', no: j + 1 } : { k: d.km, ust: `${d.dk} dk`, alt: `%${d.bas}→${d.son}`, tur: 'dc', no: j + 1 })),
+        ...P.duraklar.map((d, j) => ({ k: d.km, ust: '', alt: `%${d.son}<em> - ${d.dk}′</em>`, tur: 'dc', no: j + 1 })),   // durakta varılacak % + mola dk
         ...(yol === 2 ? [{ k: km, ust: hedefAd, alt: P.varis != null ? `%${num(P.varis)}` : '', tur: 'don' }] : []),
         { k: P.topKm, ust: yol === 2 ? 'Ev' : hedefAd, alt: `%${num(yol === 2 ? P.donus : P.varis)}`, tur: 'son' },
       ];
